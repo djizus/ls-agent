@@ -4,6 +4,7 @@ import { HOST, PORT } from "./config.ts";
 import { running, send } from "./agent.ts";
 import { db } from "./db.ts";
 import { halt, playGames } from "./runner.ts";
+import { describe, snapshot } from "./play.ts";
 import { emit, subscribe } from "./events.ts";
 import { handleMcp } from "./mcp.ts";
 
@@ -34,6 +35,11 @@ export function serve(): void {
     if (url.pathname === "/api/stop" && req.method === "POST") {
       halt();
       return res.end("ok");
+    }
+    if (url.pathname === "/api/state") {
+      const s = snapshot();
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify(s ? describe(s) : null));
     }
     if (url.pathname === "/api/games") {
       res.writeHead(200, { "content-type": "application/json" });

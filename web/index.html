@@ -1,1 +1,122 @@
-<!doctype html><title>LS Agent</title><pre id=log></pre><script>new EventSource("/events").onmessage=e=>log.textContent+=e.data+"\n"</script>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LS Agent</title>
+<style>
+  :root { --bg: #0f1113; --panel: #171a1d; --line: #262a2f; --text: #e6e6e3; --dim: #8b9096; --accent: #e0a64b; --hp: #5fb36f; --bad: #d9614c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 ui-sans-serif, system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  h1 { font-size: 16px; margin: 0 auto 0 0; letter-spacing: .02em; }
+  #status { color: var(--dim); font-size: 13px; }
+  button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); color: #1a1408; border-color: var(--accent); font-weight: 600; }
+  main { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 16px; padding: 16px; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 0 0 10px; font-weight: 600; }
+  .big { font-size: 28px; font-weight: 600; }
+  .row { display: flex; justify-content: space-between; gap: 8px; }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin: 6px 0 12px; }
+  .bar > div { height: 100%; background: var(--hp); transition: width .3s; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; font-size: 13px; margin-bottom: 12px; }
+  .dim { color: var(--dim); }
+  .beast { border-left: 3px solid var(--bad); padding: 6px 10px; margin-bottom: 12px; }
+  ul { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  #feed { height: 60vh; overflow-y: auto; font-size: 13px; }
+  #feed div { padding: 4px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+  .k-say { color: var(--text); }
+  .k-thinking { color: var(--dim); font-style: italic; }
+  .k-tool { color: var(--accent); font-family: ui-monospace, monospace; }
+  .k-result { color: var(--dim); font-family: ui-monospace, monospace; }
+  .k-status { color: var(--hp); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td, th { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--dim); font-weight: 500; }
+  td:first-child, th:first-child { text-align: left; }
+  .wide { grid-column: 1 / -1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>LS Agent</h1>
+  <span id="status">connecting…</span>
+  <button class="primary" onclick="play(10)">Play 10 practice games</button>
+  <button onclick="play(1)">Play 1</button>
+  <button onclick="post('/api/stop')">Stop</button>
+</header>
+<main>
+  <section>
+    <h2>Adventurer</h2>
+    <div id="adv" class="dim">No game yet.</div>
+  </section>
+  <section>
+    <h2>Live</h2>
+    <div id="feed"></div>
+  </section>
+  <section class="wide">
+    <h2>Games <span id="summary" class="dim"></span></h2>
+    <table><thead><tr><th>#</th><th>Mode</th><th>Strategy</th><th>Level</th><th>XP</th><th>Moves</th><th>Cost</th><th>Ended</th></tr></thead><tbody id="games"></tbody></table>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+const post = (url, body) => fetch(url, { method: "POST", body: body && JSON.stringify(body) });
+const play = (games) => post("/api/play", { games });
+
+function renderState(s) {
+  if (!s) return;
+  const maxHp = s.maxHealth;
+  const gear = Object.values(s.equipment).map((g) => `<li>${esc(g.name)} <span class="dim">T${g.tier} · lvl ${g.level}</span></li>`).join("");
+  const beast = s.beast ? `<div class="beast">${esc(s.beast.name)} <span class="dim">lvl ${s.beast.level} · T${s.beast.tier} ${s.beast.type} · ${s.beast.health} hp</span></div>` : "";
+  const st = s.stats;
+  $("adv").innerHTML = `
+    <div class="row"><span class="big">Level ${s.level}</span><span class="dim">${s.over ? "dead" : s.inBattle ? "in battle" : "exploring"}</span></div>
+    <div class="row dim"><span>${s.health} / ${maxHp} hp</span><span>${s.gold} gold · ${s.xp} xp</span></div>
+    <div class="bar"><div style="width:${Math.min(100, (100 * s.health) / maxHp)}%"></div></div>
+    ${beast}
+    <div class="grid"><span>STR ${st.strength}</span><span>DEX ${st.dexterity}</span><span>VIT ${st.vitality}</span><span>INT ${st.intelligence}</span><span>WIS ${st.wisdom}</span><span>CHA ${st.charisma}</span></div>
+    <ul>${gear}</ul>`;
+}
+
+function line(e) {
+  const text = e.kind === "tool" ? `${e.name} ${JSON.stringify(e.input)}`
+    : e.kind === "result" ? `→ ${e.output.slice(0, 160)}`
+    : e.kind === "turn" ? `turn done · $${e.costUsd.toFixed(3)}`
+    : e.text;
+  const div = document.createElement("div");
+  div.className = `k-${e.kind}`;
+  div.textContent = text;
+  const feed = $("feed");
+  const stick = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 20;
+  feed.append(div);
+  while (feed.childElementCount > 400) feed.firstElementChild.remove();
+  if (stick) feed.scrollTop = feed.scrollHeight;
+}
+
+async function loadGames() {
+  const games = await (await fetch("/api/games")).json();
+  const done = games.filter((g) => g.ended_at);
+  const levels = done.map((g) => g.level).sort((a, b) => a - b);
+  $("summary").textContent = levels.length ? `· ${levels.length} played · median level ${levels[Math.floor(levels.length / 2)]} · best ${levels.at(-1)}` : "";
+  $("games").innerHTML = games.map((g) => `<tr><td>${g.id}</td><td>${g.mode}</td><td class="dim">${g.strategy}</td><td>${g.level ?? "…"}</td><td>${g.xp ?? ""}</td><td>${g.moves ?? ""}</td><td>$${g.cost_usd.toFixed(2)}</td><td class="dim">${g.ended_at ? new Date(g.ended_at).toLocaleString() : "playing"}</td></tr>`).join("");
+}
+
+fetch("/api/state").then((r) => r.json()).then(renderState);
+loadGames();
+const source = new EventSource("/events");
+source.onopen = () => ($("status").textContent = "live");
+source.onerror = () => ($("status").textContent = "reconnecting…");
+source.onmessage = (m) => {
+  const e = JSON.parse(m.data);
+  if (e.kind === "state") return renderState(e.state);
+  if (e.kind === "status") $("status").textContent = e.text;
+  if (e.kind === "status" && /finished|practice game/.test(e.text)) loadGames();
+  line(e);
+};
+</script>
+</body>
+</html>

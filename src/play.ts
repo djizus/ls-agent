@@ -20,6 +20,7 @@ export function describe(s: Snapshot): object {
     over: s.over,
     level: levelOf(a.xp),
     health: a.health,
+    maxHealth: 100 + 15 * a.stats.vitality,
     xp: a.xp,
     gold: a.gold,
     inBattle: a.beast_health > 0,

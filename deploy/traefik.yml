@@ -1,0 +1,18 @@
+http:
+  routers:
+    ls-agent:
+      rule: "Host(`ls.example.com`)"
+      entryPoints:
+        - websecure
+      service: ls-agent
+      middlewares:
+        - globalHeaders@file
+        - secureHeaders@file
+        - authelia@docker
+      tls:
+        certResolver: cfdns
+  services:
+    ls-agent:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:4100"
