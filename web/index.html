@@ -9,50 +9,60 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=VT323&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #111111; --panel: #1b1a1c; --well: #282729; --line: #3a372f; --gold: #d0c98d; --bright: #edcf33; --orange: #f59100; --text: #d0c98d; --dim: rgba(208, 201, 141, .55); --hp: #80ff00; --bad: #e0503c; }
+  :root { --bg: #111; --panel: #1b1a1c; --well: #262528; --line: #3a372f; --gold: #d0c98d; --bright: #edcf33; --orange: #f59100; --dim: rgba(208, 201, 141, .55); --hp: #80ff00; --bad: #e0503c; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: radial-gradient(ellipse at top, #1e1c18 0%, var(--bg) 60%) fixed; color: var(--text); font: 15px/1.4 Cinzel, Georgia, serif; }
-  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  header img { width: 32px; height: 32px; image-rendering: pixelated; }
-  h1 { font-size: 20px; margin: 0 auto 0 0; letter-spacing: .06em; font-weight: 700; color: var(--bright); }
-  #status { color: var(--dim); font: 18px VT323, monospace; }
-  button { background: var(--well); color: var(--gold); border: 1px solid var(--line); border-radius: 4px; padding: 6px 14px; font: 600 13px Cinzel, serif; letter-spacing: .04em; cursor: pointer; }
-  button:hover { border-color: var(--gold); }
+  html, body { height: 100%; }
+  body { margin: 0; background: radial-gradient(ellipse at top, #1e1c18 0%, var(--bg) 60%) fixed; color: var(--gold); font: 14px/1.4 Cinzel, Georgia, serif; display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--line); flex: none; }
+  header img { width: 28px; height: 28px; }
+  h1 { font-size: 18px; margin: 0 auto 0 0; letter-spacing: .06em; color: var(--bright); }
+  .pix { font-family: VT323, monospace; font-size: 18px; line-height: 1.15; }
+  .dim { color: var(--dim); }
+  button { background: var(--well); color: var(--gold); border: 1px solid var(--line); border-radius: 4px; padding: 5px 12px; font: 600 12px Cinzel, serif; cursor: pointer; }
   button.primary { background: var(--gold); color: #111; border-color: var(--gold); }
-  main { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 16px; padding: 16px; }
-  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; min-width: 0; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); margin: 0 0 10px; font-weight: 600; }
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr 320px; gap: 12px; padding: 12px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--dim); margin: 0; }
+  .scroll { overflow-y: auto; min-height: 0; flex: 1; }
   .big { font-size: 26px; font-weight: 700; color: var(--bright); }
   .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .pix { font: 18px/1.2 VT323, monospace; }
-  .dim { color: var(--dim); }
-  .bar { height: 10px; background: var(--well); border: 1px solid var(--line); margin: 6px 0 12px; }
-  .bar > div { height: 100%; background: var(--hp); transition: width .3s; }
-  .beast { display: flex; gap: 12px; align-items: center; background: var(--well); border-left: 3px solid var(--bad); padding: 8px; margin-bottom: 12px; }
-  .beast img { width: 72px; height: 72px; object-fit: contain; }
-  .beast b { color: var(--bad); }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
-  .stats span { display: flex; align-items: center; gap: 6px; background: var(--well); padding: 4px 6px; }
-  .stats img { width: 16px; height: 16px; }
-  .gear { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
-  .gear div { display: flex; align-items: center; gap: 6px; background: var(--well); padding: 4px; font-size: 12px; min-width: 0; }
-  .gear img { width: 32px; height: 32px; flex: none; }
-  .gear small { display: block; color: var(--dim); font: 15px VT323, monospace; }
-  #feed { height: 64vh; overflow-y: auto; font: 18px/1.25 VT323, monospace; }
-  #feed div { padding: 3px 0; border-bottom: 1px solid #262420; overflow-wrap: anywhere; }
-  .k-say { color: var(--gold); }
-  .k-thinking { color: var(--dim); }
-  .k-tool { color: var(--bright); }
-  .k-result { color: #8f8a68; }
-  .k-status { color: var(--hp); }
-  .k-turn { color: var(--orange); }
-  table { width: 100%; border-collapse: collapse; font: 18px VT323, monospace; }
-  td, th { text-align: right; padding: 3px 8px; border-bottom: 1px solid #262420; }
-  th { color: var(--dim); font: 600 12px Cinzel, serif; letter-spacing: .06em; text-transform: uppercase; }
+  .bar { height: 10px; background: var(--well); border: 1px solid var(--line); }
+  .bar > div { height: 100%; background: var(--hp); transition: width .4s; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .stats span { display: flex; align-items: center; gap: 6px; background: var(--well); padding: 2px 6px; }
+  .stats img { width: 14px; height: 14px; }
+  .gear { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .slot { display: flex; align-items: center; gap: 6px; background: var(--well); padding: 3px; font-size: 11px; min-width: 0; min-height: 40px; }
+  .slot img { width: 30px; height: 30px; flex: none; }
+  .slot.empty { opacity: .45; border: 1px dashed var(--line); justify-content: center; }
+  .slot small { display: block; color: var(--dim); font: 14px VT323, monospace; }
+  .stage { display: grid; grid-template-rows: auto auto auto 1fr; gap: 10px; }
+  .scene { display: flex; gap: 14px; align-items: center; min-height: 128px; background: var(--well); border-radius: 4px; padding: 10px; }
+  .scene img { width: 120px; height: 120px; object-fit: contain; }
+  .scene .who { font-size: 20px; color: var(--bad); font-weight: 700; }
+  .scene.calm .who { color: var(--gold); }
+  .odds { display: grid; gap: 6px; }
+  .odd { display: grid; grid-template-columns: 170px 1fr 230px; gap: 10px; align-items: center; }
+  .odd.chosen { outline: 1px solid var(--bright); outline-offset: 3px; }
+  .meter { height: 14px; background: #2a3a1c; position: relative; }
+  .meter > div { position: absolute; inset: 0 auto 0 0; background: var(--bad); }
+  .meter span { position: absolute; right: 4px; top: -3px; font: 16px VT323, monospace; color: #fff; }
+  .mind { background: var(--well); border-left: 3px solid var(--bright); padding: 10px 12px; font: 21px/1.25 VT323, monospace; color: #f1ecc4; min-height: 72px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; background: #33301f; border: 1px solid var(--line); border-radius: 12px; padding: 1px 9px; font: 16px VT323, monospace; }
+  .chip img { width: 18px; height: 18px; }
+  .chip.move { background: var(--gold); color: #111; }
+  .timeline { font: 16px/1.25 VT323, monospace; }
+  .timeline > div { padding: 5px 0; border-bottom: 1px solid #2a2823; display: grid; gap: 3px; }
+  .timeline .note { color: var(--dim); }
+  .bad { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font: 16px VT323, monospace; }
+  td, th { text-align: right; padding: 2px 4px; border-bottom: 1px solid #2a2823; vertical-align: top; }
+  th { color: var(--dim); font: 600 10px Cinzel, serif; letter-spacing: .06em; text-transform: uppercase; }
   td:first-child, th:first-child { text-align: left; }
-  .wide { grid-column: 1 / -1; }
-  .tablewrap { overflow-x: auto; max-height: 50vh; }
+  td.ending { text-align: left; color: var(--dim); font-size: 14px; }
+  summary { cursor: pointer; }
+  @media (max-width: 1100px) { body { overflow: auto; } main { grid-template-columns: 1fr; } section { max-height: none; } .scroll { max-height: 50vh; } .odd { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -60,8 +70,8 @@
   <img src="/assets/skull.png" alt="">
   <h1>Death Mountain Agent</h1>
   <span id="check" class="pix dim"></span>
-  <span id="status">connecting…</span>
-  <button class="primary" onclick="play()">Run benchmark</button>
+  <span id="status" class="pix dim">connecting…</span>
+  <button class="primary" onclick="post('/api/play', {})">Run benchmark</button>
   <button onclick="post('/api/stop')">Stop</button>
 </header>
 <main>
@@ -69,86 +79,129 @@
     <h2>Adventurer</h2>
     <div id="adv" class="dim">No game yet.</div>
   </section>
+  <section class="stage">
+    <div id="scene" class="scene calm"><div class="who">Waiting for the next game</div></div>
+    <div><h2>Odds the agent sees</h2><div id="odds" class="odds pix dim">–</div></div>
+    <div><h2>Agent's mind</h2><div id="mind" class="mind">…</div><div id="chips" class="chips" style="margin-top:8px"></div></div>
+    <div style="display:flex;flex-direction:column;min-height:0"><h2>Timeline</h2><div id="timeline" class="timeline scroll"></div></div>
+  </section>
   <section>
-    <h2>Live</h2>
-    <div id="feed"></div>
-  </section>
-  <section class="wide">
-    <h2>Strategies <span class="dim">· same benchmark adventurers and luck for every strategy</span></h2>
-    <div class="tablewrap"><table><thead><tr><th>Strategy</th><th>Games</th><th>Median level</th><th>Best</th><th>Since</th></tr></thead><tbody id="strategies"></tbody></table></div>
-  </section>
-  <section class="wide">
+    <h2>Strategies</h2>
+    <div class="scroll" style="flex:0 1 auto;max-height:38%"><table><thead><tr><th>Strategy</th><th>Games</th><th>Median</th><th>Best</th></tr></thead><tbody id="strategies"></tbody></table></div>
     <h2>Games <span id="summary" class="dim"></span></h2>
-    <div class="tablewrap"><table><thead><tr><th>#</th><th>Mode</th><th>Strategy</th><th>Level</th><th>XP</th><th>Moves</th><th>Cost</th><th>Ending</th></tr></thead><tbody id="games"></tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>#</th><th>Lvl</th><th>Ending</th></tr></thead><tbody id="games"></tbody></table></div>
   </section>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 const post = (url, body) => fetch(url, { method: "POST", body: body && JSON.stringify(body) });
-const play = () => post("/api/play", {});
-const STAT_ICONS = { strength: "Strength", dexterity: "Dexterity", vitality: "Vitality", intelligence: "Intelligence", wisdom: "Wisdom", charisma: "Charisma" };
+const STATS = [["strength", "Strength", "STR"], ["dexterity", "Dexterity", "DEX"], ["vitality", "Vitality", "VIT"], ["intelligence", "Intelligence", "INT"], ["wisdom", "Wisdom", "WIS"], ["charisma", "Charisma", "CHA"]];
+const SLOTS = ["weapon", "chest", "head", "waist", "foot", "hand", "neck", "ring"];
+let items = {};
+let state = null;
 
 function renderState(s) {
   if (!s) return;
-  const beast = s.beast ? `<div class="beast"><img src="/assets/beasts/${slug(s.beast.baseName)}.png" alt=""><div><b>${esc(s.beast.name)}</b><div class="pix dim">lvl ${s.beast.level} · T${s.beast.tier} ${esc(s.beast.type)} · ${s.beast.health} hp</div></div></div>` : "";
-  const stats = Object.entries(STAT_ICONS).map(([k, icon]) => `<span class="pix"><img src="/assets/icons/${icon}.svg" alt="">${s.stats[k]}</span>`).join("");
-  const gear = s.equipment.map((g) => `<div><img src="/assets/loot/${slug(g.name)}.png" alt=""><span>${esc(g.name)}<small>T${g.tier} ${esc(g.type)} · G${g.greatness}</small></span></div>`).join("");
+  state = s;
+  for (const g of [...s.equipment, ...s.bag, ...s.market]) items[g.id] = g;
+  const bySlot = Object.fromEntries(s.equipment.map((g) => [g.slot, g]));
+  const gear = SLOTS.map((slot) => {
+    const g = bySlot[slot];
+    return g ? `<div class="slot"><img src="/assets/loot/${slug(g.name)}.png" alt=""><span>${esc(g.name)}<small>T${g.tier} ${esc(g.type)} · G${g.greatness}${g.suffix ? ` · ${esc(g.suffix)}` : ""}</small></span></div>` : `<div class="slot empty pix">no ${slot}</div>`;
+  }).join("");
+  const stats = STATS.map(([k, icon, short]) => `<span class="pix" title="${short}"><img src="/assets/icons/${icon}.svg" alt="">${short} ${s.stats[k]}</span>`).join("");
   $("adv").innerHTML = `
     <div class="row"><span class="big">Level ${s.level}</span><span class="pix dim">${s.over ? "slain" : s.beast ? "in battle" : "exploring"}</span></div>
-    <div class="row pix"><span>${s.health} / ${s.maxHealth} hp</span><span class="dim">${s.gold} gold · ${s.xp} xp</span></div>
-    <div class="bar"><div style="width:${Math.min(100, (100 * s.health) / s.maxHealth)}%"></div></div>
-    ${beast}
+    <div class="row pix"><span>${s.health} / ${s.maxHealth} HP</span><span class="dim">${s.gold} gold · ${s.xp} xp</span></div>
+    <div class="bar"><div style="width:${Math.min(100, (100 * s.health) / s.maxHealth)}%;background:${s.health / s.maxHealth < 0.35 ? "var(--bad)" : "var(--hp)"}"></div></div>
+    <div class="pix dim">potions ${s.potionPrice} gold · ${s.statUpgradesAvailable ? `<span style="color:var(--bright)">${s.statUpgradesAvailable} stat points</span>` : "no stat points"}</div>
     <div class="stats">${stats}</div>
-    <div class="gear">${gear}</div>`;
+    <div class="gear">${gear}</div>
+    <div class="pix dim">bag: ${s.bag.map((g) => esc(g.name)).join(", ") || "empty"}</div>`;
+  $("scene").className = s.beast ? "scene" : "scene calm";
+  $("scene").innerHTML = s.over
+    ? `<img src="/assets/skull.png" alt=""><div><div class="who">Slain at level ${s.level}</div></div>`
+    : s.beast
+      ? `<img src="/assets/beasts/${slug(s.beast.baseName)}.png" alt=""><div><div class="who">${esc(s.beast.name)}</div><div class="pix">level ${s.beast.level} · T${s.beast.tier} ${esc(s.beast.type)} · ${s.beast.health} HP</div></div>`
+      : `<div><div class="who">Exploring the mountain</div><div class="pix dim">level ${s.level} · ${s.health}/${s.maxHealth} HP · ${s.gold} gold</div></div>`;
 }
 
-function line(e) {
-  const text = e.kind === "tool" ? `> ${e.name} ${JSON.stringify(e.input)}`
-    : e.kind === "result" ? `  ${e.output.slice(0, 160)}`
-    : e.kind === "turn" ? `turn done · $${e.costUsd.toFixed(3)}`
-    : e.text;
+function actionChip(a) {
+  const icon = (id) => (items[id] ? `<img src="/assets/loot/${slug(items[id].name)}.png" alt="">` : "");
+  const name = (id) => esc(items[id]?.name ?? `item ${id}`);
+  switch (a.type) {
+    case "explore": return `<span class="chip move">explore</span>`;
+    case "attack": return `<span class="chip move">fight${a.tillHealth ? ` until ${a.tillHealth} HP` : ""}</span>`;
+    case "flee": return `<span class="chip move">flee${a.tillHealth ? ` until ${a.tillHealth} HP` : ""}</span>`;
+    case "upgrade": return `<span class="chip">+${a.amount} ${a.stat.slice(0, 3).toUpperCase()}</span>`;
+    case "buy": return `<span class="chip">${icon(a.item)}buy ${name(a.item)}${a.equip ? " (equip)" : ""}</span>`;
+    case "equip": return `<span class="chip">${icon(a.item)}equip ${name(a.item)}</span>`;
+    case "drop": return `<span class="chip">drop ${name(a.item)}</span>`;
+    case "potions": return `<span class="chip">${a.qty} potion${a.qty > 1 ? "s" : ""}</span>`;
+    default: return `<span class="chip">${esc(a.type)}</span>`;
+  }
+}
+
+function renderOdds(options, actions) {
+  const chosen = actions?.at(-1)?.type;
+  $("odds").innerHTML = options?.length
+    ? options.map((o) => o.error
+        ? `<div class="odd"><span>${esc(o.label)}</span><span class="bad">rejected: ${esc(o.error)}</span><span></span></div>`
+        : `<div class="odd ${o.move === chosen ? "chosen" : ""}"><span class="pix">${esc(o.label)}</span><div class="meter"><div style="width:${Math.round(100 * o.death)}%"></div><span>death ${Math.round(100 * o.death)}%</span></div><span class="pix dim">HP after ${o.hp[1]} (${o.hp[0]}–${o.hp[2]}) · +${o.xp} xp · ${o.gold >= 0 ? "+" : ""}${o.gold} gold</span></div>`).join("")
+    : `<span class="pix dim">stat points pending: upgrades and shopping first</span>`;
+}
+
+function timeline(e) {
   const div = document.createElement("div");
-  div.className = `k-${e.kind}`;
-  div.textContent = text;
-  const feed = $("feed");
-  const stick = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 20;
-  feed.append(div);
-  while (feed.childElementCount > 400) feed.firstElementChild.remove();
-  if (stick) feed.scrollTop = feed.scrollHeight;
+  if (e.kind === "decision") div.innerHTML = `<div class="chips">${e.actions.map(actionChip).join("")}${e.reserve ? `<span class="chip">keep ${e.reserve} gold</span>` : ""}</div><div>${esc(e.thought ?? e.note)}</div>${e.note && e.thought ? `<div class="note">note: ${esc(e.note)}</div>` : ""}`;
+  else if (e.kind === "rejected") div.innerHTML = `<div class="bad">rejected by the game: ${esc(e.reason)}</div>`;
+  else if (e.kind === "preview") div.innerHTML = `<div class="dim">simulated ${esc(JSON.stringify(e.actions))}: ${esc(e.result)}</div>`;
+  else if (e.kind === "status") div.innerHTML = `<div style="color:var(--hp)">${esc(e.text)}</div>`;
+  else return;
+  const t = $("timeline");
+  t.prepend(div);
+  while (t.childElementCount > 120) t.lastElementChild.remove();
 }
 
-async function loadStrategies() {
-  const rows = await (await fetch("/api/strategies")).json();
-  $("strategies").innerHTML = rows.map((r) => `<tr><td><details><summary>${r.hash}</summary><pre style="white-space:pre-wrap;text-align:left;font:16px VT323,monospace">${esc(r.text)}</pre></details></td><td>${r.games}</td><td>${r.median ?? "–"}</td><td>${r.best ?? "–"}</td><td class="dim">${new Date(r.created_at).toLocaleString()}</td></tr>`).join("");
-}
-
-async function loadGames() {
-  loadStrategies();
-  const games = await (await fetch("/api/games")).json();
-  const levels = games.filter((g) => g.ended_at).map((g) => g.level).sort((a, b) => a - b);
-  $("summary").textContent = levels.length ? `· ${levels.length} played · median level ${levels[Math.floor(levels.length / 2)]} · best ${levels.at(-1)}` : "";
-  $("games").innerHTML = games.map((g) => `<tr><td>${g.id}</td><td>${g.mode}</td><td class="dim">${g.strategy}</td><td>${g.level ?? "…"}</td><td>${g.xp ?? ""}</td><td>${g.moves ?? ""}</td><td>$${g.cost_usd.toFixed(2)}</td><td class="dim" style="text-align:left">${g.ended_at ? esc(g.ending ?? "") + (g.mismatches ? ` · ${g.mismatches} contract mismatches` : "") : "playing"}</td></tr>`).join("");
-}
-
-fetch("/api/state").then((r) => r.json()).then(renderState);
-fetch("/api/check").then((r) => r.json()).then((c) => {
-  if (!c) return;
-  $("check").textContent = `contract check ${c.failed ? `FAILED (${c.failed})` : "ok"} · ${new Date(c.at).toLocaleString()}`;
-  $("check").style.color = c.failed ? "var(--bad)" : "var(--hp)";
-});
-loadGames();
-const source = new EventSource("/events");
-source.onopen = () => ($("status").textContent = "live");
-source.onerror = () => ($("status").textContent = "reconnecting…");
-source.onmessage = (m) => {
-  const e = JSON.parse(m.data);
+function onEvent(e) {
   if (e.kind === "state") return renderState(e.state);
-  if (e.kind === "status") $("status").textContent = e.text;
-  if (e.kind === "status" && /finished|practice game/.test(e.text)) loadGames();
-  line(e);
-};
+  if (e.kind === "decision") {
+    renderOdds(e.options, e.actions);
+    $("mind").textContent = e.thought ?? e.note;
+    $("chips").innerHTML = e.actions.map(actionChip).join("") + (e.reserve ? `<span class="chip">keep ${e.reserve} gold</span>` : "");
+  }
+  if (e.kind === "status") {
+    $("status").textContent = e.text;
+    if (/finished|died|stopped|failed|game \d+ on/.test(e.text)) loadHistory();
+  }
+  timeline(e);
+}
+
+async function loadHistory() {
+  const [strategies, games] = await Promise.all([fetch("/api/strategies").then((r) => r.json()), fetch("/api/games").then((r) => r.json())]);
+  $("strategies").innerHTML = strategies.map((r) => `<tr><td><details><summary>${r.hash}</summary><pre style="white-space:pre-wrap;font:14px VT323,monospace;max-height:40vh;overflow:auto">${esc(r.text)}</pre></details></td><td>${r.games}</td><td>${r.median ?? "–"}</td><td>${r.best ?? "–"}</td></tr>`).join("");
+  const done = games.filter((g) => g.ended_at && g.mode === "practice");
+  const levels = done.map((g) => g.level).sort((a, b) => a - b);
+  $("summary").textContent = levels.length ? `· median ${levels[Math.floor(levels.length / 2)]} · best ${levels.at(-1)}` : "";
+  $("games").innerHTML = games.slice(0, 60).map((g) => `<tr><td>${g.id}</td><td>${g.level ?? "…"}</td><td class="ending">${g.ended_at ? esc(g.ending ?? "") + (g.mismatches ? ` · <span class="bad">${g.mismatches} mismatches</span>` : "") : "playing"}</td></tr>`).join("");
+}
+
+async function boot() {
+  renderState(await fetch("/api/state").then((r) => r.json()));
+  for (const e of await fetch("/api/recent").then((r) => r.json())) onEvent(e);
+  loadHistory();
+  const c = await fetch("/api/check").then((r) => r.json());
+  if (c) {
+    $("check").textContent = `contract check ${c.failed ? `FAILED (${c.failed})` : "ok"}`;
+    $("check").style.color = c.failed ? "var(--bad)" : "var(--hp)";
+  }
+  const source = new EventSource("/events");
+  source.onerror = () => ($("status").textContent = "reconnecting…");
+  source.onmessage = (m) => onEvent(JSON.parse(m.data));
+}
+boot();
 </script>
 </body>
 </html>

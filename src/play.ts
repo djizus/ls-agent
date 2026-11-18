@@ -99,27 +99,55 @@ export async function commit(actions: Action[]): Promise<State> {
   return state();
 }
 
+export type Odds = { death: number; ongoing: number; hp: [number, number, number]; xp: number; gold: number };
+export type Option = { move: string; label: string } & (Odds | { error: string });
+
+export async function odds(actions: Action[], samples: number): Promise<Odds> {
+  const outcomes = await preview(game!, actions, samples);
+  const pick = (values: number[]) => values.sort((x, y) => x - y)[Math.floor(samples / 2)];
+  const hp = outcomes.map((o) => o.adventurer.health).sort((x, y) => x - y);
+  return {
+    death: outcomes.filter((o) => o.adventurer.health === 0).length / samples,
+    ongoing: outcomes.filter((o) => o.adventurer.beast_health > 0).length / samples,
+    hp: [hp[0], hp[Math.floor(samples / 2)], hp[samples - 1]],
+    xp: pick(outcomes.map((o) => o.adventurer.xp - last!.adventurer.xp)),
+    gold: pick(outcomes.map((o) => o.adventurer.gold - last!.adventurer.gold)),
+  };
+}
+
+export function describeOdds(o: Odds): string {
+  const pct = (n: number) => `${Math.round(100 * n)}%`;
+  return `death ${pct(o.death)}, still in battle ${pct(o.ongoing)}, HP after worst ${o.hp[0]} median ${o.hp[1]} best ${o.hp[2]}, XP gained median ${o.xp}, gold change median ${o.gold}`;
+}
+
 export async function forecast(actions: Action[], samples: number): Promise<string> {
   if (!game || last?.over) return "No game in progress.";
   try {
-    const outcomes = await preview(game, actions, samples);
-    const hp = outcomes.map((o) => o.adventurer.health).sort((x, y) => x - y);
-    const xp = outcomes.map((o) => o.adventurer.xp - last!.adventurer.xp).sort((x, y) => x - y);
-    const rate = (n: number) => `${Math.round((100 * n) / samples)}%`;
-    const mid = Math.floor(samples / 2);
-    const gold = outcomes.map((o) => o.adventurer.gold - last!.adventurer.gold).sort((x, y) => x - y);
-    return `death ${rate(hp.filter((h) => h === 0).length)}, still in battle ${rate(outcomes.filter((o) => o.adventurer.beast_health > 0).length)}, HP after worst ${hp[0]} median ${hp[mid]} best ${hp[samples - 1]}, XP gained median ${xp[mid]}, gold change median ${gold[mid]}`;
+    return describeOdds(await odds(actions, samples));
   } catch (err) {
     return `rejected: ${revertReason(err)}`;
   }
 }
 
-export async function options(s: State): Promise<string> {
-  if (s.statUpgradesAvailable > 0) return "Stat points are pending: this decision applies your upgrades and purchases only; you choose what to do next with the odds in front of you.";
+const LABEL: Record<string, string> = { attack: "fight until it ends", flee: "flee until escaped", explore: "explore one step (after the automatic heal)" };
+
+export async function options(s: State): Promise<Option[]> {
+  if (s.statUpgradesAvailable > 0) return [];
   const moves: Action[] = s.beast ? [{ type: "attack" }, { type: "flee" }] : [{ type: "explore" }];
-  const label = { attack: "fight until it ends", flee: "flee until escaped", explore: "explore one step (after the automatic heal)" } as Record<string, string>;
-  const lines = await Promise.all(moves.map(async (m) => `- ${label[m.type]}: ${await forecast(shape(s, [m]), 16)}`));
-  return [`Simulated outcomes (16 samples each):`, ...lines].join("\n");
+  return Promise.all(
+    moves.map(async (m) => {
+      try {
+        return { move: m.type, label: LABEL[m.type], ...(await odds(shape(s, [m]), 16)) };
+      } catch (err) {
+        return { move: m.type, label: LABEL[m.type], error: revertReason(err) };
+      }
+    }),
+  );
+}
+
+export function describeOptions(s: State, list: Option[]): string {
+  if (s.statUpgradesAvailable > 0) return "Stat points are pending: this decision applies your upgrades and purchases only; you choose what to do next with the odds in front of you.";
+  return ["Simulated outcomes (16 samples each):", ...list.map((o) => `- ${o.label}: ${"error" in o ? `rejected: ${o.error}` : describeOdds(o)}`)].join("\n");
 }
 
 const RANDOM = new Set(["explore", "attack", "flee"]);

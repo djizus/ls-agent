@@ -14,11 +14,12 @@ for (const g of games) {
   const history: string[] = [];
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
-    if (e.kind !== "tool" || e.name !== "act") continue;
-    if (events[i + 1]?.kind === "result" && events[i + 1]?.name === "act") continue;
+    const actions = e.kind === "decision" ? e.actions : e.kind === "tool" && e.name === "act" ? e.input : undefined;
+    if (!actions) continue;
+    if (events[i + 1]?.kind === "rejected" || (events[i + 1]?.kind === "result" && events[i + 1]?.name === "act")) continue;
     const before = describe(snap, g.game_id);
-    history.push(`${render(before)}\n=> ${JSON.stringify(e.input)}`);
-    snap = await act(game, e.input as Action[]);
+    history.push(`${render(before)}\n=> ${JSON.stringify(actions)}${e.thought ? `\n   thought: ${e.thought}` : ""}`);
+    snap = await act(game, actions as Action[]);
   }
   console.log(`\n##### game ${g.id} level ${g.level}\n${history.slice(-3).join("\n---\n")}\n---\n${render(describe(snap, g.game_id))}`);
 }

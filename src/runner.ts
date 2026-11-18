@@ -5,7 +5,7 @@ import { DUNGEON } from "./config.ts";
 import { db } from "./db.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide } from "./decide.ts";
 import { emit, subscribe } from "./events.ts";
-import { begin, commit, movesMade, options, phase, render, shape, snapshot, verify, type Phase } from "./play.ts";
+import { begin, commit, describeOptions, movesMade, options, phase, render, shape, snapshot, verify, type Phase } from "./play.ts";
 
 const promptFile = process.env.LS_STRATEGY ?? new URL("../strategy/prompt.md", import.meta.url).pathname;
 const MAX_REJECTIONS = 3;
@@ -58,12 +58,12 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<strin
   let rejections = 0;
   cost = 0;
   while (!state.over && !stopping && rejections < MAX_REJECTIONS) {
-    const prompt = [render(state), await options(state), note && `Your note from the previous decision: ${note}`, rejected].filter(Boolean).join("\n\n");
+    const choices = await options(state);
+    const prompt = [render(state), describeOptions(state, choices), note && `Your note from the previous decision: ${note}`, rejected].filter(Boolean).join("\n\n");
     const decision = await decide(rules(phase(state)), prompt);
     cost += decision.costUsd;
-    emit({ kind: "say", text: decision.note });
     const actions = shape(state, decision.actions as Action[], decision.reserve);
-    emit({ kind: "tool", name: "act", input: actions });
+    emit({ kind: "decision", phase: phase(state), options: choices, thought: decision.thought, actions, note: decision.note, reserve: decision.reserve, costUsd: decision.costUsd });
     try {
       if (!actions.length) throw new Error("spend your stat points before anything else");
       const drift = await verify(state, actions);
@@ -80,7 +80,7 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<strin
       rejections = 0;
     } catch (err) {
       rejected = `Your last decision ${JSON.stringify(decision.actions)} was rejected by the game: ${(err as Error).message}. Choose again.`;
-      emit({ kind: "result", name: "act", output: rejected });
+      emit({ kind: "rejected", actions, reason: (err as Error).message });
       rejections++;
       if (rejections === MAX_REJECTIONS) ending = `stopped after ${MAX_REJECTIONS} rejected decisions`;
     }

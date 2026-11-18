@@ -1,9 +1,7 @@
 export type AgentEvent =
-  | { kind: "thinking"; text: string }
-  | { kind: "say"; text: string }
-  | { kind: "tool"; name: string; input: unknown }
-  | { kind: "result"; name: string; output: string }
-  | { kind: "turn"; costUsd: number; durationMs: number; error: boolean }
+  | { kind: "decision"; phase: string; options: unknown[]; thought: string; actions: unknown[]; note: string; reserve: number; costUsd: number }
+  | { kind: "rejected"; actions: unknown[]; reason: string }
+  | { kind: "preview"; actions: unknown; result: string }
   | { kind: "status"; text: string }
   | { kind: "state"; game: string; state: object };
 

@@ -56,6 +56,8 @@ export function serve(): void {
     if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
     if (url.pathname === "/api/games") return reply(res, db.prepare("SELECT * FROM games ORDER BY id DESC LIMIT 200").all());
     if (url.pathname === "/api/strategies") return reply(res, strategies());
+    if (url.pathname === "/api/recent")
+      return reply(res, (db.prepare("SELECT body FROM events WHERE game = (SELECT max(id) FROM games) ORDER BY rowid DESC LIMIT 40").all() as { body: string }[]).map((r) => JSON.parse(r.body)).reverse());
     if (url.pathname === "/api/check") return reply(res, existsSync(CHECK) ? JSON.parse(readFileSync(CHECK, "utf8")) : null);
     if (url.pathname.startsWith("/assets/") && /^\/assets\/[a-z]+\/?[A-Za-z0-9_]*\.(png|svg)$/.test(url.pathname)) {
       const file = new URL(`../web${url.pathname}`, import.meta.url).pathname;
