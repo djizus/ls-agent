@@ -21,11 +21,7 @@ const untilHealth = z.number().int().min(0).max(1023).optional();
 const itemId = z.number().int().min(1).max(101).describe("Item id, shown in brackets.");
 
 export const action = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("explore"),
-    tillDamage: z.number().int().min(0).max(2047).optional().describe("Keep exploring until this much damage is taken."),
-    tillGold: z.number().int().min(0).max(511).optional().describe("Keep exploring until this much gold is found."),
-  }),
+  z.object({ type: z.literal("explore") }),
   z.object({
     type: z.literal("attack"),
     tillHealth: untilHealth.describe("Omit to fight until the beast or you die. With N, stop once your health falls to N or below."),
@@ -75,7 +71,7 @@ export function decodeBag(packed: bigint): Item[] {
 
 function word(a: Action): number {
   switch (a.type) {
-    case "explore": return 1 | ((a.tillDamage ?? 0) << 4) | ((a.tillGold ?? 0) << 15);
+    case "explore": return 1;
     case "attack": return 2 | ((a.tillHealth ?? 0) << 4) | ((a.spareBeast ?? 0) << 14);
     case "flee": return 3 | ((a.tillHealth ?? 0) << 4);
     case "upgrade": return 4 | (STATS.indexOf(a.stat) << 4) | (a.amount << 7);

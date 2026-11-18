@@ -5,7 +5,7 @@ import { BENCHMARK } from "./config.ts";
 import { db } from "./db.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide } from "./decide.ts";
 import { emit, subscribe } from "./events.ts";
-import { begin, commit, movesMade, options, phase, render, snapshot, type Phase } from "./play.ts";
+import { begin, commit, movesMade, options, phase, render, shape, snapshot, type Phase } from "./play.ts";
 
 const promptFile = process.env.LS_STRATEGY ?? new URL("../strategy/prompt.md", import.meta.url).pathname;
 const MAX_REJECTIONS = 3;
@@ -54,9 +54,11 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<void>
     const decision = await decide(rules(phase(state)), prompt);
     cost += decision.costUsd;
     emit({ kind: "say", text: decision.note });
-    emit({ kind: "tool", name: "act", input: decision.actions });
+    const actions = shape(state, decision.actions as Action[]);
+    emit({ kind: "tool", name: "act", input: actions });
     try {
-      state = await commit(decision.actions as Action[]);
+      if (!actions.length) throw new Error("spend your stat points before anything else");
+      state = await commit(actions);
       note = decision.note;
       rejected = "";
       rejections = 0;

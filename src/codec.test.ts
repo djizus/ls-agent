@@ -14,7 +14,7 @@ test("encodes packets exactly as the live client does", () => {
   assert.equal(encodePacket([{ type: "explore" }]), 0x1n);
   assert.equal(encodePacket([{ type: "attack" }]), 0x2n);
   assert.equal(
-    encodePacket([{ type: "upgrade", stat: "dexterity", amount: 1 }, { type: "explore", tillDamage: 1 }]),
-    (1n << 240n) | (0x11n << 16n) | 0x94n,
+    encodePacket([{ type: "upgrade", stat: "dexterity", amount: 1 }, { type: "explore" }]),
+    (1n << 240n) | (0x1n << 16n) | 0x94n,
   );
 });

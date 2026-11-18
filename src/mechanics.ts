@@ -1,6 +1,6 @@
 export const MECHANICS = [
   "The market is open whenever you are not in battle. Stat points must be spent before exploring or buying potions; doing it first in the same decision works.",
-  "A potion heals 10 HP, up to max health; buying one at full health is rejected.",
+  "A potion heals 10 HP, up to max health; buying one at full health is rejected. Potions cost max(1, level - 2 x CHA) gold each, so CHA keeps healing cheap as you level.",
   "Max health is 100 + 15 x VIT. Each VIT point raises max health by 15 and heals 15 HP immediately.",
   "Item prices fall by 1 gold per point of CHA, to a minimum of 1.",
   "Attack and flee without a threshold continue until the fight ends: the beast dies, you escape, or you die.",

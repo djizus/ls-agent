@@ -1,7 +1,7 @@
 import { beastOf, type Beast } from "./beast.ts";
 import type { Action, Item } from "./codec.ts";
 import { emit } from "./events.ts";
-import { itemOf, levelOf, type LootItem } from "./items.ts";
+import { itemOf, levelOf, potionPrice, priceOf, type LootItem } from "./items.ts";
 import { marketOf } from "./market.ts";
 import { act, newPracticeGame, preview, replay, revertReason, type Game, type Snapshot } from "./practice.ts";
 
@@ -19,6 +19,7 @@ export type State = {
   equipment: Gear[];
   bag: Gear[];
   market: (LootItem & { price: number })[];
+  potionPrice: number;
 };
 
 
@@ -38,6 +39,7 @@ export function describe(s: Snapshot, id: string): State {
     stats: a.stats,
     equipment: Object.values(a.equipment).filter((i) => i.id).map(gear),
     bag: s.bag.map(gear),
+    potionPrice: potionPrice(levelOf(a.xp), a.stats.charisma),
     market: a.beast_health === 0 ? marketOf(a, id).map((o) => ({ ...itemOf(o.id)!, price: o.price })) : [],
   };
 }
@@ -54,6 +56,7 @@ export function render(s: State): string {
     `Bag: ${s.bag.map((g) => `${item(g)} G${g.greatness}`).join("; ") || "empty"}`,
   ];
   if (s.beast) lines.push(`Beast: ${s.beast.name} level ${s.beast.level} T${s.beast.tier} ${s.beast.type}, ${s.beast.health} HP`);
+  if (!s.beast) lines.push(`Potions: ${s.potionPrice} gold each, ${Math.ceil((s.maxHealth - s.health) / 10)} to reach full health.`);
   if (s.market.length) lines.push(`Market: ${s.market.map((m) => `${item(m)} ${m.slot} ${m.price}g`).join("; ")}`);
   return lines.join("\n");
 }
@@ -96,25 +99,40 @@ export async function forecast(actions: Action[], samples: number): Promise<stri
     const xp = outcomes.map((o) => o.adventurer.xp - last!.adventurer.xp).sort((x, y) => x - y);
     const rate = (n: number) => `${Math.round((100 * n) / samples)}%`;
     const mid = Math.floor(samples / 2);
-    return `death ${rate(hp.filter((h) => h === 0).length)}, still in battle ${rate(outcomes.filter((o) => o.adventurer.beast_health > 0).length)}, HP after worst ${hp[0]} median ${hp[mid]} best ${hp[samples - 1]}, XP gained median ${xp[mid]}`;
+    const gold = outcomes.map((o) => o.adventurer.gold - last!.adventurer.gold).sort((x, y) => x - y);
+    return `death ${rate(hp.filter((h) => h === 0).length)}, still in battle ${rate(outcomes.filter((o) => o.adventurer.beast_health > 0).length)}, HP after worst ${hp[0]} median ${hp[mid]} best ${hp[samples - 1]}, XP gained median ${xp[mid]}, gold change median ${gold[mid]}`;
   } catch (err) {
     return `rejected: ${revertReason(err)}`;
   }
 }
 
 export async function options(s: State): Promise<string> {
-  if (s.statUpgradesAvailable > 0) return "Spend your stat points in this decision; the simulations resume after.";
+  if (s.statUpgradesAvailable > 0) return "Stat points are pending: this decision applies your upgrades and purchases only; you choose what to do next with the odds in front of you.";
   const moves: Action[] = s.beast ? [{ type: "attack" }, { type: "flee" }] : [{ type: "explore" }];
-  const label = { attack: "fight until it ends", flee: "flee until escaped", explore: "explore" } as Record<string, string>;
-  const lines = await Promise.all(moves.map(async (m) => `- ${label[m.type]}: ${await forecast([m], 16)}`));
-  const potion = !s.beast && s.health < s.maxHealth ? await potionPrice() : undefined;
-  return [`Simulated outcomes (16 samples each):`, ...lines, potion && `Potions cost ${potion} gold each (10 HP).`].filter(Boolean).join("\n");
+  const label = { attack: "fight until it ends", flee: "flee until escaped", explore: "explore one step (after the automatic heal)" } as Record<string, string>;
+  const lines = await Promise.all(moves.map(async (m) => `- ${label[m.type]}: ${await forecast(shape(s, [m]), 16)}`));
+  return [`Simulated outcomes (16 samples each):`, ...lines].join("\n");
 }
 
-async function potionPrice(): Promise<number | undefined> {
-  const before = last!.adventurer.gold;
-  const [after] = await preview(game!, [{ type: "potions", qty: 1 }], 1).catch(() => []);
-  return after && before - after.adventurer.gold;
+const RANDOM = new Set(["explore", "attack", "flee"]);
+
+export function shape(s: State, actions: Action[]): Action[] {
+  if (s.statUpgradesAvailable > 0) return actions.filter((a) => !RANDOM.has(a.type));
+  if (s.beast) return actions;
+  const ups = (stat: string) => actions.reduce((n, a) => n + (a.type === "upgrade" && a.stat === stat ? a.amount : 0), 0);
+  const charisma = s.stats.charisma + ups("charisma");
+  const maxHealth = s.maxHealth + 15 * ups("vitality");
+  const health = s.health + 15 * ups("vitality");
+  const gold = actions.reduce((g, a) => g - (a.type === "buy" ? priceOf(a.item, charisma) : 0), s.gold);
+  const price = potionPrice(s.level, charisma);
+  const wanted = actions.reduce((n, a) => n + (a.type === "potions" ? a.qty : 0), 0);
+  const needed = Math.ceil((maxHealth - health) / 10);
+  const exploring = actions.at(-1)?.type === "explore";
+  const qty = Math.min(Math.max(wanted, exploring ? needed : 0), needed, Math.floor(gold / price));
+  const rest = actions.filter((a) => a.type !== "potions");
+  const random = rest.filter((a) => RANDOM.has(a.type));
+  const fixed = rest.filter((a) => !RANDOM.has(a.type));
+  return [...fixed, ...(qty > 0 ? [{ type: "potions" as const, qty }] : []), ...random];
 }
 
 export function snapshot(): State | undefined {

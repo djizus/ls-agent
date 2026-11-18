@@ -116,6 +116,8 @@ export const itemName = (id: number): string => itemOf(id)?.name ?? "None";
 
 export const basePrice = (tier: number): number => (6 - tier) * 4;
 
+export const potionPrice = (level: number, charisma: number): number => Math.max(1, level - 2 * charisma);
+
 export const priceOf = (id: number, charisma: number): number => Math.max(1, basePrice(ITEMS[id - 1].tier) - charisma);
 
 export const levelOf = (xp: number): number => (xp === 0 ? 1 : Math.floor(Math.sqrt(xp)));
