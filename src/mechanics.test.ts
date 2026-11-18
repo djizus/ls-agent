@@ -228,3 +228,85 @@ test("a G15 item's suffix adds its stats: equipped gives all of them, the bag ke
   assert.ok(hits[0].dealt > hits[1].dealt);
   assert.equal(hits[1].dealt, hits[2].dealt);
 });
+
+const STATS_GAME = "0x000000000000000000000100000000020000000001c8527e010ef354000fe8c1";
+const INT_ZERO_GAME = "0x000000000000000000000100000000020000000001c841fa010ca11b001726e1";
+const AVOID_TRIES = Array.from({ length: 32 }, (_, i) => luck(`ex-${i}`));
+
+async function inBatches<T>(jobs: (() => Promise<T>)[]) {
+  const out: T[] = [];
+  for (let i = 0; i < jobs.length; i += 8) out.push(...(await Promise.all(jobs.slice(i, i + 8).map((job) => job()))));
+  return out;
+}
+
+async function explores(id: string, setup: Move[], tries: string[]) {
+  const before = (await play(id, setup)).adventurer;
+  return inBatches(tries.map((l) => async () => {
+    const a = (await play(id, [...setup, [[{ type: "explore" }], l]])).adventurer;
+    return { kind: a.beast_health > 0 ? "beast" : a.xp - before.xp > 1 ? "obstacle" : "discovery", taken: before.health - a.health, stats: a.stats };
+  }));
+}
+
+let levelFive: Promise<Move[]> | undefined;
+const climbToLevelFive = () =>
+  (levelFive ??= (async () => {
+    const moves: Move[] = [];
+    let s = await play(STATS_GAME, moves);
+    while (!(levelOf(s.adventurer.xp) === 5 && s.adventurer.beast_health === 0 && !s.adventurer.stat_upgrades_available)) {
+      const a = s.adventurer;
+      assert.ok(a.health > 0 && moves.length < 20);
+      const points: Action[] = a.stat_upgrades_available ? [{ type: "upgrade", stat: "charisma", amount: a.stat_upgrades_available }] : [];
+      moves.push([[...points, { type: a.beast_health > 0 ? "attack" : "explore" }], luck(`a-${moves.length}`)]);
+      s = await play(STATS_GAME, moves);
+    }
+    return moves;
+  })());
+
+async function avoidanceAtLevelFive(stat: "intelligence" | "wisdom", kind: "obstacle" | "beast") {
+  const moves = await climbToLevelFive();
+  const upgrades = moves.flatMap(([a], i) => (a[0].type === "upgrade" ? [i] : []));
+  assert.equal(upgrades.length, 4);
+  const first = await explores(STATS_GAME, moves, AVOID_TRIES);
+  const tries = AVOID_TRIES.filter((_, i) => first[i].kind === kind);
+  const rows = [first.filter((o) => o.kind === kind)];
+  for (let n = 1; n <= 4; n++) {
+    const swapped = moves.map(([a, l], i): Move => (upgrades.slice(0, n).includes(i) ? [[{ type: "upgrade", stat, amount: 1 }, ...a.slice(1)], l] : [a, l]));
+    rows.push(await explores(STATS_GAME, swapped, tries));
+  }
+  rows.forEach((row) => assert.ok(row.every((o) => o.kind === kind)));
+  const taken = tries.map((_, j) => rows.map((row) => row[j].taken));
+  taken.forEach((t) => {
+    assert.ok(new Set(t.filter((d) => d > 0)).size <= 1, `all or nothing: ${t}`);
+    assert.ok(t.every((d, n) => n === 0 || t[n - 1] > 0 || d === 0), `avoided stays avoided as ${stat} grows: ${t}`);
+  });
+  return { stats: rows.map((row) => row[0].stats[stat]), avoided: rows.map((row) => row.filter((o) => o.taken === 0).length / row.length), first };
+}
+
+const levelOneExplores = (id: string) => explores(id, [], AVOID_TRIES.slice(0, 16));
+
+test("INT dodges obstacle damage: never at 0, about INT / level below level, always at or above", { timeout: 600_000 }, async () => {
+  const [intZero, intOne] = [await levelOneExplores(INT_ZERO_GAME), await levelOneExplores(STATS_GAME)];
+  assert.deepEqual([intZero[0].stats.intelligence, intOne[0].stats.intelligence], [0, 1]);
+  const obstacles = (r: typeof intZero) => r.filter((o) => o.kind === "obstacle").map((o) => o.taken);
+  assert.ok(obstacles(intZero).length >= 3 && obstacles(intZero).every((d) => d > 0));
+  assert.ok(obstacles(intOne).length >= 3 && obstacles(intOne).every((d) => d === 0));
+  const { stats, avoided } = await avoidanceAtLevelFive("intelligence", "obstacle");
+  assert.deepEqual(stats, [1, 2, 3, 4, 5]);
+  stats.forEach((int, n) => assert.ok(Math.abs(avoided[n] - Math.min(int / 5, 1)) <= 0.25, `dodged at INT ${stats}, level 5: ${avoided}`));
+  assert.equal(avoided[4], 1);
+});
+
+test("WIS avoids the ambush on arrival: never at 0, about WIS / level below level, always at or above", { timeout: 600_000 }, async () => {
+  const [wisTwo, wisZero] = [await levelOneExplores(INT_ZERO_GAME), await levelOneExplores(STATS_GAME)];
+  assert.deepEqual([wisTwo[0].stats.wisdom, wisZero[0].stats.wisdom], [2, 0]);
+  const ambushes = (r: typeof wisTwo) => r.filter((o) => o.kind === "beast").map((o) => o.taken);
+  assert.ok(ambushes(wisZero).length >= 3 && ambushes(wisZero).every((d) => d > 0));
+  assert.ok(ambushes(wisTwo).length >= 3 && ambushes(wisTwo).every((d) => d === 0));
+  const { stats, avoided, first } = await avoidanceAtLevelFive("wisdom", "beast");
+  assert.deepEqual(stats, [0, 1, 2, 3, 4]);
+  assert.equal(avoided[0], 0);
+  stats.forEach((wis, n) => assert.ok(Math.abs(avoided[n] - wis / 5) <= 0.25, `avoided at WIS ${stats}, level 5: ${avoided}`));
+  const obstacles = AVOID_TRIES.filter((_, i) => first[i].kind === "obstacle");
+  const maxWis = (await climbToLevelFive()).map(([a, l]): Move => (a[0].type === "upgrade" ? [[{ type: "upgrade", stat: "wisdom", amount: 1 }, ...a.slice(1)], l] : [a, l]));
+  assert.deepEqual((await explores(STATS_GAME, maxWis, obstacles)).map((o) => o.taken), first.filter((o) => o.kind === "obstacle").map((o) => o.taken));
+});

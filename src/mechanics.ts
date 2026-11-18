@@ -5,6 +5,8 @@ export const MECHANICS = [
   "Item prices fall by 1 gold per point of CHA, to a minimum of 1.",
   "Attack and flee without a threshold continue until the fight ends: the beast dies, you escape, or you die.",
   "Each flee try succeeds with chance DEX / level (always when DEX is at least your level); with DEX 0 you cannot flee.",
+  "Each obstacle's damage is dodged with chance INT / level (always when INT is at least your level); with INT 0 every obstacle hits.",
+  "When you find a beast, its ambush hit is avoided with chance WIS / level (always when WIS is at least your level); with WIS 0 every beast ambushes you.",
   "Weapon attack is greatness x (6 - tier), so a T1 weapon hits 5x harder than a T5 at equal greatness. Damage is that attack minus the beast's armor (beast level x (6 - beast tier)), with a minimum of 4.",
   "Each STR point adds 10% of the weapon's attack (rounded down), before beast armor is subtracted.",
   "Blade weapons deal +50% to Magic beasts, Bludgeon to Blade beasts, Magic to Bludgeon beasts; the reverse pairing (Blade vs Bludgeon, Bludgeon vs Magic, Magic vs Blade) deals -50%.",
