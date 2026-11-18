@@ -116,7 +116,7 @@ export async function options(s: State): Promise<string> {
 
 const RANDOM = new Set(["explore", "attack", "flee"]);
 
-export function shape(s: State, actions: Action[]): Action[] {
+export function shape(s: State, actions: Action[], reserve = 0): Action[] {
   if (s.statUpgradesAvailable > 0) return actions.filter((a) => !RANDOM.has(a.type));
   if (s.beast) return actions;
   const ups = (stat: string) => actions.reduce((n, a) => n + (a.type === "upgrade" && a.stat === stat ? a.amount : 0), 0);
@@ -128,7 +128,8 @@ export function shape(s: State, actions: Action[]): Action[] {
   const wanted = actions.reduce((n, a) => n + (a.type === "potions" ? a.qty : 0), 0);
   const needed = Math.ceil((maxHealth - health) / 10);
   const exploring = actions.at(-1)?.type === "explore";
-  const qty = Math.min(Math.max(wanted, exploring ? needed : 0), needed, Math.floor(gold / price));
+  const healing = exploring ? Math.min(needed, Math.floor(Math.max(0, gold - reserve) / price)) : 0;
+  const qty = Math.min(Math.max(wanted, healing), needed, Math.floor(gold / price));
   const rest = actions.filter((a) => a.type !== "potions");
   const random = rest.filter((a) => RANDOM.has(a.type));
   const fixed = rest.filter((a) => !RANDOM.has(a.type));

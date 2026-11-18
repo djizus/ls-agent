@@ -54,7 +54,7 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<void>
     const decision = await decide(rules(phase(state)), prompt);
     cost += decision.costUsd;
     emit({ kind: "say", text: decision.note });
-    const actions = shape(state, decision.actions as Action[]);
+    const actions = shape(state, decision.actions as Action[], decision.reserve);
     emit({ kind: "tool", name: "act", input: actions });
     try {
       if (!actions.length) throw new Error("spend your stat points before anything else");

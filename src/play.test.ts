@@ -55,6 +55,9 @@ test("potion price formula matches the contract; explores are healed first and p
   const potions = healed.find((a) => a.type === "potions");
   assert.ok(potions && potions.type === "potions");
   assert.equal(potions.qty, Math.min(Math.ceil((state.maxHealth - state.health) / 10), Math.floor(state.gold / state.potionPrice)));
+  assert.equal(shape(state, [{ type: "explore" }], state.gold).some((a) => a.type === "potions"), false);
+  const half = shape(state, [{ type: "explore" }], Math.floor(state.gold / 2)).find((a) => a.type === "potions");
+  assert.ok(!half || (half.type === "potions" && half.qty * state.potionPrice <= state.gold - Math.floor(state.gold / 2)));
   const one = await commit([{ type: "potions", qty: 1 }]);
   assert.equal(goldBefore - one.gold, state.potionPrice);
   assert.equal(one.health, Math.min(healthBefore + 10, state.maxHealth));
