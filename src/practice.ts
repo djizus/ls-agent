@@ -12,9 +12,25 @@ const randomHash = () => "0x" + randomBytes(31).toString("hex");
 const luck = (game: Game, move: number) => "0x" + createHash("sha256").update(`${game.id}:${move}`).digest("hex").slice(0, 62);
 export const hashes = (game: Game) => game.packets.map((_, i) => luck(game, i));
 
+const MAX_IN_FLIGHT = 4;
+let inFlight = 0;
+const waiting: (() => void)[] = [];
+
+async function limited<T>(run: () => Promise<T>): Promise<T> {
+  if (inFlight < MAX_IN_FLIGHT) inFlight++;
+  else await new Promise<void>((r) => waiting.push(r));
+  try {
+    return await run();
+  } finally {
+    const next = waiting.shift();
+    if (next) next();
+    else inFlight--;
+  }
+}
+
 async function call(request: Parameters<typeof provider.callContract>[0], attempt = 0): Promise<string[]> {
   try {
-    return await provider.callContract(request);
+    return await limited(() => provider.callContract(request));
   } catch (err) {
     if (attempt >= 5 || !/rate limit|429|-32005/i.test(String((err as Error).message))) throw err;
     await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));

@@ -102,6 +102,8 @@ export async function commit(actions: Action[]): Promise<State> {
   return state();
 }
 
+const SAMPLES = 8;
+
 export type Odds = { death: number; ongoing: number; hp: [number, number, number]; xp: number; gold: number };
 export type Option = { move: string; label: string } & (Odds | { error: string });
 
@@ -140,7 +142,7 @@ export async function options(s: State): Promise<Option[]> {
   return Promise.all(
     moves.map(async (m) => {
       try {
-        return { move: m.type, label: LABEL[m.type], ...(await odds(shape(s, [m]), 16)) };
+        return { move: m.type, label: LABEL[m.type], ...(await odds(shape(s, [m]), SAMPLES)) };
       } catch (err) {
         return { move: m.type, label: LABEL[m.type], error: revertReason(err) };
       }
@@ -150,7 +152,7 @@ export async function options(s: State): Promise<Option[]> {
 
 export function describeOptions(s: State, list: Option[]): string {
   if (s.statUpgradesAvailable > 0) return "Stat points are pending: this decision applies your upgrades and purchases only; you choose what to do next with the odds in front of you.";
-  return ["Simulated outcomes (16 samples each):", ...list.map((o) => `- ${o.label}: ${"error" in o ? `rejected: ${o.error}` : describeOdds(o)}`)].join("\n");
+  return [`Simulated outcomes (${SAMPLES} samples each):`, ...list.map((o) => `- ${o.label}: ${"error" in o ? `rejected: ${o.error}` : describeOdds(o)}`)].join("\n");
 }
 
 const RANDOM = new Set(["explore", "attack", "flee"]);
