@@ -12,10 +12,20 @@ const randomHash = () => "0x" + randomBytes(31).toString("hex");
 const luck = (game: Game, move: number) => "0x" + createHash("sha256").update(`${game.id}:${move}`).digest("hex").slice(0, 62);
 export const hashes = (game: Game) => game.packets.map((_, i) => luck(game, i));
 
+async function call(request: Parameters<typeof provider.callContract>[0], attempt = 0): Promise<string[]> {
+  try {
+    return await provider.callContract(request);
+  } catch (err) {
+    if (attempt >= 5 || !/rate limit|429|-32005/i.test(String((err as Error).message))) throw err;
+    await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
+    return call(request, attempt + 1);
+  }
+}
+
 export async function replay(game: Game, packets = game.packets, luckHashes = hashes(game)): Promise<Snapshot> {
   const blocks = packets.map((_, i) => (FAR_BLOCK + BigInt(i)).toString());
   const calldata = [game.id, String(packets.length), ...packets.map(String), String(blocks.length), ...blocks, String(luckHashes.length), ...luckHashes, "0"];
-  const out = await provider.callContract({ contractAddress: GAME_CORE, entrypoint: "replay_transcript", calldata });
+  const out = await call({ contractAddress: GAME_CORE, entrypoint: "replay_transcript", calldata });
   const adventurer = decodeAdventurer(BigInt(out[3]));
   return { adventurer, bag: decodeBag(BigInt(out[4])), over: adventurer.health === 0 && packets.length > 0 };
 }

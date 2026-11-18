@@ -7,7 +7,7 @@ import { MARKET } from "./settings.ts";
 import { SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
 import { act, newPracticeGame, preview, replay, revertReason, type Game, type Snapshot } from "./practice.ts";
 
-type Gear = LootItem & { greatness: number; suffix?: string; bonus?: Partial<State["stats"]> };
+type Gear = LootItem & { greatness: number; xp: number; suffix?: string; bonus?: Partial<State["stats"]> };
 export type State = {
   over: boolean;
   level: number;
@@ -31,7 +31,7 @@ export function describe(s: Snapshot, id: string): State {
   const gear = (i: Item): Gear => {
     const greatness = levelOf(i.xp);
     const suffix = greatness >= SUFFIX_GREATNESS ? suffixOf(i.id, a.item_specials_salt, id) : undefined;
-    return { ...itemOf(i.id)!, greatness, ...(suffix && { suffix, bonus: SUFFIXES[suffix] }) };
+    return { ...itemOf(i.id)!, greatness, xp: i.xp, ...(suffix && { suffix, bonus: SUFFIXES[suffix] }) };
   };
   return {
     over: s.over,
@@ -52,7 +52,10 @@ export function describe(s: Snapshot, id: string): State {
 
 const ABBR: Record<string, string> = { strength: "STR", dexterity: "DEX", vitality: "VIT", intelligence: "INT", wisdom: "WIS", charisma: "CHA" };
 const item = (g: LootItem) => `${g.name} [${g.id}] T${g.tier} ${g.type}`;
-const owned = (g: Gear) => `${item(g)} G${g.greatness}${g.suffix ? ` ${g.suffix} (${Object.entries(g.bonus!).map(([k, v]) => `+${v} ${ABBR[k]}`).join(" ")})` : ""}`;
+const attack = (g: LootItem, greatness: number) => (g.slot === "weapon" ? `attack ${greatness * (6 - g.tier)}` : "");
+const growth = (g: Gear) => (g.greatness >= 20 ? "maxed" : `${(g.greatness + 1) ** 2 - g.xp} xp to G${g.greatness + 1}${g.greatness < 15 ? `, suffix at G15` : ""}`);
+const owned = (g: Gear) =>
+  `${item(g)} G${g.greatness}${g.suffix ? ` ${g.suffix} (${Object.entries(g.bonus!).map(([k, v]) => `+${v} ${ABBR[k]}`).join(" ")})` : ""} (${[attack(g, g.greatness), growth(g)].filter(Boolean).join(", ")})`;
 
 export function render(s: State): string {
   const st = s.stats;
@@ -65,7 +68,7 @@ export function render(s: State): string {
   ];
   if (s.beast) lines.push(`Beast: ${s.beast.name} level ${s.beast.level} T${s.beast.tier} ${s.beast.type}, ${s.beast.health} HP`);
   if (!s.beast) lines.push(`Potions: ${s.potionPrice} gold each, ${Math.ceil((s.maxHealth - s.health) / 10)} to reach full health.`);
-  if (s.market.length) lines.push(`Market: ${s.market.map((m) => `${item(m)} ${m.slot} ${m.price}g`).join("; ")}`);
+  if (s.market.length) lines.push(`Market (items start at G1): ${s.market.map((m) => `${item(m)} ${m.slot} ${m.price}g${m.slot === "weapon" ? ` (${attack(m, 1)}, ${attack(m, 20)} at G20)` : ""}`).join("; ")}`);
   return lines.join("\n");
 }
 
