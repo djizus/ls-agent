@@ -8,13 +8,17 @@ type Game = { id: number; mode: string; game_id: string; strategy: string; start
 let added = 0;
 for (const dir of process.argv.slice(2)) {
   const source = new DatabaseSync(`${dir.replace(/\/$/, "")}/ls.sqlite`, { readOnly: true });
+  for (const t of source.prepare("SELECT hash, text, created_at FROM strategies").all() as { hash: string; text: string; created_at: number }[])
+    db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(t.hash, t.text, t.created_at);
   for (const g of source.prepare("SELECT * FROM games WHERE ended_at IS NOT NULL").all() as Game[]) {
     if (db.prepare("SELECT 1 FROM games WHERE game_id = ? AND started_at = ?").get(g.game_id, g.started_at)) continue;
+    db.exec("BEGIN IMMEDIATE");
     const id = db
       .prepare("INSERT INTO games (mode, game_id, strategy, started_at, ended_at, level, xp, moves, cost_usd) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(g.mode, g.game_id, g.strategy, g.started_at, g.ended_at, g.level, g.xp, g.moves, g.cost_usd).lastInsertRowid;
     for (const e of source.prepare("SELECT at, body FROM events WHERE game = ?").all(g.id) as { at: number; body: string }[])
       db.prepare("INSERT INTO events (game, at, body) VALUES (?, ?, ?)").run(id, e.at, e.body);
+    db.exec("COMMIT");
     added++;
   }
 }

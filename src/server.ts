@@ -28,6 +28,7 @@ function strategies() {
       const levels = rows.filter((r) => r.strategy === t.hash).map((r) => r.level).sort((a, b) => a - b);
       return { ...t, games: levels.length, median: levels[Math.floor(levels.length / 2)] ?? null, best: levels.at(-1) ?? null };
     })
+    .filter((s) => s.games > 0)
     .sort((a, b) => b.created_at - a.created_at);
 }
 

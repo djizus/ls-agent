@@ -6,6 +6,7 @@ mkdirSync(VAR_DIR, { recursive: true });
 export const db = new DatabaseSync(`${VAR_DIR}ls.sqlite`);
 db.exec(`
   PRAGMA journal_mode = WAL;
+  PRAGMA busy_timeout = 5000;
   CREATE TABLE IF NOT EXISTS games (
     id INTEGER PRIMARY KEY,
     mode TEXT NOT NULL,
