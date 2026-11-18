@@ -105,7 +105,8 @@ export async function forecast(actions: Action[], samples: number): Promise<stri
 export async function options(s: State): Promise<string> {
   if (s.statUpgradesAvailable > 0) return "Spend your stat points in this decision; the simulations resume after.";
   const moves: Action[] = s.beast ? [{ type: "attack" }, { type: "flee" }] : [{ type: "explore" }];
-  const lines = await Promise.all(moves.map(async (m) => `- ${m.type} once: ${await forecast([m], 16)}`));
+  const label = { attack: "fight until it ends", flee: "flee until escaped", explore: "explore" } as Record<string, string>;
+  const lines = await Promise.all(moves.map(async (m) => `- ${label[m.type]}: ${await forecast([m], 16)}`));
   const potion = !s.beast && s.health < s.maxHealth ? await potionPrice() : undefined;
   return [`Simulated outcomes (16 samples each):`, ...lines, potion && `Potions cost ${potion} gold each (10 HP).`].filter(Boolean).join("\n");
 }

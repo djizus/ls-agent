@@ -17,15 +17,26 @@ export type Adventurer = {
 export const SLOTS = ["weapon", "chest", "head", "waist", "foot", "hand", "neck", "ring"] as const;
 export const STATS = ["strength", "dexterity", "vitality", "intelligence", "wisdom", "charisma"] as const;
 
+const untilHealth = z.number().int().min(0).max(1023).optional();
+const itemId = z.number().int().min(1).max(101).describe("Item id, shown in brackets.");
+
 export const action = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("explore"), tillDamage: z.number().int().min(0).max(2047).optional(), tillGold: z.number().int().min(0).max(511).optional() }),
-  z.object({ type: z.literal("attack"), tillHealth: z.number().int().min(0).max(1023).optional(), spareBeast: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional() }),
-  z.object({ type: z.literal("flee"), tillHealth: z.number().int().min(0).max(1023).optional() }),
+  z.object({
+    type: z.literal("explore"),
+    tillDamage: z.number().int().min(0).max(2047).optional().describe("Keep exploring until this much damage is taken."),
+    tillGold: z.number().int().min(0).max(511).optional().describe("Keep exploring until this much gold is found."),
+  }),
+  z.object({
+    type: z.literal("attack"),
+    tillHealth: untilHealth.describe("Omit to fight until the beast or you die. With N, stop once your health falls to N or below."),
+    spareBeast: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional().describe("1 stops before a certain kill, 2 before a possible kill (to equip gear before the final blow)."),
+  }),
+  z.object({ type: z.literal("flee"), tillHealth: untilHealth.describe("Omit to keep fleeing until you escape or die. With N, stop once your health falls to N or below.") }),
   z.object({ type: z.literal("upgrade"), stat: z.enum(STATS), amount: z.number().int().min(1).max(15) }),
-  z.object({ type: z.literal("buy"), item: z.number().int().min(1).max(101), equip: z.boolean() }),
-  z.object({ type: z.literal("equip"), item: z.number().int().min(1).max(101) }),
-  z.object({ type: z.literal("drop"), item: z.number().int().min(1).max(101) }),
-  z.object({ type: z.literal("potions"), qty: z.number().int().min(1).max(255) }),
+  z.object({ type: z.literal("buy"), item: itemId, equip: z.boolean() }),
+  z.object({ type: z.literal("equip"), item: itemId }),
+  z.object({ type: z.literal("drop"), item: itemId }),
+  z.object({ type: z.literal("potions"), qty: z.number().int().min(1).max(255).describe("Each heals 10 HP.") }),
 ]);
 export const actions = z.array(action).min(1).max(15);
 export type Action = z.infer<typeof action>;
