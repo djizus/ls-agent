@@ -38,7 +38,7 @@ export function describe(s: Snapshot, id: string): State {
     stats: a.stats,
     equipment: Object.values(a.equipment).filter((i) => i.id).map(gear),
     bag: s.bag.map(gear),
-    market: a.stat_upgrades_available > 0 ? marketOf(a, id).map((o) => ({ ...itemOf(o.id)!, price: o.price })) : [],
+    market: a.beast_health === 0 ? marketOf(a, id).map((o) => ({ ...itemOf(o.id)!, price: o.price })) : [],
   };
 }
 
@@ -58,7 +58,7 @@ export function render(s: State): string {
   return lines.join("\n");
 }
 
-export type Phase = "battle" | "market" | "explore";
+export type Phase = "battle" | "explore";
 
 let game: Game | undefined;
 let last: Snapshot | undefined;
@@ -70,7 +70,7 @@ function state(): State {
 }
 
 export function phase(s: State): Phase {
-  return s.beast ? "battle" : s.statUpgradesAvailable > 0 ? "market" : "explore";
+  return s.beast ? "battle" : "explore";
 }
 
 export async function begin(id: string): Promise<State> {
@@ -103,9 +103,17 @@ export async function forecast(actions: Action[], samples: number): Promise<stri
 }
 
 export async function options(s: State): Promise<string> {
-  const moves: Action[] = phase(s) === "battle" ? [{ type: "attack" }, { type: "flee" }] : phase(s) === "explore" ? [{ type: "explore" }] : [];
+  if (s.statUpgradesAvailable > 0) return "Spend your stat points in this decision; the simulations resume after.";
+  const moves: Action[] = s.beast ? [{ type: "attack" }, { type: "flee" }] : [{ type: "explore" }];
   const lines = await Promise.all(moves.map(async (m) => `- ${m.type} once: ${await forecast([m], 16)}`));
-  return lines.length ? `Simulated outcomes (16 samples each):\n${lines.join("\n")}` : "";
+  const potion = !s.beast && s.health < s.maxHealth ? await potionPrice() : undefined;
+  return [`Simulated outcomes (16 samples each):`, ...lines, potion && `Potions cost ${potion} gold each (10 HP).`].filter(Boolean).join("\n");
+}
+
+async function potionPrice(): Promise<number | undefined> {
+  const before = last!.adventurer.gold;
+  const [after] = await preview(game!, [{ type: "potions", qty: 1 }], 1).catch(() => []);
+  return after && before - after.adventurer.gold;
 }
 
 export function snapshot(): State | undefined {
