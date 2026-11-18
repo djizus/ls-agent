@@ -47,6 +47,17 @@ async function playGame(id: string): Promise<void> {
   }
 }
 
+async function decideWithRetry(system: string, prompt: string, attempts = 3): ReturnType<typeof decide> {
+  for (let i = 1; ; i++) {
+    try {
+      return await decide(system, prompt);
+    } catch (err) {
+      if (i >= attempts || stopping) throw err;
+      emit({ kind: "status", text: `decision retry ${i}: ${(err as Error).message.slice(0, 120)}` });
+    }
+  }
+}
+
 const DOING: Record<string, string> = { explore: "exploring", attack: "fighting", flee: "fleeing" };
 
 async function playMoves(id: string, rules: (p: Phase) => string): Promise<string> {
@@ -60,7 +71,7 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<strin
   while (!state.over && !stopping && rejections < MAX_REJECTIONS) {
     const choices = await options(state);
     const prompt = [render(state), describeOptions(state, choices), note && `Your note from the previous decision: ${note}`, rejected].filter(Boolean).join("\n\n");
-    const decision = await decide(rules(phase(state)), prompt);
+    const decision = await decideWithRetry(rules(phase(state)), prompt);
     cost += decision.costUsd;
     const actions = shape(state, decision.actions as Action[], decision.reserve);
     emit({ kind: "decision", phase: phase(state), options: choices, thought: decision.thought, actions, note: decision.note, reserve: decision.reserve, costUsd: decision.costUsd });
