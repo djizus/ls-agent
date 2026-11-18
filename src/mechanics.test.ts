@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
-import { encodePacket, type Action, type Stats } from "./codec.ts";
-import { levelOf } from "./items.ts";
+import { hash } from "starknet";
+import { decodeAdventurer, decodeBag, encodePacket, type Action, type Stats } from "./codec.ts";
+import { GAME_CORE } from "./config.ts";
+import { levelOf, potionPrice, priceOf } from "./items.ts";
+import { marketOf } from "./market.ts";
 import { newPracticeGame, replay, revertReason, type Snapshot } from "./practice.ts";
+import { effectiveStats, suffixOf } from "./specials.ts";
+import { provider } from "./wallet.ts";
 
 type Move = [Action[], string];
 
@@ -142,4 +147,83 @@ test("flee needs DEX: rejected at 0, about DEX / level per try below level, alwa
   assert.ok(counts[0] <= 7 && counts[3] >= 9 && counts[0] < counts[3], `escapes out of 16 at DEX 1..4, level 5: ${counts}`);
   const atLevel = await flee(levelTwoFight([{ type: "upgrade", stat: "charisma", amount: 1 }], LEVEL_TWO.jotunn), GAME);
   assert.ok(atLevel.every((ok) => ok === true));
+});
+
+const SUFFIX_GAME = "0x000000000000000000000100000000020000000001c857c7010fb07100109821";
+const SUFFIX_GAME_BLOCKS = { from: 17_805_430, to: 17_805_800 };
+const AFTER_UNLOCK = 32;
+
+let transcript: Promise<{ packets: string[]; blocks: string[] }> | undefined;
+const realTranscript = () =>
+  (transcript ??= provider
+    .getEvents({ address: GAME_CORE, from_block: { block_number: SUFFIX_GAME_BLOCKS.from }, to_block: { block_number: SUFFIX_GAME_BLOCKS.to }, keys: [[hash.getSelectorFromName("ActionCommitted")], [SUFFIX_GAME]], chunk_size: 100 })
+    .then(({ events }) => ({
+      packets: events.flatMap((e) => e.data.slice(1, 1 + Number(e.data[0]))),
+      blocks: events.flatMap((e) => Array(Number(e.data[0])).fill(String(e.block_number))),
+    })));
+
+async function fromRealGame(committed: number, extra: Action[][] = [], seed = "real") {
+  const t = await realTranscript();
+  const packets = [...t.packets.slice(0, committed), ...extra.map((a) => String(encodePacket(a)))];
+  const blocks = [...t.blocks.slice(0, committed), ...extra.map((_, i) => String(4_000_000_000 + i))];
+  const hashes = [...blocks.slice(0, committed).map(() => "0x0"), ...extra.map((_, i) => luck(`${seed}-${i}`))];
+  const calldata = [SUFFIX_GAME, String(packets.length), ...packets, String(blocks.length), ...blocks, String(hashes.length), ...hashes, String(committed)];
+  const out = await provider.callContract({ contractAddress: GAME_CORE, entrypoint: "replay_transcript", calldata });
+  const adventurer = decodeAdventurer(BigInt(out[3])), bag = decodeBag(BigInt(out[4]));
+  return { adventurer, bag, stats: effectiveStats(adventurer, bag, SUFFIX_GAME) };
+}
+
+test("items grow by greatness: 2x beast xp, 1x obstacle xp, equipped only, capped at G20 with a stat point each", { timeout: 120_000 }, async () => {
+  assert.equal((await realTranscript()).packets.length, 37);
+  const [start, kill, obstacle, after] = await Promise.all([1, 2, 13, 14].map((n) => fromRealGame(n)));
+  assert.deepEqual([kill.adventurer.xp - start.adventurer.xp, kill.adventurer.equipment.weapon.xp - start.adventurer.equipment.weapon.xp], [4, 8]);
+  assert.deepEqual([after.adventurer.xp - obstacle.adventurer.xp, after.adventurer.equipment.weapon.xp - obstacle.adventurer.equipment.weapon.xp], [23, 23]);
+  assert.deepEqual(after.bag, [{ id: 12, xp: 0 }]);
+  const [before, maxed, swapped] = await Promise.all([33, 34, 35].map((n) => fromRealGame(n)));
+  const capped = Object.values(maxed.adventurer.equipment).filter((i) => i.xp === 400).length;
+  assert.deepEqual([levelOf(before.adventurer.xp), levelOf(maxed.adventurer.xp), capped], [16, 17, 5]);
+  assert.equal(maxed.adventurer.stat_upgrades_available, 1 + capped);
+  assert.deepEqual(swapped.bag.filter((i) => i.xp > 0).map((i) => i.xp), [400, 400, 400, 400, 400]);
+});
+
+test("a G15 item's suffix adds its stats: equipped gives all of them, the bag keeps only VIT and CHA", { timeout: 300_000 }, async () => {
+  const locked = await fromRealGame(23);
+  assert.equal(locked.adventurer.item_specials_salt, 0);
+  assert.deepEqual(locked.stats, locked.adventurer.stats);
+
+  const real = await fromRealGame(AFTER_UNLOCK);
+  const { adventurer: a } = real;
+  assert.deepEqual(
+    Object.values(a.equipment).filter((i) => i.id).map((i) => suffixOf(i.id, a.item_specials_salt, SUFFIX_GAME)),
+    ["of Titans", "of Anger", "of Skill", "of Reflection", "of Rage", "of Perfection", "of the Twins"],
+  );
+  assert.deepEqual([a.stats.vitality, real.stats.vitality, a.stats.charisma, real.stats.charisma, a.stats.strength, real.stats.strength], [5, 6, 6, 11, 3, 9]);
+
+  const healed = (await fromRealGame(AFTER_UNLOCK, [[{ type: "potions", qty: 8 }]])).adventurer.health;
+  const noGloves = (await fromRealGame(AFTER_UNLOCK, [[{ type: "drop", item: 70 }, { type: "potions", qty: 7 }]])).adventurer.health;
+  assert.deepEqual([healed, noGloves], [100 + 15 * 6, 100 + 15 * 5]);
+
+  const potionSetups: Action[][] = [[], [{ type: "drop", item: 2 }, { type: "drop", item: 65 }], [{ type: "drop", item: 2 }, { type: "drop", item: 65 }, { type: "drop", item: 9 }], [{ type: "equip", item: 1 }, { type: "drop", item: 65 }, { type: "drop", item: 9 }]];
+  const spent = await Promise.all(potionSetups.map(async (setup) => {
+    const r = await fromRealGame(AFTER_UNLOCK, [[...setup, { type: "potions", qty: 1 }]]);
+    return { paid: a.gold - r.adventurer.gold, price: potionPrice(levelOf(r.adventurer.xp), r.stats.charisma), charisma: r.stats.charisma };
+  }));
+  assert.deepEqual(spent.map((s) => s.charisma), [11, 7, 6, 9]);
+  spent.forEach((s) => assert.equal(s.paid, s.price));
+
+  const owned = new Set([...Object.values(a.equipment), ...real.bag].map((i) => i.id));
+  const offer = marketOf(a, SUFFIX_GAME).find((o) => !owned.has(o.id))!;
+  const bought = await fromRealGame(AFTER_UNLOCK, [[{ type: "buy", item: offer.id, equip: false }]]);
+  assert.equal(a.gold - bought.adventurer.gold, priceOf(offer.id, real.stats.charisma));
+  assert.notEqual(priceOf(offer.id, real.stats.charisma), priceOf(offer.id, a.stats.charisma));
+
+  const dealt = async (setup: Action[]) => {
+    const found = await fromRealGame(AFTER_UNLOCK, [[...setup, { type: "explore" }]], "str-7");
+    const hit = await fromRealGame(AFTER_UNLOCK, [[...setup, { type: "explore" }], [{ type: "attack", tillHealth: found.adventurer.health - 1 }]], "str-7");
+    return { dealt: found.adventurer.beast_health - hit.adventurer.beast_health, strength: found.stats.strength };
+  };
+  const hits = await Promise.all([[], [{ type: "drop", item: 51 }], [{ type: "equip", item: 18 }]].map((s) => dealt(s as Action[])));
+  assert.deepEqual(hits.map((h) => h.strength), [9, 7, 7]);
+  assert.ok(hits[0].dealt > hits[1].dealt);
+  assert.equal(hits[1].dealt, hits[2].dealt);
 });

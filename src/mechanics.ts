@@ -9,5 +9,8 @@ export const MECHANICS = [
   "Each STR point adds 10% of the weapon's attack (rounded down), before beast armor is subtracted.",
   "Blade weapons deal +50% to Magic beasts, Bludgeon to Blade beasts, Magic to Bludgeon beasts; the reverse pairing (Blade vs Bludgeon, Bludgeon vs Magic, Magic vs Blade) deals -50%.",
   "Magic beasts wear Cloth, Blade beasts Hide, Bludgeon beasts Metal. Beasts hit an empty armor slot for 1.5x their attack; armor of the type their weapon beats also takes 1.5x, and armor that beats it halves the hit.",
+  "Greatness is floor(sqrt(item xp)), at most 20. Only equipped items gain xp: twice the adventurer's xp from a beast, the same amount from an obstacle.",
+  "At greatness 15 an item gains a suffix worth +3 stat points, sometimes split (+2/+1 or +1/+1/+1). Equipped, all of them count; in the bag only its VIT and CHA count. Shown stats include these bonuses, and prices, max health and damage use them.",
+  "At greatness 20 an item stops gaining xp and you get 1 extra stat point to spend.",
   "A beast's level is random up to three times yours, plus 10, 20, 40 or 80 once you reach level 20, 30, 40 or 50.",
 ];

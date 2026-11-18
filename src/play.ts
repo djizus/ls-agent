@@ -3,9 +3,10 @@ import type { Action, Item } from "./codec.ts";
 import { emit } from "./events.ts";
 import { itemOf, levelOf, potionPrice, priceOf, type LootItem } from "./items.ts";
 import { marketOf } from "./market.ts";
+import { SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
 import { act, newPracticeGame, preview, replay, revertReason, type Game, type Snapshot } from "./practice.ts";
 
-type Gear = LootItem & { greatness: number };
+type Gear = LootItem & { greatness: number; suffix?: string; bonus?: Partial<State["stats"]> };
 export type State = {
   over: boolean;
   level: number;
@@ -23,10 +24,14 @@ export type State = {
 };
 
 
-const gear = (i: Item): Gear => ({ ...itemOf(i.id)!, greatness: levelOf(i.xp) });
 
 export function describe(s: Snapshot, id: string): State {
-  const a = s.adventurer;
+  const a = { ...s.adventurer, stats: effectiveStats(s.adventurer, s.bag, id) };
+  const gear = (i: Item): Gear => {
+    const greatness = levelOf(i.xp);
+    const suffix = greatness >= SUFFIX_GREATNESS ? suffixOf(i.id, a.item_specials_salt, id) : undefined;
+    return { ...itemOf(i.id)!, greatness, ...(suffix && { suffix, bonus: SUFFIXES[suffix] }) };
+  };
   return {
     over: s.over,
     level: levelOf(a.xp),
@@ -44,16 +49,18 @@ export function describe(s: Snapshot, id: string): State {
   };
 }
 
+const ABBR: Record<string, string> = { strength: "STR", dexterity: "DEX", vitality: "VIT", intelligence: "INT", wisdom: "WIS", charisma: "CHA" };
 const item = (g: LootItem) => `${g.name} [${g.id}] T${g.tier} ${g.type}`;
+const owned = (g: Gear) => `${item(g)} G${g.greatness}${g.suffix ? ` ${g.suffix} (${Object.entries(g.bonus!).map(([k, v]) => `+${v} ${ABBR[k]}`).join(" ")})` : ""}`;
 
 export function render(s: State): string {
   const st = s.stats;
   const lines = [
     s.over ? "DEAD." : s.beast ? "IN BATTLE." : "Exploring.",
     `Level ${s.level} | HP ${s.health}/${s.maxHealth} | Gold ${s.gold} | XP ${s.xp} | Stat points ${s.statUpgradesAvailable}`,
-    `Stats STR ${st.strength} DEX ${st.dexterity} VIT ${st.vitality} INT ${st.intelligence} WIS ${st.wisdom} CHA ${st.charisma}`,
-    `Equipped: ${s.equipment.map((g) => `${g.slot}: ${item(g)} G${g.greatness}`).join("; ")}`,
-    `Bag: ${s.bag.map((g) => `${item(g)} G${g.greatness}`).join("; ") || "empty"}`,
+    `Stats (with item bonuses) STR ${st.strength} DEX ${st.dexterity} VIT ${st.vitality} INT ${st.intelligence} WIS ${st.wisdom} CHA ${st.charisma}`,
+    `Equipped: ${s.equipment.map((g) => `${g.slot}: ${owned(g)}`).join("; ")}`,
+    `Bag: ${s.bag.map(owned).join("; ") || "empty"}`,
   ];
   if (s.beast) lines.push(`Beast: ${s.beast.name} level ${s.beast.level} T${s.beast.tier} ${s.beast.type}, ${s.beast.health} HP`);
   if (!s.beast) lines.push(`Potions: ${s.potionPrice} gold each, ${Math.ceil((s.maxHealth - s.health) / 10)} to reach full health.`);
