@@ -188,20 +188,19 @@ async function loadHistory() {
   $("games").innerHTML = games.slice(0, 60).map((g) => `<tr><td>${g.id}</td><td>${g.level ?? "…"}</td><td class="ending">${g.ended_at ? esc(g.ending ?? "") + (g.mismatches ? ` · <span class="bad">${g.mismatches} mismatches</span>` : "") : "playing"}</td></tr>`).join("");
 }
 
-async function boot() {
-  renderState(await fetch("/api/state").then((r) => r.json()));
-  for (const e of await fetch("/api/recent").then((r) => r.json())) onEvent(e);
-  loadHistory();
-  const c = await fetch("/api/check").then((r) => r.json());
-  if (c) {
-    $("check").textContent = `contract check ${c.failed ? `FAILED (${c.failed})` : "ok"}`;
-    $("check").style.color = c.failed ? "var(--bad)" : "var(--hp)";
-  }
-  const source = new EventSource("/events");
-  source.onerror = () => ($("status").textContent = "reconnecting…");
-  source.onmessage = (m) => onEvent(JSON.parse(m.data));
-}
-boot();
+const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const source = new EventSource("/events");
+source.onopen = () => ($("status").textContent = "live");
+source.onerror = () => ($("status").textContent = "reconnecting…");
+source.onmessage = (m) => onEvent(JSON.parse(m.data));
+get("/api/state").then(renderState);
+get("/api/recent").then((events) => (events ?? []).forEach(onEvent));
+loadHistory().catch(() => {});
+get("/api/check").then((c) => {
+  if (!c) return;
+  $("check").textContent = `contract check ${c.failed ? `FAILED (${c.failed})` : "ok"}`;
+  $("check").style.color = c.failed ? "var(--bad)" : "var(--hp)";
+});
 </script>
 </body>
 </html>

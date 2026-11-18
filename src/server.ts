@@ -7,7 +7,7 @@ import { snapshot } from "./play.ts";
 import { subscribe } from "./events.ts";
 import { handleMcp } from "./mcp.ts";
 
-const page = new URL("../web/index.html", import.meta.url).pathname;
+const page = readFileSync(new URL("../web/index.html", import.meta.url));
 const CHECK = `${VAR_DIR}contract-check.json`;
 
 async function json(req: IncomingMessage): Promise<unknown> {
@@ -67,7 +67,7 @@ export function serve(): void {
     }
     if (url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html" });
-      return res.end(readFileSync(page));
+      return res.end(page);
     }
     res.writeHead(404).end();
   }).listen(PORT, HOST, () => console.log(`ls-agent on http://${HOST}:${PORT}`));
