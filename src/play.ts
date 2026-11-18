@@ -2,6 +2,7 @@ import { beastOf, type Beast } from "./beast.ts";
 import type { Action, Item } from "./codec.ts";
 import { emit } from "./events.ts";
 import { itemOf, levelOf, potionPrice, priceOf, type LootItem } from "./items.ts";
+import { beastHit, yourHit } from "./combat.ts";
 import { marketOf } from "./market.ts";
 import { MARKET } from "./settings.ts";
 import { SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
@@ -66,7 +67,14 @@ export function render(s: State): string {
     `Equipped: ${s.equipment.map((g) => `${g.slot}: ${owned(g)}`).join("; ")}`,
     `Bag: ${s.bag.map(owned).join("; ") || "empty"}`,
   ];
-  if (s.beast) lines.push(`Beast: ${s.beast.name} level ${s.beast.level} T${s.beast.tier} ${s.beast.type}, ${s.beast.health} HP`);
+  if (s.beast) {
+    const worn = (slot: string) => s.equipment.find((g) => g.slot === slot);
+    const mine = yourHit(worn("weapon"), s.stats, s.beast);
+    const blows = Math.ceil(s.beast.health / mine.normal);
+    const theirs = ["chest", "head", "waist", "foot", "hand"].map((slot) => `${slot} ${beastHit(s.beast!, worn(slot)).normal}`);
+    lines.push(`Beast: ${s.beast.name} level ${s.beast.level} T${s.beast.tier} ${s.beast.type}, ${s.beast.health} HP`);
+    lines.push(`Your hit: ${mine.normal} damage (${mine.crit} on a crit), so ${blows} blows to kill. Its hit by slot struck: ${theirs.join(", ")} (double on a crit, ${s.level}% chance).`);
+  }
   if (!s.beast) lines.push(`Potions: ${s.potionPrice} gold each, ${Math.ceil((s.maxHealth - s.health) / 10)} to reach full health.`);
   if (s.market.length) lines.push(`Market (items start at G1): ${s.market.map((m) => `${item(m)} ${m.slot} ${m.price}g${m.slot === "weapon" ? ` (${attack(m, 1)}, ${attack(m, 20)} at G20)` : ""}`).join("; ")}`);
   return lines.join("\n");
