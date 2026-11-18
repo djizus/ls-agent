@@ -6,7 +6,7 @@ import { provider } from "./wallet.ts";
 export type Snapshot = { adventurer: Adventurer; bag: Item[]; over: boolean };
 export type Game = { id: string; packets: bigint[]; hashes: string[] };
 
-const FAR_BLOCK = 10n ** 12n;
+const FAR_BLOCK = 4_000_000_000n;
 
 const randomHash = () => "0x" + randomBytes(31).toString("hex");
 
