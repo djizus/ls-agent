@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { SLOTS, encodePacket, type Action } from "./codec.ts";
-import { BENCHMARK, GAME_CORE } from "./config.ts";
+import { DUNGEON } from "./config.ts";
 import { ITEMS, itemName, priceOf } from "./items.ts";
-import { BEAST_MODE_MARKET, marketOf } from "./market.ts";
+import { marketOf } from "./market.ts";
+import { MARKET } from "./settings.ts";
 import { act, hashes, newPracticeGame, replay, revertReason, type Game, type Snapshot } from "./practice.ts";
-import { provider } from "./wallet.ts";
 
 const NOT_ON_MARKET = "item does not exist";
 const NOT_ENOUGH_GOLD = "not enough gold";
-const BEAST_MODE_SETTINGS = "2";
 
 async function inBatches<T, R>(items: T[], run: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = [];
@@ -18,7 +17,7 @@ async function inBatches<T, R>(items: T[], run: (item: T) => Promise<R>): Promis
 }
 
 async function reachLevelUp(levelUps: number): Promise<{ game: Game; state: Snapshot }> {
-  for (const id of BENCHMARK) {
+  for (const id of DUNGEON.benchmark) {
     const game = newPracticeGame(id);
     let state = await replay(game);
     let seen = 0;
@@ -44,12 +43,6 @@ async function tryBuy(game: Game, state: Snapshot, item: number): Promise<{ gold
   }
 }
 
-test("Beast Mode market config matches the live settings", { timeout: 30_000 }, async () => {
-  const out = await provider.callContract({ contractAddress: GAME_CORE, entrypoint: "get_settings", calldata: [BEAST_MODE_SETTINGS] });
-  const [pair01, pair23, pair4_enabled] = out.slice(-6, -3).map(BigInt);
-  assert.deepEqual({ pair01, pair23, pair4_enabled }, BEAST_MODE_MARKET);
-});
-
 test("items table names, slots and prices", () => {
   assert.equal(ITEMS.length, 101);
   assert.deepEqual(ITEMS[11], { id: 12, name: "Wand", slot: "weapon", type: "Magic", tier: 5 });
@@ -65,7 +58,7 @@ for (const levelUps of [1, 2, 3]) {
     const { game, state } = await reachLevelUp(levelUps);
     const a = state.adventurer;
     const owned = new Set([...Object.values(a.equipment), ...state.bag].map((i) => i.id));
-    const offers = marketOf(a, game.id).filter((o) => !owned.has(o.id));
+    const offers = marketOf(a, game.id, MARKET).filter((o) => !owned.has(o.id));
     const listed = new Set(offers.map((o) => o.id));
     const unlisted = ITEMS.map((i) => i.id).filter((id) => !listed.has(id) && !owned.has(id)).sort(() => Math.random() - 0.5).slice(0, 12);
     assert.ok(offers.length > 5);

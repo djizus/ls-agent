@@ -1,3 +1,4 @@
+import { MARKET } from "./settings.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
@@ -212,7 +213,7 @@ test("a G15 item's suffix adds its stats: equipped gives all of them, the bag ke
   spent.forEach((s) => assert.equal(s.paid, s.price));
 
   const owned = new Set([...Object.values(a.equipment), ...real.bag].map((i) => i.id));
-  const offer = marketOf(a, SUFFIX_GAME).find((o) => !owned.has(o.id))!;
+  const offer = marketOf(a, SUFFIX_GAME, MARKET).find((o) => !owned.has(o.id))!;
   const bought = await fromRealGame(AFTER_UNLOCK, [[{ type: "buy", item: offer.id, equip: false }]]);
   assert.equal(a.gold - bought.adventurer.gold, priceOf(offer.id, real.stats.charisma));
   assert.notEqual(priceOf(offer.id, real.stats.charisma), priceOf(offer.id, a.stats.charisma));

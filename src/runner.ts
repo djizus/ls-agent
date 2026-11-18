@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
-import { BENCHMARK } from "./config.ts";
+import { DUNGEON } from "./config.ts";
 import { db } from "./db.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide } from "./decide.ts";
 import { emit, subscribe } from "./events.ts";
-import { begin, commit, movesMade, options, phase, render, shape, snapshot, type Phase } from "./play.ts";
+import { begin, commit, movesMade, options, phase, render, shape, snapshot, verify, type Phase } from "./play.ts";
 
 const promptFile = process.env.LS_STRATEGY ?? new URL("../strategy/prompt.md", import.meta.url).pathname;
 const MAX_REJECTIONS = 3;
@@ -14,6 +14,7 @@ let row: number | undefined;
 let stopping = false;
 let busy = false;
 let cost = 0;
+let mismatches = 0;
 
 subscribe((e) => {
   if (row !== undefined && e.kind !== "state") db.prepare("INSERT INTO events (game, at, body) VALUES (?, ?, ?)").run(row, e.at, JSON.stringify(e));
@@ -29,22 +30,29 @@ export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
 }
 
 async function playGame(id: string): Promise<void> {
+  let ending = "stopped";
   const strategy = loadStrategy();
   db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(strategy.hash, strategy.text, Date.now());
   row = Number(db.prepare("INSERT INTO games (mode, game_id, strategy, started_at) VALUES ('practice', ?, ?, ?)").run(id, strategy.hash, Date.now()).lastInsertRowid);
   emit({ kind: "status", text: `game ${row} on ${id.slice(-8)}` });
   try {
-    await playMoves(id, strategy.rules);
+    ending = await playMoves(id, strategy.rules);
+  } catch (err) {
+    ending = `failed: ${(err as Error).message.slice(0, 200)}`;
   } finally {
     const end = snapshot();
-    db.prepare("UPDATE games SET ended_at = ?, level = ?, xp = ?, moves = ?, cost_usd = ? WHERE id = ?").run(Date.now(), end?.level ?? 0, end?.xp ?? 0, movesMade(), cost, row);
-    emit({ kind: "status", text: `game ${row} finished at level ${end?.level ?? 0}` });
+    db.prepare("UPDATE games SET ended_at = ?, level = ?, xp = ?, moves = ?, cost_usd = ?, ending = ?, mismatches = ? WHERE id = ?").run(Date.now(), end?.level ?? 0, end?.xp ?? 0, movesMade(), cost, ending, mismatches, row);
+    emit({ kind: "status", text: `game ${row} ${ending}` });
     row = undefined;
   }
 }
 
-async function playMoves(id: string, rules: (p: Phase) => string): Promise<void> {
+const DOING: Record<string, string> = { explore: "exploring", attack: "fighting", flee: "fleeing" };
+
+async function playMoves(id: string, rules: (p: Phase) => string): Promise<string> {
   let state = await begin(id);
+  let ending = "stopped";
+  mismatches = 0;
   let note = "";
   let rejected = "";
   let rejections = 0;
@@ -58,7 +66,15 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<void>
     emit({ kind: "tool", name: "act", input: actions });
     try {
       if (!actions.length) throw new Error("spend your stat points before anything else");
+      const drift = await verify(state, actions);
+      if (drift) {
+        mismatches++;
+        emit({ kind: "status", text: `CONTRACT MISMATCH: ${drift}` });
+      }
+      const before = state;
       state = await commit(actions);
+      const last = actions.at(-1)!.type;
+      if (state.over) ending = `died at level ${state.level} while ${DOING[last] ?? last} from ${before.health}/${before.maxHealth} HP${before.beast ? ` against ${before.beast.name} level ${before.beast.level}` : ""}`;
       note = decision.note;
       rejected = "";
       rejections = 0;
@@ -66,16 +82,18 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<void>
       rejected = `Your last decision ${JSON.stringify(decision.actions)} was rejected by the game: ${(err as Error).message}. Choose again.`;
       emit({ kind: "result", name: "act", output: rejected });
       rejections++;
+      if (rejections === MAX_REJECTIONS) ending = `stopped after ${MAX_REJECTIONS} rejected decisions`;
     }
   }
+  return ending;
 }
 
-export async function playBenchmark(count = BENCHMARK.length): Promise<void> {
+export async function playBenchmark(count = DUNGEON.benchmark.length): Promise<void> {
   if (busy) return;
   busy = true;
   stopping = false;
   try {
-    for (const id of BENCHMARK.slice(0, count)) {
+    for (const id of DUNGEON.benchmark.slice(0, count)) {
       if (stopping) break;
       await playGame(id).catch((err) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` }));
     }

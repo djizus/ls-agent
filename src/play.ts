@@ -3,6 +3,7 @@ import type { Action, Item } from "./codec.ts";
 import { emit } from "./events.ts";
 import { itemOf, levelOf, potionPrice, priceOf, type LootItem } from "./items.ts";
 import { marketOf } from "./market.ts";
+import { MARKET } from "./settings.ts";
 import { SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
 import { act, newPracticeGame, preview, replay, revertReason, type Game, type Snapshot } from "./practice.ts";
 
@@ -45,7 +46,7 @@ export function describe(s: Snapshot, id: string): State {
     equipment: Object.values(a.equipment).filter((i) => i.id).map(gear),
     bag: s.bag.map(gear),
     potionPrice: potionPrice(levelOf(a.xp), a.stats.charisma),
-    market: a.beast_health === 0 ? marketOf(a, id).map((o) => ({ ...itemOf(o.id)!, price: o.price })) : [],
+    market: a.beast_health === 0 ? marketOf(a, id, MARKET).map((o) => ({ ...itemOf(o.id)!, price: o.price })) : [],
   };
 }
 
@@ -122,6 +123,22 @@ export async function options(s: State): Promise<string> {
 }
 
 const RANDOM = new Set(["explore", "attack", "flee"]);
+
+export async function verify(s: State, actions: Action[]): Promise<string | undefined> {
+  const fixed = actions.filter((a) => !RANDOM.has(a.type));
+  if (!fixed.length || fixed.some((a) => a.type === "equip" || a.type === "drop")) return;
+  const ups = (stat: string) => fixed.reduce((n, a) => n + (a.type === "upgrade" && a.stat === stat ? a.amount : 0), 0);
+  const charisma = s.stats.charisma + ups("charisma");
+  const potions = fixed.reduce((n, a) => n + (a.type === "potions" ? a.qty : 0), 0);
+  const maxHealth = s.maxHealth + 15 * ups("vitality");
+  const expected = {
+    gold: fixed.reduce((g, a) => g - (a.type === "buy" ? priceOf(a.item, charisma) : 0), s.gold) - potions * potionPrice(s.level, charisma),
+    health: Math.min(s.health + 15 * ups("vitality") + 10 * potions, maxHealth),
+  };
+  const [after] = await preview(game!, fixed, 1);
+  const actual = { gold: after.adventurer.gold, health: after.adventurer.health };
+  if (expected.gold !== actual.gold || expected.health !== actual.health) return `predicted ${JSON.stringify(expected)}, contract ${JSON.stringify(actual)} for ${JSON.stringify(fixed)}`;
+}
 
 export function shape(s: State, actions: Action[], reserve = 0): Action[] {
   if (s.statUpgradesAvailable > 0) return actions.filter((a) => !RANDOM.has(a.type));

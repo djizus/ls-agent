@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BENCHMARK } from "./config.ts";
+import { DUNGEON } from "./config.ts";
 import { act, newPracticeGame, preview, replay } from "./practice.ts";
 
 test("a practice game starts fresh, takes a move, and previews differ by luck", { timeout: 60_000 }, async () => {
-  const game = newPracticeGame(BENCHMARK[1]);
+  const game = newPracticeGame(DUNGEON.benchmark[1]);
   const start = await replay(game);
   assert.equal(start.adventurer.xp, 0);
   assert.equal(start.adventurer.equipment.weapon.id, 12);

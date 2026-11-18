@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
-import { HOST, PORT } from "./config.ts";
+import { HOST, PORT, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { halt, playBenchmark, running } from "./runner.ts";
 import { snapshot } from "./play.ts";
@@ -8,6 +8,7 @@ import { subscribe } from "./events.ts";
 import { handleMcp } from "./mcp.ts";
 
 const page = new URL("../web/index.html", import.meta.url).pathname;
+const CHECK = `${VAR_DIR}contract-check.json`;
 
 async function json(req: IncomingMessage): Promise<unknown> {
   let raw = "";
@@ -55,6 +56,7 @@ export function serve(): void {
     if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
     if (url.pathname === "/api/games") return reply(res, db.prepare("SELECT * FROM games ORDER BY id DESC LIMIT 200").all());
     if (url.pathname === "/api/strategies") return reply(res, strategies());
+    if (url.pathname === "/api/check") return reply(res, existsSync(CHECK) ? JSON.parse(readFileSync(CHECK, "utf8")) : null);
     if (url.pathname.startsWith("/assets/") && /^\/assets\/[a-z]+\/?[A-Za-z0-9_]*\.(png|svg)$/.test(url.pathname)) {
       const file = new URL(`../web${url.pathname}`, import.meta.url).pathname;
       if (!existsSync(file)) return res.writeHead(404).end();

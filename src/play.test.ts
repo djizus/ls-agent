@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BENCHMARK } from "./config.ts";
+import { DUNGEON } from "./config.ts";
 import { begin, commit, render, shape, type State } from "./play.ts";
 import { act, newPracticeGame, preview, replay, type Snapshot } from "./practice.ts";
 
 test("market and potions are open between fights, not only at level-up", { timeout: 120_000 }, async () => {
-  let state = await begin(BENCHMARK[0]);
+  let state = await begin(DUNGEON.benchmark[0]);
   while (state.beast || state.statUpgradesAvailable > 0 || state.health === state.maxHealth) {
     const points = state.statUpgradesAvailable;
     const upgrade = points > 0 ? [{ type: "upgrade" as const, stat: "dexterity" as const, amount: points }] : [];
@@ -18,7 +18,7 @@ test("market and potions are open between fights, not only at level-up", { timeo
 });
 
 test("attack and flee without a threshold run until the fight ends; tillHealth stops early", { timeout: 120_000 }, async () => {
-  const game = newPracticeGame(BENCHMARK[4]);
+  const game = newPracticeGame(DUNGEON.benchmark[4]);
   let snap = await replay(game);
   while (snap.adventurer.beast_health === 0) {
     const points = snap.adventurer.stat_upgrades_available;
@@ -47,7 +47,7 @@ test("potion price formula matches the contract; explores are healed first and p
     return state;
   };
   let state: State | undefined;
-  for (const id of BENCHMARK) if ((state = await hurtWithGold(id))) break;
+  for (const id of DUNGEON.benchmark) if ((state = await hurtWithGold(id))) break;
   assert.ok(state, "no benchmark adventurer reached a hurt state with gold");
   const goldBefore = state.gold;
   const healthBefore = state.health;

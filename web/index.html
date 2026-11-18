@@ -59,6 +59,7 @@
 <header>
   <img src="/assets/skull.png" alt="">
   <h1>Death Mountain Agent</h1>
+  <span id="check" class="pix dim"></span>
   <span id="status">connecting…</span>
   <button class="primary" onclick="play()">Run benchmark</button>
   <button onclick="post('/api/stop')">Stop</button>
@@ -78,7 +79,7 @@
   </section>
   <section class="wide">
     <h2>Games <span id="summary" class="dim"></span></h2>
-    <div class="tablewrap"><table><thead><tr><th>#</th><th>Mode</th><th>Strategy</th><th>Level</th><th>XP</th><th>Moves</th><th>Cost</th><th>Ended</th></tr></thead><tbody id="games"></tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Mode</th><th>Strategy</th><th>Level</th><th>XP</th><th>Moves</th><th>Cost</th><th>Ending</th></tr></thead><tbody id="games"></tbody></table></div>
   </section>
 </main>
 <script>
@@ -128,10 +129,15 @@ async function loadGames() {
   const games = await (await fetch("/api/games")).json();
   const levels = games.filter((g) => g.ended_at).map((g) => g.level).sort((a, b) => a - b);
   $("summary").textContent = levels.length ? `· ${levels.length} played · median level ${levels[Math.floor(levels.length / 2)]} · best ${levels.at(-1)}` : "";
-  $("games").innerHTML = games.map((g) => `<tr><td>${g.id}</td><td>${g.mode}</td><td class="dim">${g.strategy}</td><td>${g.level ?? "…"}</td><td>${g.xp ?? ""}</td><td>${g.moves ?? ""}</td><td>$${g.cost_usd.toFixed(2)}</td><td class="dim">${g.ended_at ? new Date(g.ended_at).toLocaleString() : "playing"}</td></tr>`).join("");
+  $("games").innerHTML = games.map((g) => `<tr><td>${g.id}</td><td>${g.mode}</td><td class="dim">${g.strategy}</td><td>${g.level ?? "…"}</td><td>${g.xp ?? ""}</td><td>${g.moves ?? ""}</td><td>$${g.cost_usd.toFixed(2)}</td><td class="dim" style="text-align:left">${g.ended_at ? esc(g.ending ?? "") + (g.mismatches ? ` · ${g.mismatches} contract mismatches` : "") : "playing"}</td></tr>`).join("");
 }
 
 fetch("/api/state").then((r) => r.json()).then(renderState);
+fetch("/api/check").then((r) => r.json()).then((c) => {
+  if (!c) return;
+  $("check").textContent = `contract check ${c.failed ? `FAILED (${c.failed})` : "ok"} · ${new Date(c.at).toLocaleString()}`;
+  $("check").style.color = c.failed ? "var(--bad)" : "var(--hp)";
+});
 loadGames();
 const source = new EventSource("/events");
 source.onopen = () => ($("status").textContent = "live");

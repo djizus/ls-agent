@@ -30,3 +30,7 @@ db.exec(`
     body TEXT NOT NULL
   );
 `);
+
+const columns = (db.prepare("PRAGMA table_info(games)").all() as { name: string }[]).map((c) => c.name);
+if (!columns.includes("ending")) db.exec("ALTER TABLE games ADD COLUMN ending TEXT");
+if (!columns.includes("mismatches")) db.exec("ALTER TABLE games ADD COLUMN mismatches INTEGER NOT NULL DEFAULT 0");
