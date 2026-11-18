@@ -1,8 +1,10 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { readFileSync } from "node:fs";
 import { PORT } from "./config.ts";
-import { running, send, start, stop } from "./agent.ts";
-import { subscribe } from "./events.ts";
+import { running, send } from "./agent.ts";
+import { db } from "./db.ts";
+import { halt, playGames } from "./runner.ts";
+import { emit, subscribe } from "./events.ts";
 import { handleMcp } from "./mcp.ts";
 
 const page = new URL("../web/index.html", import.meta.url).pathname;
@@ -24,13 +26,18 @@ export function serve(): void {
       req.on("close", off);
       return;
     }
-    if (url.pathname === "/api/start" && req.method === "POST") {
-      start();
+    if (url.pathname === "/api/play" && req.method === "POST") {
+      const games = Number(((await json(req)) as { games?: number })?.games ?? 1);
+      playGames(games).then(() => emit({ kind: "status", text: "batch done" }));
       return res.end("ok");
     }
     if (url.pathname === "/api/stop" && req.method === "POST") {
-      stop();
+      halt();
       return res.end("ok");
+    }
+    if (url.pathname === "/api/games") {
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify(db.prepare("SELECT * FROM games ORDER BY id DESC LIMIT 200").all()));
     }
     if (url.pathname === "/api/say" && req.method === "POST") {
       send(String(((await json(req)) as { text?: string })?.text ?? ""));

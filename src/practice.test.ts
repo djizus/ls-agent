@@ -10,6 +10,8 @@ test("a practice game starts fresh, takes a move, and previews differ by luck", 
   const after = await act(game, [{ type: "explore" }]);
   assert.equal(game.packets.length, 1);
   assert.ok(after.adventurer.xp > 0 || after.adventurer.gold !== start.adventurer.gold || after.adventurer.health !== start.adventurer.health);
-  const outcomes = await preview(game, [{ type: after.adventurer.beast_health > 0 ? "attack" : "explore" }], 8);
+  const points = after.adventurer.stat_upgrades_available;
+  const upgrade = points > 0 ? [{ type: "upgrade" as const, stat: "vitality" as const, amount: points }] : [];
+  const outcomes = await preview(game, [...upgrade, { type: after.adventurer.beast_health > 0 ? "attack" : "explore" }], 8);
   assert.ok(new Set(outcomes.map((o) => JSON.stringify(o.adventurer))).size > 1);
 });

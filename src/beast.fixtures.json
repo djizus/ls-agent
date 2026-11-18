@@ -1,0 +1,884 @@
+[
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 2178,
+    "beast_salt": 120679,
+    "beast_health": 292,
+    "beast": {
+      "id": 69,
+      "name": "\"Carrion Shout\" Golem",
+      "baseName": "Golem",
+      "tier": 4,
+      "type": "Bludgeon",
+      "level": 71,
+      "health": 292,
+      "specialPrefix": "Carrion",
+      "specialSuffix": "Shout",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c851ad010ed60d00173d21",
+    "xp": 1971,
+    "beast_salt": 94915,
+    "beast_health": 835,
+    "beast": {
+      "id": 2,
+      "name": "\"Corruption Song\" Typhon",
+      "baseName": "Typhon",
+      "tier": 1,
+      "type": "Magic",
+      "level": 155,
+      "health": 835,
+      "specialPrefix": "Corruption",
+      "specialSuffix": "Song",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c877ec01142fb2000cf581",
+    "xp": 1965,
+    "beast_salt": 20702,
+    "beast_health": 813,
+    "beast": {
+      "id": 27,
+      "name": "\"Damnation Bane\" Manticore",
+      "baseName": "Manticore",
+      "tier": 1,
+      "type": "Blade",
+      "level": 83,
+      "health": 813,
+      "specialPrefix": "Damnation",
+      "specialSuffix": "Bane",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b4b01097166001d0ae1",
+    "xp": 1939,
+    "beast_salt": 87059,
+    "beast_health": 429,
+    "beast": {
+      "id": 14,
+      "name": "\"Vortex Sun\" Draugr",
+      "baseName": "Draugr",
+      "tier": 3,
+      "type": "Magic",
+      "level": 160,
+      "health": 429,
+      "specialPrefix": "Vortex",
+      "specialSuffix": "Sun",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82ba701097e5f001a6b41",
+    "xp": 1898,
+    "beast_salt": 33899,
+    "beast_health": 648,
+    "beast": {
+      "id": 60,
+      "name": "\"Woe Grasp\" Juggernaut",
+      "baseName": "Juggernaut",
+      "tier": 2,
+      "type": "Bludgeon",
+      "level": 112,
+      "health": 648,
+      "specialPrefix": "Woe",
+      "specialSuffix": "Grasp",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c877990114242f000a1da1",
+    "xp": 1840,
+    "beast_salt": 73757,
+    "beast_health": 816,
+    "beast": {
+      "id": 19,
+      "name": "\"Carrion Instrument\" Sprite",
+      "baseName": "Sprite",
+      "tier": 4,
+      "type": "Magic",
+      "level": 154,
+      "health": 816,
+      "specialPrefix": "Carrion",
+      "specialSuffix": "Instrument",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b660109753500159c41",
+    "xp": 1762,
+    "beast_salt": 35249,
+    "beast_health": 1023,
+    "beast": {
+      "id": 26,
+      "name": "\"Agony Bender\" Griffin",
+      "baseName": "Griffin",
+      "tier": 1,
+      "type": "Blade",
+      "level": 116,
+      "health": 1023,
+      "specialPrefix": "Agony",
+      "specialSuffix": "Bender",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c841fa010ca11b001726e1",
+    "xp": 1757,
+    "beast_salt": 74762,
+    "beast_health": 658,
+    "beast": {
+      "id": 1,
+      "name": "\"Dread Growl\" Warlock",
+      "baseName": "Warlock",
+      "tier": 1,
+      "type": "Magic",
+      "level": 109,
+      "health": 658,
+      "specialPrefix": "Dread",
+      "specialSuffix": "Growl",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c86b0c011262d200138361",
+    "xp": 1706,
+    "beast_salt": 13006,
+    "beast_health": 553,
+    "beast": {
+      "id": 56,
+      "name": "\"Plague Root\" Titan",
+      "baseName": "Titan",
+      "tier": 2,
+      "type": "Bludgeon",
+      "level": 153,
+      "health": 553,
+      "specialPrefix": "Plague",
+      "specialSuffix": "Root",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c84db8010e484c00132561",
+    "xp": 1655,
+    "beast_salt": 18089,
+    "beast_health": 855,
+    "beast": {
+      "id": 55,
+      "name": "\"Mind Form\" Tarrasque",
+      "baseName": "Tarrasque",
+      "tier": 1,
+      "type": "Bludgeon",
+      "level": 142,
+      "health": 855,
+      "specialPrefix": "Mind",
+      "specialSuffix": "Form",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c8527e010ef354000fe8c1",
+    "xp": 1607,
+    "beast_salt": 13896,
+    "beast_health": 500,
+    "beast": {
+      "id": 55,
+      "name": "\"Brimstone Roar\" Tarrasque",
+      "baseName": "Tarrasque",
+      "tier": 1,
+      "type": "Bludgeon",
+      "level": 64,
+      "health": 500,
+      "specialPrefix": "Brimstone",
+      "specialSuffix": "Roar",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020708000001c84936010da5ec00048001",
+    "xp": 1605,
+    "beast_salt": 12165,
+    "beast_health": 966,
+    "beast": {
+      "id": 32,
+      "name": "\"Bramble Shout\" Ammit",
+      "baseName": "Ammit",
+      "tier": 2,
+      "type": "Blade",
+      "level": 53,
+      "health": 966,
+      "specialPrefix": "Bramble",
+      "specialSuffix": "Shout",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c84e98010e67bc001e86e1",
+    "xp": 1597,
+    "beast_salt": 25991,
+    "beast_health": 216,
+    "beast": {
+      "id": 57,
+      "name": "\"Tempest Grasp\" Nephilim",
+      "baseName": "Nephilim",
+      "tier": 2,
+      "type": "Bludgeon",
+      "level": 40,
+      "health": 216,
+      "specialPrefix": "Tempest",
+      "specialSuffix": "Grasp",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82aef01096487001b3221",
+    "xp": 1594,
+    "beast_salt": 16135,
+    "beast_health": 823,
+    "beast": {
+      "id": 60,
+      "name": "\"Soul Moon\" Juggernaut",
+      "baseName": "Juggernaut",
+      "tier": 2,
+      "type": "Bludgeon",
+      "level": 87,
+      "health": 823,
+      "specialPrefix": "Soul",
+      "specialSuffix": "Moon",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c83156010a4a0e001b5601",
+    "xp": 1577,
+    "beast_salt": 26878,
+    "beast_health": 422,
+    "beast": {
+      "id": 5,
+      "name": "\"Miracle Bite\" Basilisk",
+      "baseName": "Basilisk",
+      "tier": 1,
+      "type": "Magic",
+      "level": 106,
+      "health": 422,
+      "specialPrefix": "Miracle",
+      "specialSuffix": "Bite",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c84cfb010e2db3001b4b21",
+    "xp": 1569,
+    "beast_salt": 32812,
+    "beast_health": 472,
+    "beast": {
+      "id": 32,
+      "name": "\"Glyph Bane\" Ammit",
+      "baseName": "Ammit",
+      "tier": 2,
+      "type": "Blade",
+      "level": 84,
+      "health": 472,
+      "specialPrefix": "Glyph",
+      "specialSuffix": "Bane",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c83eb8010c2b9200046461",
+    "xp": 1556,
+    "beast_salt": 76699,
+    "beast_health": 246,
+    "beast": {
+      "id": 2,
+      "name": "\"Death Shout\" Typhon",
+      "baseName": "Typhon",
+      "tier": 1,
+      "type": "Magic",
+      "level": 127,
+      "health": 246,
+      "specialPrefix": "Death",
+      "specialSuffix": "Shout",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c852a8010ef9440014e6a1",
+    "xp": 1546,
+    "beast_salt": 110135,
+    "beast_health": 358,
+    "beast": {
+      "id": 58,
+      "name": "\"Cataclysm Grasp\" Behemoth",
+      "baseName": "Behemoth",
+      "tier": 2,
+      "type": "Bludgeon",
+      "level": 81,
+      "health": 358,
+      "specialPrefix": "Cataclysm",
+      "specialSuffix": "Grasp",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c8518f010ed1f9001ff8a1",
+    "xp": 1521,
+    "beast_salt": 66176,
+    "beast_health": 914,
+    "beast": {
+      "id": 36,
+      "name": "\"Golem Song\" Weretiger",
+      "baseName": "Weretiger",
+      "tier": 3,
+      "type": "Blade",
+      "level": 115,
+      "health": 914,
+      "specialPrefix": "Golem",
+      "specialSuffix": "Song",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 190,
+    "beast_salt": 84600,
+    "beast_health": 52,
+    "beast": {
+      "id": 9,
+      "name": "\"Eagle Bane\" Chimera",
+      "baseName": "Chimera",
+      "tier": 2,
+      "type": "Magic",
+      "level": 19,
+      "health": 52,
+      "specialPrefix": "Eagle",
+      "specialSuffix": "Bane",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 283,
+    "beast_salt": 34046,
+    "beast_health": 145,
+    "beast": {
+      "id": 37,
+      "name": "\"Doom Root\" Wyvern",
+      "baseName": "Wyvern",
+      "tier": 3,
+      "type": "Blade",
+      "level": 30,
+      "health": 145,
+      "specialPrefix": "Doom",
+      "specialSuffix": "Root",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 699,
+    "beast_salt": 105995,
+    "beast_health": 597,
+    "beast": {
+      "id": 45,
+      "name": "\"Doom Shadow\" Direwolf",
+      "baseName": "Direwolf",
+      "tier": 4,
+      "type": "Blade",
+      "level": 84,
+      "health": 597,
+      "specialPrefix": "Doom",
+      "specialSuffix": "Shadow",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 840,
+    "beast_salt": 130313,
+    "beast_health": 249,
+    "beast": {
+      "id": 74,
+      "name": "\"Dragon Grasp\" Orc",
+      "baseName": "Orc",
+      "tier": 5,
+      "type": "Bludgeon",
+      "level": 26,
+      "health": 249,
+      "specialPrefix": "Dragon",
+      "specialSuffix": "Grasp",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 1110,
+    "beast_salt": 71743,
+    "beast_health": 235,
+    "beast": {
+      "id": 62,
+      "name": "\"Miracle Shout\" Jotunn",
+      "baseName": "Jotunn",
+      "tier": 3,
+      "type": "Bludgeon",
+      "level": 61,
+      "health": 235,
+      "specialPrefix": "Miracle",
+      "specialSuffix": "Shout",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 1111,
+    "beast_salt": 46511,
+    "beast_health": 254,
+    "beast": {
+      "id": 2,
+      "name": "\"Miracle Growl\" Typhon",
+      "baseName": "Typhon",
+      "tier": 1,
+      "type": "Magic",
+      "level": 21,
+      "health": 254,
+      "specialPrefix": "Miracle",
+      "specialSuffix": "Growl",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 1286,
+    "beast_salt": 100040,
+    "beast_health": 897,
+    "beast": {
+      "id": 19,
+      "name": "\"Vengeance Moon\" Sprite",
+      "baseName": "Sprite",
+      "tier": 4,
+      "type": "Magic",
+      "level": 32,
+      "health": 897,
+      "specialPrefix": "Vengeance",
+      "specialSuffix": "Moon",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 1295,
+    "beast_salt": 44690,
+    "beast_health": 262,
+    "beast": {
+      "id": 68,
+      "name": "\"Gale Tear\" Yeti",
+      "baseName": "Yeti",
+      "tier": 4,
+      "type": "Bludgeon",
+      "level": 78,
+      "health": 262,
+      "specialPrefix": "Gale",
+      "specialSuffix": "Tear",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 1331,
+    "beast_salt": 50094,
+    "beast_health": 707,
+    "beast": {
+      "id": 53,
+      "name": "\"Blood Glow\" Balrog",
+      "baseName": "Balrog",
+      "tier": 1,
+      "type": "Bludgeon",
+      "level": 108,
+      "health": 707,
+      "specialPrefix": "Blood",
+      "specialSuffix": "Glow",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 1342,
+    "beast_salt": 113926,
+    "beast_health": 341,
+    "beast": {
+      "id": 31,
+      "name": "\"Brood Root\" Qilin",
+      "baseName": "Qilin",
+      "tier": 2,
+      "type": "Blade",
+      "level": 26,
+      "health": 341,
+      "specialPrefix": "Brood",
+      "specialSuffix": "Root",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 1558,
+    "beast_salt": 85831,
+    "beast_health": 291,
+    "beast": {
+      "id": 23,
+      "name": "\"Dread Root\" Kelpie",
+      "baseName": "Kelpie",
+      "tier": 5,
+      "type": "Magic",
+      "level": 111,
+      "health": 291,
+      "specialPrefix": "Dread",
+      "specialSuffix": "Root",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 1902,
+    "beast_salt": 106081,
+    "beast_health": 741,
+    "beast": {
+      "id": 11,
+      "name": "\"Fate Bite\" Rakshasa",
+      "baseName": "Rakshasa",
+      "tier": 3,
+      "type": "Magic",
+      "level": 79,
+      "health": 741,
+      "specialPrefix": "Fate",
+      "specialSuffix": "Bite",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 1921,
+    "beast_salt": 125079,
+    "beast_health": 612,
+    "beast": {
+      "id": 60,
+      "name": "\"Hypnotic Shout\" Juggernaut",
+      "baseName": "Juggernaut",
+      "tier": 2,
+      "type": "Bludgeon",
+      "level": 139,
+      "health": 612,
+      "specialPrefix": "Hypnotic",
+      "specialSuffix": "Shout",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c87a76011489e0001f7381",
+    "xp": 358,
+    "beast_salt": 21660,
+    "beast_health": 236,
+    "beast": {
+      "id": 46,
+      "name": "\"Kraken Glow\" Bear",
+      "baseName": "Bear",
+      "tier": 5,
+      "type": "Blade",
+      "level": 54,
+      "health": 236,
+      "specialPrefix": "Kraken",
+      "specialSuffix": "Glow",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c87a76011489e0001f7381",
+    "xp": 1143,
+    "beast_salt": 14823,
+    "beast_health": 698,
+    "beast": {
+      "id": 27,
+      "name": "\"Skull Shadow\" Manticore",
+      "baseName": "Manticore",
+      "tier": 1,
+      "type": "Blade",
+      "level": 82,
+      "health": 698,
+      "specialPrefix": "Skull",
+      "specialSuffix": "Shadow",
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 6,
+    "beast_salt": 23073,
+    "beast_health": 37,
+    "beast": {
+      "id": 57,
+      "name": "Nephilim",
+      "baseName": "Nephilim",
+      "tier": 2,
+      "type": "Bludgeon",
+      "level": 6,
+      "health": 37,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 16,
+    "beast_salt": 108019,
+    "beast_health": 75,
+    "beast": {
+      "id": 22,
+      "name": "Leprechaun",
+      "baseName": "Leprechaun",
+      "tier": 5,
+      "type": "Magic",
+      "level": 4,
+      "health": 75,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 24,
+    "beast_salt": 90198,
+    "beast_health": 88,
+    "beast": {
+      "id": 20,
+      "name": "Kappa",
+      "baseName": "Kappa",
+      "tier": 4,
+      "type": "Magic",
+      "level": 12,
+      "health": 88,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 35,
+    "beast_salt": 104845,
+    "beast_health": 37,
+    "beast": {
+      "id": 46,
+      "name": "Bear",
+      "baseName": "Bear",
+      "tier": 5,
+      "type": "Blade",
+      "level": 2,
+      "health": 37,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 158,
+    "beast_salt": 124509,
+    "beast_health": 245,
+    "beast": {
+      "id": 36,
+      "name": "Weretiger",
+      "baseName": "Weretiger",
+      "tier": 3,
+      "type": "Blade",
+      "level": 4,
+      "health": 245,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
+    "xp": 218,
+    "beast_salt": 76464,
+    "beast_health": 278,
+    "beast": {
+      "id": 33,
+      "name": "Nue",
+      "baseName": "Nue",
+      "tier": 2,
+      "type": "Blade",
+      "level": 18,
+      "health": 278,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c87a76011489e0001f7381",
+    "xp": 25,
+    "beast_salt": 69785,
+    "beast_health": 66,
+    "beast": {
+      "id": 69,
+      "name": "Golem",
+      "baseName": "Golem",
+      "tier": 4,
+      "type": "Bludgeon",
+      "level": 12,
+      "health": 66,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c87a76011489e0001f7381",
+    "xp": 41,
+    "beast_salt": 4462,
+    "beast_health": 68,
+    "beast": {
+      "id": 26,
+      "name": "Griffin",
+      "baseName": "Griffin",
+      "tier": 1,
+      "type": "Blade",
+      "level": 18,
+      "health": 68,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c87a76011489e0001f7381",
+    "xp": 87,
+    "beast_salt": 67717,
+    "beast_health": 169,
+    "beast": {
+      "id": 15,
+      "name": "Vampire",
+      "baseName": "Vampire",
+      "tier": 3,
+      "type": "Magic",
+      "level": 3,
+      "health": 169,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c87a76011489e0001f7381",
+    "xp": 97,
+    "beast_salt": 54164,
+    "beast_health": 163,
+    "beast": {
+      "id": 63,
+      "name": "Ettin",
+      "baseName": "Ettin",
+      "tier": 3,
+      "type": "Bludgeon",
+      "level": 8,
+      "health": 163,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c87a76011489e0001f7381",
+    "xp": 623,
+    "beast_salt": 25985,
+    "beast_health": 176,
+    "beast": {
+      "id": 3,
+      "name": "Jiangshi",
+      "baseName": "Jiangshi",
+      "tier": 1,
+      "type": "Magic",
+      "level": 17,
+      "health": 176,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c851ad010ed60d00173d21",
+    "xp": 25,
+    "beast_salt": 114531,
+    "beast_health": 36,
+    "beast": {
+      "id": 71,
+      "name": "Troll",
+      "baseName": "Troll",
+      "tier": 5,
+      "type": "Bludgeon",
+      "level": 11,
+      "health": 36,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c851ad010ed60d00173d21",
+    "xp": 106,
+    "beast_salt": 85125,
+    "beast_health": 203,
+    "beast": {
+      "id": 41,
+      "name": "Hippogriff",
+      "baseName": "Hippogriff",
+      "tier": 4,
+      "type": "Blade",
+      "level": 17,
+      "health": 203,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c877ec01142fb2000cf581",
+    "xp": 18,
+    "beast_salt": 58455,
+    "beast_health": 90,
+    "beast": {
+      "id": 55,
+      "name": "Tarrasque",
+      "baseName": "Tarrasque",
+      "tier": 1,
+      "type": "Bludgeon",
+      "level": 4,
+      "health": 90,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  },
+  {
+    "gameId": "0x000000000000000000000100000000020000000001c877ec01142fb2000cf581",
+    "xp": 844,
+    "beast_salt": 70661,
+    "beast_health": 174,
+    "beast": {
+      "id": 6,
+      "name": "Gorgon",
+      "baseName": "Gorgon",
+      "tier": 2,
+      "type": "Magic",
+      "level": 11,
+      "health": 174,
+      "specialPrefix": null,
+      "specialSuffix": null,
+      "isCollectable": false
+    }
+  }
+]

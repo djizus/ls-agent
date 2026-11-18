@@ -39,3 +39,12 @@ export async function preview(game: Game, actions: Action[], samples: number): P
     Array.from({ length: samples }, () => replay(game, [...game.packets, packet], [...game.hashes, randomHash()])),
   );
 }
+
+export function revertReason(err: unknown): string {
+  const text = String(err instanceof Error ? err.message : err);
+  const hexes = [...text.matchAll(/revert_error":"([^"]+)"/g)].flatMap((m) => m[1].split(/,\s*/));
+  const words = hexes
+    .map((h) => (/^0x[0-9a-f]+$/i.test(h) ? Buffer.from(h.slice(2).padStart(h.length % 2 ? h.length - 1 : h.length - 2, "0"), "hex").toString("latin1").replace(/[^\x20-\x7e]/g, "") : h))
+    .filter((w) => w && w !== "ENTRYPOINT_FAILED");
+  return words.length ? words.join("; ") : text.slice(0, 300);
+}
