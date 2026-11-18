@@ -18,6 +18,11 @@ db.exec(`
     moves INTEGER,
     cost_usd REAL NOT NULL DEFAULT 0
   );
+  CREATE TABLE IF NOT EXISTS strategies (
+    hash TEXT PRIMARY KEY,
+    text TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS events (
     game INTEGER NOT NULL,
     at INTEGER NOT NULL,

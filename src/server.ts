@@ -1,11 +1,10 @@
-import { createServer, type IncomingMessage } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { HOST, PORT } from "./config.ts";
-import { running, send } from "./agent.ts";
 import { db } from "./db.ts";
-import { halt, playGames } from "./runner.ts";
-import { describe, snapshot } from "./play.ts";
-import { emit, subscribe } from "./events.ts";
+import { halt, playBenchmark, running } from "./runner.ts";
+import { snapshot } from "./play.ts";
+import { subscribe } from "./events.ts";
 import { handleMcp } from "./mcp.ts";
 
 const page = new URL("../web/index.html", import.meta.url).pathname;
@@ -14,6 +13,22 @@ async function json(req: IncomingMessage): Promise<unknown> {
   let raw = "";
   for await (const chunk of req) raw += chunk;
   return raw ? JSON.parse(raw) : undefined;
+}
+
+function reply(res: ServerResponse, body: unknown): void {
+  res.writeHead(200, { "content-type": "application/json" });
+  res.end(JSON.stringify(body));
+}
+
+function strategies() {
+  const rows = db.prepare("SELECT strategy, level FROM games WHERE ended_at IS NOT NULL AND mode = 'practice'").all() as { strategy: string; level: number }[];
+  const texts = db.prepare("SELECT hash, text, created_at FROM strategies").all() as { hash: string; text: string; created_at: number }[];
+  return texts
+    .map((t) => {
+      const levels = rows.filter((r) => r.strategy === t.hash).map((r) => r.level).sort((a, b) => a - b);
+      return { ...t, games: levels.length, median: levels[Math.floor(levels.length / 2)] ?? null, best: levels.at(-1) ?? null };
+    })
+    .sort((a, b) => b.created_at - a.created_at);
 }
 
 export function serve(): void {
@@ -28,27 +43,17 @@ export function serve(): void {
       return;
     }
     if (url.pathname === "/api/play" && req.method === "POST") {
-      const games = Number(((await json(req)) as { games?: number })?.games ?? 1);
-      playGames(games).then(() => emit({ kind: "status", text: "batch done" }));
+      const games = Number(((await json(req)) as { games?: number })?.games) || undefined;
+      playBenchmark(games);
       return res.end("ok");
     }
     if (url.pathname === "/api/stop" && req.method === "POST") {
       halt();
       return res.end("ok");
     }
-    if (url.pathname === "/api/state") {
-      const s = snapshot();
-      res.writeHead(200, { "content-type": "application/json" });
-      return res.end(JSON.stringify(s ? describe(s) : null));
-    }
-    if (url.pathname === "/api/games") {
-      res.writeHead(200, { "content-type": "application/json" });
-      return res.end(JSON.stringify(db.prepare("SELECT * FROM games ORDER BY id DESC LIMIT 200").all()));
-    }
-    if (url.pathname === "/api/say" && req.method === "POST") {
-      send(String(((await json(req)) as { text?: string })?.text ?? ""));
-      return res.end("ok");
-    }
+    if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
+    if (url.pathname === "/api/games") return reply(res, db.prepare("SELECT * FROM games ORDER BY id DESC LIMIT 200").all());
+    if (url.pathname === "/api/strategies") return reply(res, strategies());
     if (url.pathname.startsWith("/assets/") && /^\/assets\/[a-z]+\/?[A-Za-z0-9_]*\.(png|svg)$/.test(url.pathname)) {
       const file = new URL(`../web${url.pathname}`, import.meta.url).pathname;
       if (!existsSync(file)) return res.writeHead(404).end();

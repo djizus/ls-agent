@@ -60,8 +60,7 @@
   <img src="/assets/skull.png" alt="">
   <h1>Death Mountain Agent</h1>
   <span id="status">connecting…</span>
-  <button class="primary" onclick="play(10)">Play 10 practice games</button>
-  <button onclick="play(1)">Play 1</button>
+  <button class="primary" onclick="play()">Run benchmark</button>
   <button onclick="post('/api/stop')">Stop</button>
 </header>
 <main>
@@ -74,6 +73,10 @@
     <div id="feed"></div>
   </section>
   <section class="wide">
+    <h2>Strategies <span class="dim">· same 10 benchmark adventurers and luck for every strategy</span></h2>
+    <div class="tablewrap"><table><thead><tr><th>Strategy</th><th>Games</th><th>Median level</th><th>Best</th><th>Since</th></tr></thead><tbody id="strategies"></tbody></table></div>
+  </section>
+  <section class="wide">
     <h2>Games <span id="summary" class="dim"></span></h2>
     <div class="tablewrap"><table><thead><tr><th>#</th><th>Mode</th><th>Strategy</th><th>Level</th><th>XP</th><th>Moves</th><th>Cost</th><th>Ended</th></tr></thead><tbody id="games"></tbody></table></div>
   </section>
@@ -83,16 +86,16 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 const post = (url, body) => fetch(url, { method: "POST", body: body && JSON.stringify(body) });
-const play = (games) => post("/api/play", { games });
+const play = () => post("/api/play", {});
 const STAT_ICONS = { strength: "Strength", dexterity: "Dexterity", vitality: "Vitality", intelligence: "Intelligence", wisdom: "Wisdom", charisma: "Charisma" };
 
 function renderState(s) {
   if (!s) return;
   const beast = s.beast ? `<div class="beast"><img src="/assets/beasts/${slug(s.beast.baseName)}.png" alt=""><div><b>${esc(s.beast.name)}</b><div class="pix dim">lvl ${s.beast.level} · T${s.beast.tier} ${esc(s.beast.type)} · ${s.beast.health} hp</div></div></div>` : "";
   const stats = Object.entries(STAT_ICONS).map(([k, icon]) => `<span class="pix"><img src="/assets/icons/${icon}.svg" alt="">${s.stats[k]}</span>`).join("");
-  const gear = Object.values(s.equipment).map((g) => `<div><img src="/assets/loot/${slug(g.name)}.png" alt=""><span>${esc(g.name)}<small>T${g.tier} ${esc(g.type)} · G${g.greatness}</small></span></div>`).join("");
+  const gear = s.equipment.map((g) => `<div><img src="/assets/loot/${slug(g.name)}.png" alt=""><span>${esc(g.name)}<small>T${g.tier} ${esc(g.type)} · G${g.greatness}</small></span></div>`).join("");
   $("adv").innerHTML = `
-    <div class="row"><span class="big">Level ${s.level}</span><span class="pix dim">${s.over ? "slain" : s.inBattle ? "in battle" : "exploring"}</span></div>
+    <div class="row"><span class="big">Level ${s.level}</span><span class="pix dim">${s.over ? "slain" : s.beast ? "in battle" : "exploring"}</span></div>
     <div class="row pix"><span>${s.health} / ${s.maxHealth} hp</span><span class="dim">${s.gold} gold · ${s.xp} xp</span></div>
     <div class="bar"><div style="width:${Math.min(100, (100 * s.health) / s.maxHealth)}%"></div></div>
     ${beast}
@@ -115,7 +118,13 @@ function line(e) {
   if (stick) feed.scrollTop = feed.scrollHeight;
 }
 
+async function loadStrategies() {
+  const rows = await (await fetch("/api/strategies")).json();
+  $("strategies").innerHTML = rows.map((r) => `<tr><td><details><summary>${r.hash}</summary><pre style="white-space:pre-wrap;text-align:left;font:16px VT323,monospace">${esc(r.text)}</pre></details></td><td>${r.games}</td><td>${r.median ?? "–"}</td><td>${r.best ?? "–"}</td><td class="dim">${new Date(r.created_at).toLocaleString()}</td></tr>`).join("");
+}
+
 async function loadGames() {
+  loadStrategies();
   const games = await (await fetch("/api/games")).json();
   const levels = games.filter((g) => g.ended_at).map((g) => g.level).sort((a, b) => a - b);
   $("summary").textContent = levels.length ? `· ${levels.length} played · median level ${levels[Math.floor(levels.length / 2)]} · best ${levels.at(-1)}` : "";

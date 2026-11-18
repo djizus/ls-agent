@@ -1,3 +1,4 @@
+import { z } from "zod";
 export type Item = { id: number; xp: number };
 export type Stats = { strength: number; dexterity: number; vitality: number; intelligence: number; wisdom: number; charisma: number };
 export type Adventurer = {
@@ -16,16 +17,18 @@ export type Adventurer = {
 export const SLOTS = ["weapon", "chest", "head", "waist", "foot", "hand", "neck", "ring"] as const;
 export const STATS = ["strength", "dexterity", "vitality", "intelligence", "wisdom", "charisma"] as const;
 
-export type Action =
-  | { type: "explore"; tillDamage?: number; tillGold?: number }
-  | { type: "attack"; tillHealth?: number; spareBeast?: 0 | 1 | 2 }
-  | { type: "flee"; tillHealth?: number }
-  | { type: "upgrade"; stat: (typeof STATS)[number]; amount: number }
-  | { type: "buy"; item: number; equip: boolean }
-  | { type: "equip"; item: number }
-  | { type: "drop"; item: number }
-  | { type: "surrender" }
-  | { type: "potions"; qty: number };
+export const action = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("explore"), tillDamage: z.number().int().min(0).max(2047).optional(), tillGold: z.number().int().min(0).max(511).optional() }),
+  z.object({ type: z.literal("attack"), tillHealth: z.number().int().min(0).max(1023).optional(), spareBeast: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional() }),
+  z.object({ type: z.literal("flee"), tillHealth: z.number().int().min(0).max(1023).optional() }),
+  z.object({ type: z.literal("upgrade"), stat: z.enum(STATS), amount: z.number().int().min(1).max(15) }),
+  z.object({ type: z.literal("buy"), item: z.number().int().min(1).max(101), equip: z.boolean() }),
+  z.object({ type: z.literal("equip"), item: z.number().int().min(1).max(101) }),
+  z.object({ type: z.literal("drop"), item: z.number().int().min(1).max(101) }),
+  z.object({ type: z.literal("potions"), qty: z.number().int().min(1).max(255) }),
+]);
+export const actions = z.array(action).min(1).max(15);
+export type Action = z.infer<typeof action>;
 
 const item = (v: bigint): Item => ({ id: Number(v & 127n), xp: Number(v >> 7n) });
 
@@ -68,7 +71,6 @@ function word(a: Action): number {
     case "buy": return 5 | (a.item << 4) | (Number(a.equip) << 11);
     case "equip": return 6 | (a.item << 4);
     case "drop": return 7 | (a.item << 4);
-    case "surrender": return 8;
     case "potions": return 9 | (a.qty << 4);
   }
 }

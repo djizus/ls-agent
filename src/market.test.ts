@@ -1,21 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { SLOTS, encodePacket, type Action } from "./codec.ts";
-import { GAME_CORE } from "./config.ts";
+import { BENCHMARK, GAME_CORE } from "./config.ts";
 import { ITEMS, itemName, priceOf } from "./items.ts";
 import { BEAST_MODE_MARKET, marketOf } from "./market.ts";
-import { act, newPracticeGame, replay, type Game, type Snapshot } from "./practice.ts";
+import { act, hashes, newPracticeGame, replay, revertReason, type Game, type Snapshot } from "./practice.ts";
 import { provider } from "./wallet.ts";
 
 const NOT_ON_MARKET = "item does not exist";
 const NOT_ENOUGH_GOLD = "not enough gold";
 const BEAST_MODE_SETTINGS = "2";
-
-function revert(error: unknown): string {
-  const hex = /revert_error":"([^"]*)"/.exec(String((error as Error).message))?.[1];
-  if (!hex) throw error;
-  return hex.split(", ").map((h) => Buffer.from(h.slice(2), "hex").toString("latin1"))[0];
-}
 
 async function inBatches<T, R>(items: T[], run: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = [];
@@ -24,8 +18,8 @@ async function inBatches<T, R>(items: T[], run: (item: T) => Promise<R>): Promis
 }
 
 async function reachLevelUp(levelUps: number): Promise<{ game: Game; state: Snapshot }> {
-  for (;;) {
-    const game = await newPracticeGame();
+  for (const id of BENCHMARK) {
+    const game = newPracticeGame(id);
     let state = await replay(game);
     let seen = 0;
     while (!state.over && game.packets.length < 120) {
@@ -36,16 +30,17 @@ async function reachLevelUp(levelUps: number): Promise<{ game: Game; state: Snap
       state = await act(game, actions);
     }
   }
+  throw new Error(`no benchmark game reached level-up ${levelUps}`);
 }
 
 async function tryBuy(game: Game, state: Snapshot, item: number): Promise<{ gold: number } | { error: string }> {
   const upgrade: Action = { type: "upgrade", stat: "vitality", amount: state.adventurer.stat_upgrades_available };
   const packet = encodePacket([upgrade, { type: "buy", item, equip: false }]);
   try {
-    const after = await replay(game, [...game.packets, packet], [...game.hashes, "0x1"]);
+    const after = await replay(game, [...game.packets, packet], [...hashes(game), "0x1"]);
     return { gold: after.adventurer.gold };
   } catch (error) {
-    return { error: revert(error) };
+    return { error: revertReason(error) };
   }
 }
 

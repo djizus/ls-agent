@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { db } from "../src/db.ts";
 
@@ -17,3 +19,11 @@ for (const dir of process.argv.slice(2)) {
   }
 }
 console.log(`imported ${added} games`);
+
+const git = (...args: string[]) => execFileSync("git", args, { cwd: new URL("..", import.meta.url).pathname, encoding: "utf8" });
+for (const line of git("log", "--format=%H %ct", "--", "strategy/prompt.md").trim().split("\n")) {
+  const [commit, time] = line.split(" ");
+  const text = git("show", `${commit}:strategy/prompt.md`);
+  const hash = createHash("sha256").update(text).digest("hex").slice(0, 8);
+  db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(hash, text, Number(time) * 1000);
+}
