@@ -8,6 +8,8 @@ import { JEV_MODEL, jevDecide } from "./jev.ts";
 import { emit, subscribe } from "./events.ts";
 import { type Option, type State, auditGame, begin, commit, describeOptions, movesMade, options, phase, render, shape, snapshot, type Phase } from "./play.ts";
 
+export const DECIDER = process.env.LS_DECIDER ?? "jev";
+const DECIDER_SOURCE = ["jev.ts", "rollout.ts"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("");
 const promptFile = process.env.LS_STRATEGY ?? new URL("../strategy/prompt.md", import.meta.url).pathname;
 const MAX_REJECTIONS = 3;
 
@@ -23,7 +25,7 @@ subscribe((e) => {
 
 export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
   const full = `${DECIDER === "jev" ? JEV_MODEL : `${MODEL} effort ${EFFORT}`}\n\n${PREAMBLE}\n\n${text}`;
-  const hash = createHash("sha256").update(full).digest("hex").slice(0, 8);
+  const hash = createHash("sha256").update(full).update(DECIDER === "jev" ? DECIDER_SOURCE : "").digest("hex").slice(0, 8);
   const [common, ...rest] = text.split(/^<!-- phase:(\w+) -->$/m);
   const sections: Record<string, string> = {};
   for (let i = 0; i < rest.length; i += 2) sections[rest[i]] = rest[i + 1].trim();
@@ -48,7 +50,7 @@ async function playGame(id: string): Promise<void> {
   }
 }
 
-export const DECIDER = process.env.LS_DECIDER ?? "jev";
+
 
 async function decideWithRetry(state: State, rules: string, prompt: string, choices: Option[], attempts = 3): Promise<Decision> {
   for (let i = 1; ; i++) {

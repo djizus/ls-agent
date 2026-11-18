@@ -165,6 +165,8 @@ export function describeOptions(s: State, list: Option[]): string {
 
 const RANDOM = new Set(["explore", "attack", "flee"]);
 
+export const currentGame = (): Game => game!;
+
 export function auditGame(): Promise<string | undefined> {
   return audit(game!);
 }
