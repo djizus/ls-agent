@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
 import { DUNGEON } from "./config.ts";
 import { db } from "./db.ts";
-import { EFFORT, MODEL, PREAMBLE, cancel, decide } from "./decide.ts";
+import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
+import { JEV_MODEL, jevDecide } from "./jev.ts";
 import { emit, subscribe } from "./events.ts";
-import { begin, commit, describeOptions, movesMade, options, phase, render, shape, snapshot, verify, type Phase } from "./play.ts";
+import { type State, begin, commit, describeOptions, movesMade, options, phase, render, shape, snapshot, verify, type Phase } from "./play.ts";
 
 const promptFile = process.env.LS_STRATEGY ?? new URL("../strategy/prompt.md", import.meta.url).pathname;
 const MAX_REJECTIONS = 3;
@@ -21,7 +22,7 @@ subscribe((e) => {
 });
 
 export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
-  const full = `${MODEL} effort ${EFFORT}\n\n${PREAMBLE}\n\n${text}`;
+  const full = `${DECIDER === "jev" ? JEV_MODEL : `${MODEL} effort ${EFFORT}`}\n\n${PREAMBLE}\n\n${text}`;
   const hash = createHash("sha256").update(full).digest("hex").slice(0, 8);
   const [common, ...rest] = text.split(/^<!-- phase:(\w+) -->$/m);
   const sections: Record<string, string> = {};
@@ -47,10 +48,12 @@ async function playGame(id: string): Promise<void> {
   }
 }
 
-async function decideWithRetry(system: string, prompt: string, attempts = 3): ReturnType<typeof decide> {
+export const DECIDER = process.env.LS_DECIDER ?? "jev";
+
+async function decideWithRetry(state: State, rules: string, prompt: string, attempts = 3): Promise<Decision> {
   for (let i = 1; ; i++) {
     try {
-      return await decide(system, prompt);
+      return DECIDER === "jev" ? await jevDecide(state, rules, prompt) : await decide(rules, prompt);
     } catch (err) {
       if (i >= attempts || stopping) throw err;
       emit({ kind: "status", text: `decision retry ${i}: ${(err as Error).message.slice(0, 120)}` });
@@ -71,7 +74,7 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<strin
   while (!state.over && !stopping && rejections < MAX_REJECTIONS) {
     const choices = await options(state);
     const prompt = [render(state), describeOptions(state, choices), note && `Your note from the previous decision: ${note}`, rejected].filter(Boolean).join("\n\n");
-    const decision = await decideWithRetry(rules(phase(state)), prompt);
+    const decision = await decideWithRetry(state, rules(phase(state)), prompt);
     cost += decision.costUsd;
     const actions = shape(state, decision.actions as Action[], decision.reserve);
     emit({ kind: "decision", phase: phase(state), options: choices, thought: decision.thought, actions, note: decision.note, reserve: decision.reserve, costUsd: decision.costUsd });
