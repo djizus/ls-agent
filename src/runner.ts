@@ -5,13 +5,15 @@ import { DUNGEON } from "./config.ts";
 import { db } from "./db.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
+import { plan } from "./policy.ts";
 import { emit, subscribe } from "./events.ts";
 import { type Option, type State, auditGame, begin, commit, describeOptions, movesMade, options, phase, render, shape, snapshot, type Phase } from "./play.ts";
 
-export const DECIDER = process.env.LS_DECIDER ?? "jev";
-const DECIDER_SOURCE = ["jev.ts", "rollout.ts"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("");
+export const DECIDER = process.env.LS_DECIDER ?? "rules";
+const DECIDER_SOURCE = ["policy.ts", "jev.ts", "rollout.ts"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("");
 const promptFile = process.env.LS_STRATEGY ?? new URL("../strategy/prompt.md", import.meta.url).pathname;
 const MAX_REJECTIONS = 3;
+const PACE_MS = Number(process.env.LS_PACE_MS ?? 0);
 
 let row: number | undefined;
 let stopping = false;
@@ -24,8 +26,8 @@ subscribe((e) => {
 });
 
 export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
-  const full = `${DECIDER === "jev" ? JEV_MODEL : `${MODEL} effort ${EFFORT}`}\n\n${PREAMBLE}\n\n${text}`;
-  const hash = createHash("sha256").update(full).update(DECIDER === "jev" ? DECIDER_SOURCE : "").digest("hex").slice(0, 8);
+  const full = `${DECIDER === "rules" ? "rules" : DECIDER === "jev" ? JEV_MODEL : `${MODEL} effort ${EFFORT}`}\n\n${PREAMBLE}\n\n${text}`;
+  const hash = createHash("sha256").update(full).update(DECIDER === "model" ? "" : DECIDER_SOURCE).digest("hex").slice(0, 8);
   const [common, ...rest] = text.split(/^<!-- phase:(\w+) -->$/m);
   const sections: Record<string, string> = {};
   for (let i = 0; i < rest.length; i += 2) sections[rest[i]] = rest[i + 1].trim();
@@ -55,6 +57,10 @@ async function playGame(id: string): Promise<void> {
 async function decideWithRetry(state: State, rules: string, prompt: string, choices: Option[], attempts = 3): Promise<Decision> {
   for (let i = 1; ; i++) {
     try {
+      if (DECIDER === "rules") {
+        const { actions, why } = plan(state);
+        return { thought: why, actions, note: "", reserve: 0, costUsd: 0 };
+      }
       return DECIDER === "jev" ? await jevDecide(state, rules, prompt, choices) : await decide(rules, prompt);
     } catch (err) {
       if (i >= attempts || stopping) throw err;
@@ -77,6 +83,7 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<strin
     const choices = await options(state);
     const prompt = [render(state), describeOptions(state, choices), note && `Your note from the previous decision: ${note}`, rejected].filter(Boolean).join("\n\n");
     const decision = await decideWithRetry(state, rules(phase(state)), prompt, choices);
+    if (PACE_MS) await new Promise((r) => setTimeout(r, PACE_MS));
     cost += decision.costUsd;
     const actions = shape(state, decision.actions as Action[], decision.reserve);
     emit({ kind: "decision", phase: phase(state), options: choices, thought: decision.thought, actions, note: decision.note, reserve: decision.reserve, costUsd: decision.costUsd });
