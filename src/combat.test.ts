@@ -39,7 +39,7 @@ const levelTwo = (buys: number[], beast: keyof typeof BEASTS, stat: Stat = "char
   [[{ type: "upgrade", stat, amount: 1 }, ...buys.map((item): Action => ({ type: "buy", item, equip: true })), { type: "explore" }], BEASTS[beast]],
 ];
 
-const play = (moves: Move[]) => replay(newPracticeGame(GAME), moves.map(([a]) => encodePacket(a)), moves.map(([, l]) => l));
+const play = (moves: Move[]) => replay({ id: GAME, packets: [] }, moves.map(([a]) => encodePacket(a)), moves.map(([, l]) => l));
 
 async function practiceRound(moves: Move[], strike: string): Promise<Round> {
   const before = await play(moves);

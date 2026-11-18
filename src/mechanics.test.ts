@@ -37,7 +37,7 @@ const LEVEL_UP: Move = [[{ type: "buy", item: KATANA, equip: true }, { type: "ex
 const levelTwoFight = (setup: Action[], beast: string): Move[] => [LEVEL_UP, [[...setup, { type: "explore" }], beast]];
 const WOUNDED: Move[] = [...levelTwoFight([{ type: "upgrade", stat: "charisma", amount: 1 }], LEVEL_TWO.jotunn), [[{ type: "flee" }], luck("flee")]];
 
-const play = (id: string, moves: Move[]) => replay(newPracticeGame(id), moves.map(([a]) => encodePacket(a)), moves.map(([, l]) => l));
+const play = (id: string, moves: Move[]) => replay({ id, packets: [] }, moves.map(([a]) => encodePacket(a)), moves.map(([, l]) => l));
 
 async function outcome(id: string, moves: Move[]): Promise<Snapshot | string> {
   try {

@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { existsSync, readFileSync } from "node:fs";
 import { HOST, PORT, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
+import { ITEMS } from "./items.ts";
 import { halt, playBenchmark, running } from "./runner.ts";
 import { snapshot } from "./play.ts";
 import { subscribe } from "./events.ts";
@@ -56,6 +57,7 @@ export function serve(): void {
     if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
     if (url.pathname === "/api/games") return reply(res, db.prepare("SELECT * FROM games ORDER BY id DESC LIMIT 200").all());
     if (url.pathname === "/api/strategies") return reply(res, strategies());
+    if (url.pathname === "/api/items") return reply(res, ITEMS);
     if (url.pathname === "/api/recent")
       return reply(res, (db.prepare("SELECT body FROM events WHERE game = (SELECT max(id) FROM games) ORDER BY rowid DESC LIMIT 40").all() as { body: string }[]).map((r) => JSON.parse(r.body)).reverse());
     if (url.pathname === "/api/check") return reply(res, existsSync(CHECK) ? JSON.parse(readFileSync(CHECK, "utf8")) : null);

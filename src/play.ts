@@ -6,7 +6,7 @@ import { beastHit, yourHit } from "./combat.ts";
 import { marketOf } from "./market.ts";
 import { MARKET } from "./settings.ts";
 import { SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
-import { act, newPracticeGame, preview, replay, revertReason, type Game, type Snapshot } from "./practice.ts";
+import { act, audit, newPracticeGame, preview, revertReason, type Game, type Snapshot } from "./practice.ts";
 
 type Gear = LootItem & { greatness: number; xp: number; suffix?: string; bonus?: Partial<State["stats"]> };
 export type State = {
@@ -96,14 +96,14 @@ export function phase(s: State): Phase {
 }
 
 export async function begin(id: string): Promise<State> {
-  game = newPracticeGame(id);
-  last = await replay(game);
+  game = await newPracticeGame(id);
+  last = game.start;
   return state();
 }
 
 export async function commit(actions: Action[]): Promise<State> {
   try {
-    last = await act(game!, actions);
+    last = act(game!, actions);
   } catch (err) {
     throw new Error(revertReason(err));
   }
@@ -116,7 +116,7 @@ export type Odds = { death: number; ongoing: number; hp: [number, number, number
 export type Option = { move: string; label: string } & (Odds | { error: string });
 
 export async function odds(actions: Action[], samples: number): Promise<Odds> {
-  const outcomes = await preview(game!, actions, samples);
+  const outcomes = preview(game!, actions, samples);
   const pick = (values: number[]) => values.sort((x, y) => x - y)[Math.floor(samples / 2)];
   const hp = outcomes.map((o) => o.adventurer.health).sort((x, y) => x - y);
   return {
@@ -165,20 +165,8 @@ export function describeOptions(s: State, list: Option[]): string {
 
 const RANDOM = new Set(["explore", "attack", "flee"]);
 
-export async function verify(s: State, actions: Action[]): Promise<string | undefined> {
-  const fixed = actions.filter((a) => !RANDOM.has(a.type));
-  if (!fixed.length || fixed.some((a) => a.type === "equip" || a.type === "drop")) return;
-  const ups = (stat: string) => fixed.reduce((n, a) => n + (a.type === "upgrade" && a.stat === stat ? a.amount : 0), 0);
-  const charisma = s.stats.charisma + ups("charisma");
-  const potions = fixed.reduce((n, a) => n + (a.type === "potions" ? a.qty : 0), 0);
-  const maxHealth = s.maxHealth + 15 * ups("vitality");
-  const expected = {
-    gold: fixed.reduce((g, a) => g - (a.type === "buy" ? priceOf(a.item, charisma) : 0), s.gold) - potions * potionPrice(s.level, charisma),
-    health: Math.min(s.health + 15 * ups("vitality") + 10 * potions, maxHealth),
-  };
-  const [after] = await preview(game!, fixed, 1);
-  const actual = { gold: after.adventurer.gold, health: after.adventurer.health };
-  if (expected.gold !== actual.gold || expected.health !== actual.health) return `predicted ${JSON.stringify(expected)}, contract ${JSON.stringify(actual)} for ${JSON.stringify(fixed)}`;
+export function auditGame(): Promise<string | undefined> {
+  return audit(game!);
 }
 
 export function shape(s: State, actions: Action[], reserve = 0): Action[] {

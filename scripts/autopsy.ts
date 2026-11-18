@@ -9,8 +9,8 @@ const games = (ids.length ? ids.map((id) => db.prepare("SELECT * FROM games WHER
 
 for (const g of games) {
   const events = (db.prepare("SELECT body FROM events WHERE game = ? ORDER BY rowid").all(g.id) as { body: string }[]).map((r) => JSON.parse(r.body));
-  const game = newPracticeGame(g.game_id);
-  let snap = await replay(game);
+  const game = await newPracticeGame(g.game_id);
+  let snap = game.start;
   const history: string[] = [];
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
@@ -19,7 +19,7 @@ for (const g of games) {
     if (events[i + 1]?.kind === "rejected" || (events[i + 1]?.kind === "result" && events[i + 1]?.name === "act")) continue;
     const before = describe(snap, g.game_id);
     history.push(`${render(before)}\n=> ${JSON.stringify(actions)}${e.thought ? `\n   thought: ${e.thought}` : ""}`);
-    snap = await act(game, actions as Action[]);
+    snap = act(game, actions as Action[]);
   }
   console.log(`\n##### game ${g.id} level ${g.level}\n${history.slice(-3).join("\n---\n")}\n---\n${render(describe(snap, g.game_id))}`);
 }

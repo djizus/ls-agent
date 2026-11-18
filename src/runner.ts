@@ -6,7 +6,7 @@ import { db } from "./db.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
 import { emit, subscribe } from "./events.ts";
-import { type Option, type State, begin, commit, describeOptions, movesMade, options, phase, render, shape, snapshot, verify, type Phase } from "./play.ts";
+import { type Option, type State, auditGame, begin, commit, describeOptions, movesMade, options, phase, render, shape, snapshot, type Phase } from "./play.ts";
 
 const promptFile = process.env.LS_STRATEGY ?? new URL("../strategy/prompt.md", import.meta.url).pathname;
 const MAX_REJECTIONS = 3;
@@ -80,11 +80,6 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<strin
     emit({ kind: "decision", phase: phase(state), options: choices, thought: decision.thought, actions, note: decision.note, reserve: decision.reserve, costUsd: decision.costUsd });
     try {
       if (!actions.length) throw new Error("spend your stat points before anything else");
-      const drift = await verify(state, actions);
-      if (drift) {
-        mismatches++;
-        emit({ kind: "status", text: `CONTRACT MISMATCH: ${drift}` });
-      }
       const before = state;
       state = await commit(actions);
       const last = actions.at(-1)!.type;
@@ -98,6 +93,11 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<strin
       rejections++;
       if (rejections === MAX_REJECTIONS) ending = `stopped after ${MAX_REJECTIONS} rejected decisions`;
     }
+  }
+  const drift = await auditGame().catch((err) => `audit failed: ${(err as Error).message.slice(0, 120)}`);
+  if (drift) {
+    mismatches++;
+    emit({ kind: "status", text: `CONTRACT MISMATCH: ${drift.slice(0, 300)}` });
   }
   return ending;
 }

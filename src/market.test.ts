@@ -18,7 +18,7 @@ async function inBatches<T, R>(items: T[], run: (item: T) => Promise<R>): Promis
 
 async function reachLevelUp(levelUps: number): Promise<{ game: Game; state: Snapshot }> {
   for (const id of DUNGEON.benchmark) {
-    const game = newPracticeGame(id);
+    const game = await newPracticeGame(id);
     let state = await replay(game);
     let seen = 0;
     while (!state.over && game.packets.length < 120) {
@@ -26,7 +26,7 @@ async function reachLevelUp(levelUps: number): Promise<{ game: Game; state: Snap
       if (a.stat_upgrades_available > 0 && ++seen === levelUps) return { game, state };
       const move: Action = a.beast_health > 0 ? { type: "attack" } : { type: "explore" };
       const actions: Action[] = a.stat_upgrades_available > 0 ? [{ type: "upgrade", stat: "vitality", amount: a.stat_upgrades_available }, move] : [move];
-      state = await act(game, actions);
+      state = act(game, actions);
     }
   }
   throw new Error(`no benchmark game reached level-up ${levelUps}`);

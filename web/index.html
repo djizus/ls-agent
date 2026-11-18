@@ -3,203 +3,604 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Death Mountain Agent</title>
+<title>Death Mountain Live</title>
 <link rel="icon" href="/assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=VT323&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #111; --panel: #1b1a1c; --well: #262528; --line: #3a372f; --gold: #d0c98d; --bright: #edcf33; --orange: #f59100; --dim: rgba(208, 201, 141, .55); --hp: #80ff00; --bad: #e0503c; }
+  :root {
+    --night: #111; --stone: #282729; --rock: #1b1a1c; --seam: #3a372f;
+    --parchment: #d0c98d; --faded: rgba(208, 201, 141, .62); --gold: #edcf33; --ember: #f59100; --life: #80ff00; --blood: #e5523d;
+    --chat: 360px; --dock: 196px;
+    --display: Cinzel, Georgia, serif; --pixel: VT323, ui-monospace, monospace;
+  }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { height: 100%; }
-  body { margin: 0; background: radial-gradient(ellipse at top, #1e1c18 0%, var(--bg) 60%) fixed; color: var(--gold); font: 14px/1.4 Cinzel, Georgia, serif; display: flex; flex-direction: column; overflow: hidden; }
-  header { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--line); flex: none; }
-  header img { width: 28px; height: 28px; }
-  h1 { font-size: 18px; margin: 0 auto 0 0; letter-spacing: .06em; color: var(--bright); }
-  .pix { font-family: VT323, monospace; font-size: 18px; line-height: 1.15; }
-  .dim { color: var(--dim); }
-  button { background: var(--well); color: var(--gold); border: 1px solid var(--line); border-radius: 4px; padding: 5px 12px; font: 600 12px Cinzel, serif; cursor: pointer; }
-  button.primary { background: var(--gold); color: #111; border-color: var(--gold); }
-  main { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr 320px; gap: 12px; padding: 12px; }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
-  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--dim); margin: 0; }
-  .scroll { overflow-y: auto; min-height: 0; flex: 1; }
-  .big { font-size: 26px; font-weight: 700; color: var(--bright); }
-  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .bar { height: 10px; background: var(--well); border: 1px solid var(--line); }
-  .bar > div { height: 100%; background: var(--hp); transition: width .4s; }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-  .stats span { display: flex; align-items: center; gap: 6px; background: var(--well); padding: 2px 6px; }
-  .stats img { width: 14px; height: 14px; }
-  .gear { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-  .slot { display: flex; align-items: center; gap: 6px; background: var(--well); padding: 3px; font-size: 11px; min-width: 0; min-height: 40px; }
-  .slot img { width: 30px; height: 30px; flex: none; }
-  .slot.empty { opacity: .45; border: 1px dashed var(--line); justify-content: center; }
-  .slot small { display: block; color: var(--dim); font: 14px VT323, monospace; }
-  .stage { display: grid; grid-template-rows: auto auto auto 1fr; gap: 10px; }
-  .scene { display: flex; gap: 14px; align-items: center; min-height: 128px; background: var(--well); border-radius: 4px; padding: 10px; }
-  .scene img { width: 120px; height: 120px; object-fit: contain; }
-  .scene .who { font-size: 20px; color: var(--bad); font-weight: 700; }
-  .scene.calm .who { color: var(--gold); }
-  .odds { display: grid; gap: 6px; }
-  .odd { display: grid; grid-template-columns: 170px 1fr 230px; gap: 10px; align-items: center; }
-  .odd.chosen { outline: 1px solid var(--bright); outline-offset: 3px; }
-  .meter { height: 14px; background: #2a3a1c; position: relative; }
-  .meter > div { position: absolute; inset: 0 auto 0 0; background: var(--bad); }
-  .meter span { position: absolute; right: 4px; top: -3px; font: 16px VT323, monospace; color: #fff; }
-  .mind { background: var(--well); border-left: 3px solid var(--bright); padding: 10px 12px; font: 21px/1.25 VT323, monospace; color: #f1ecc4; min-height: 72px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { display: inline-flex; align-items: center; gap: 4px; background: #33301f; border: 1px solid var(--line); border-radius: 12px; padding: 1px 9px; font: 16px VT323, monospace; }
-  .chip img { width: 18px; height: 18px; }
-  .chip.move { background: var(--gold); color: #111; }
-  .timeline { font: 16px/1.25 VT323, monospace; }
-  .timeline > div { padding: 5px 0; border-bottom: 1px solid #2a2823; display: grid; gap: 3px; }
-  .timeline .note { color: var(--dim); }
-  .bad { color: var(--bad); }
-  table { width: 100%; border-collapse: collapse; font: 16px VT323, monospace; }
-  td, th { text-align: right; padding: 2px 4px; border-bottom: 1px solid #2a2823; vertical-align: top; }
-  th { color: var(--dim); font: 600 10px Cinzel, serif; letter-spacing: .06em; text-transform: uppercase; }
-  td:first-child, th:first-child { text-align: left; }
-  td.ending { text-align: left; color: var(--dim); font-size: 14px; }
-  summary { cursor: pointer; }
-  @media (max-width: 1100px) { body { overflow: auto; } main { grid-template-columns: 1fr; } section { max-height: none; } .scroll { max-height: 50vh; } .odd { grid-template-columns: 1fr; } }
+  body { margin: 0; background: var(--night); color: var(--parchment); font: 16px/1.3 var(--display); overflow: hidden; }
+  img { display: block; }
+  button { font: 700 14px var(--display); letter-spacing: .04em; border-radius: 3px; padding: 7px 16px; cursor: pointer; border: 1px solid var(--seam); background: var(--stone); color: var(--parchment); }
+  button.go { background: var(--gold); border-color: var(--gold); color: var(--night); }
+  button:disabled { opacity: .4; cursor: default; }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .px { font-family: var(--pixel); }
+
+  .app { height: 100vh; display: grid; grid-template: "top top" auto "stage chat" 1fr "dock chat" var(--dock) / 1fr var(--chat); }
+
+  .top { grid-area: top; display: flex; align-items: center; gap: 18px; padding: 8px 16px; border-bottom: 1px solid var(--seam); background: var(--rock); }
+  .brand { display: flex; align-items: center; gap: 10px; font: 800 20px var(--display); color: var(--gold); letter-spacing: .05em; white-space: nowrap; }
+  .brand img { width: 30px; height: 30px; }
+  .onair { display: inline-flex; align-items: center; gap: 7px; font: 22px var(--pixel); color: var(--faded); padding: 0 10px; border: 1px solid var(--seam); border-radius: 3px; }
+  .onair i { width: 9px; height: 9px; border-radius: 50%; background: var(--faded); }
+  .live .onair { color: #fff; background: #b8231a; border-color: #b8231a; }
+  .live .onair i { background: #fff; animation: beat 1.6s ease-in-out infinite; }
+  .game { font: 22px var(--pixel); display: flex; gap: 18px; white-space: nowrap; overflow: hidden; }
+  .game b { color: var(--gold); font-weight: 400; }
+  .game span { color: var(--faded); }
+  .top .controls { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .check { font: 18px var(--pixel); color: var(--faded); margin-right: 6px; }
+  .check.bad { color: var(--blood); }
+
+  .stage { grid-area: stage; position: relative; overflow: hidden; background: #0c160a url(/assets/scenes/portal.png) center 38% / cover no-repeat; min-height: 0; }
+  .stage.fallen { background-image: url(/assets/scenes/fallen.png); background-position: center 80%; }
+  .stage::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 75% 70% at 50% 40%, transparent 40%, rgba(0, 0, 0, .78)), linear-gradient(transparent 55%, rgba(0, 0, 0, .85)); pointer-events: none; }
+  .foe { position: absolute; left: 50%; top: 40%; height: 46%; aspect-ratio: 1; transform: translate(-50%, -50%); image-rendering: pixelated; mix-blend-mode: screen; -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent); mask-image: radial-gradient(closest-side, #000 72%, transparent); opacity: 0; transition: opacity .35s; }
+  .fight .foe { opacity: 1; }
+  .gone .foe { opacity: .3; filter: grayscale(1); transition-duration: 1.2s; }
+  .fallen .foe { opacity: 0; }
+
+  .hud { position: absolute; top: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; gap: 16px; z-index: 1; }
+  .fighter { width: min(380px, 44%); background: rgba(17, 17, 17, .82); border: 1px solid var(--seam); border-radius: 4px; padding: 8px 12px 10px; }
+  .fighter.them { text-align: right; visibility: hidden; border-color: rgba(245, 145, 0, .5); }
+  .fight .fighter.them { visibility: visible; }
+  .who { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .them .who { flex-direction: row-reverse; }
+  .who strong { font: 700 20px var(--display); color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .them .who strong { color: var(--ember); }
+  .who span { font: 20px var(--pixel); color: var(--faded); white-space: nowrap; }
+  .hp { position: relative; height: 16px; margin-top: 6px; background: #22201a; border: 1px solid #000; }
+  .hp div { position: absolute; inset: 0 auto 0 0; }
+  .hp .trail { background: #fff3; transition: width .6s .35s; }
+  .hp .fill { background: var(--life); transition: width .2s; }
+  .them .hp div { inset: 0 0 0 auto; }
+  .them .hp .fill { background: var(--ember); }
+  .hp.low .fill { background: var(--blood); }
+  .hp b { position: absolute; inset: -3px 6px auto auto; font: 400 20px var(--pixel); color: #fff; text-shadow: 0 1px 0 #000, 0 0 3px #000; }
+  .them .hp b { inset: -3px auto auto 6px; }
+
+  .stamp { position: absolute; left: 0; right: 0; top: 46%; text-align: center; font: 900 clamp(40px, 6vw, 84px)/1 var(--display); color: var(--gold); letter-spacing: .08em; text-shadow: 0 0 28px rgba(0, 0, 0, .9), 0 3px 0 #000; opacity: 0; pointer-events: none; z-index: 2; }
+  .stamp small { display: block; font: 400 clamp(22px, 2vw, 30px) var(--pixel); color: var(--parchment); letter-spacing: 0; margin-top: 6px; }
+  .stamp.bad { color: var(--blood); }
+  .stamp.show { animation: stamp 1.3s cubic-bezier(.2, .9, .3, 1) both; }
+  .stamp.hold { opacity: 1; animation: none; }
+
+  .third { position: absolute; left: 16px; right: 16px; bottom: 14px; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .caption { justify-self: center; max-width: 100%; display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 6px 18px; background: rgba(17, 17, 17, .9); border-left: 4px solid var(--gold); padding: 8px 20px; font: 38px/1.05 var(--pixel); color: #f6f0c8; min-height: 58px; }
+  .caption .name { font: 700 18px var(--display); color: var(--gold); }
+  .caption .said { overflow-wrap: anywhere; }
+  .caption .thinking { color: var(--faded); }
+  .caption .thinking::after { content: "..."; animation: dots 1.2s steps(4) infinite; display: inline-block; width: 1.5em; overflow: hidden; vertical-align: bottom; white-space: nowrap; }
+  .pick { display: inline-flex; align-items: center; gap: 8px; }
+  .pick meter { width: 70px; height: 12px; }
+  .pick em { font-style: normal; color: var(--gold); }
+  meter { appearance: none; background: #33301f; border: 0; }
+  meter::-webkit-meter-bar { background: #33301f; border: 0; border-radius: 0; height: 10px; }
+  meter::-webkit-meter-optimum-value, meter::-webkit-meter-suboptimum-value, meter::-webkit-meter-even-less-good-value { background: var(--gold); border-radius: 0; }
+  meter::-moz-meter-bar { background: var(--gold); }
+  .acts { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+  .act { display: inline-flex; align-items: center; gap: 4px; font: 20px var(--pixel); background: #33301f; color: var(--parchment); border-radius: 2px; padding: 0 7px; white-space: nowrap; }
+  .act img { width: 20px; height: 20px; }
+  .act.move { background: var(--parchment); color: var(--night); }
+
+  .odds { background: rgba(17, 17, 17, .88); border: 1px solid var(--seam); border-radius: 4px; padding: 6px 14px 8px; display: grid; grid-template-columns: auto minmax(110px, .7fr) minmax(160px, 1.6fr) auto auto auto; gap: 4px 18px; align-items: center; font: 21px var(--pixel); }
+  .odds .head { color: var(--faded); font: 600 13px var(--display); letter-spacing: .04em; }
+  .odds .move { font: 700 17px var(--display); color: var(--parchment); white-space: nowrap; }
+  .odds .chosen { color: var(--gold); }
+  .odds .chosen::before { content: "▸ "; }
+  .odds .note { grid-column: 1 / -1; color: var(--faded); font: 21px var(--pixel); }
+  .risk { display: grid; grid-template-columns: 1fr 52px; gap: 8px; align-items: center; }
+  .risk .bar { height: 12px; background: #2a3a1c; }
+  .risk .bar div { height: 100%; background: var(--blood); }
+  .risk b { font-weight: 400; text-align: right; }
+  .risk.safe b { color: var(--life); }
+  .risk.dead b { color: var(--blood); }
+  .track { position: relative; height: 14px; background: #22201a; }
+  .track .band { position: absolute; top: 2px; bottom: 2px; background: rgba(128, 255, 0, .35); }
+  .track .mid { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px; background: var(--life); }
+  .track .now { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--parchment); }
+  .gain { color: var(--faded); white-space: nowrap; text-align: right; }
+  .gain b { color: var(--parchment); font-weight: 400; }
+
+  .chat { grid-area: chat; display: flex; flex-direction: column; min-height: 0; background: var(--rock); border-left: 1px solid var(--seam); }
+  .chat h2, .dock h2 { margin: 0; font: 700 15px var(--display); color: var(--faded); letter-spacing: .04em; }
+  .chat h2 { padding: 10px 14px; border-bottom: 1px solid var(--seam); display: flex; justify-content: space-between; align-items: baseline; }
+  .chat h2 span { font: 18px var(--pixel); }
+  .log { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 14px; font: 20px/1.2 var(--pixel); overscroll-behavior: contain; }
+  .log > div { padding: 4px 0; }
+  .log .by { font: 700 14px var(--display); color: var(--gold); margin-right: 6px; }
+  .log .acts { margin-top: 3px; display: flex; }
+  .log .act { font-size: 18px; }
+  .log .times { color: var(--faded); }
+  .log .moment { color: var(--ember); text-align: center; padding: 6px 0; }
+  .log .moment.good { color: var(--life); }
+  .log .moment.bad { color: var(--blood); }
+  .log .sys { color: var(--faded); }
+  .log .split { color: var(--gold); text-align: center; border-top: 1px solid var(--seam); margin-top: 8px; padding-top: 8px; font: 700 14px var(--display); }
+  .jump { margin: 0 14px 10px; display: none; }
+  .scrolled .jump { display: block; }
+
+  .dock { grid-area: dock; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); border-top: 1px solid var(--seam); background: var(--rock); min-height: 0; }
+  .dock > section { padding: 10px 16px; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+  .dock > section + section { border-left: 1px solid var(--seam); }
+  .dock h2 { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .dock h2 span { font: 19px var(--pixel); color: var(--faded); font-weight: 400; }
+  .purse { display: flex; gap: 16px; font: 21px var(--pixel); align-items: center; flex-wrap: wrap; }
+  .purse b { color: var(--gold); font-weight: 400; }
+  .purse .points { color: var(--night); background: var(--gold); padding: 0 6px; }
+  .xpbar { flex: 1; min-width: 80px; height: 6px; background: #33301f; }
+  .xpbar div { height: 100%; background: var(--gold); }
+  .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .stats div { display: flex; align-items: baseline; gap: 6px; font: 22px var(--pixel); background: var(--stone); padding: 1px 8px; }
+  .stats img { width: 15px; height: 17px; opacity: .85; align-self: center; }
+  .stats small { font-size: 17px; color: var(--faded); }
+  .gear { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; flex: 1; min-height: 0; }
+  .slot { background: var(--stone); display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center; padding: 3px; min-height: 0; position: relative; }
+  .slot img { width: 100%; max-width: 46px; height: 100%; max-height: 46px; object-fit: contain; min-height: 0; }
+  .slot.empty img { opacity: .28; width: 24px; height: 24px; }
+  .slot span { font: 16px var(--pixel); color: var(--faded); white-space: nowrap; }
+  .slot.suffixed { box-shadow: inset 0 0 0 1px var(--gold); }
+
+  .run { display: grid; grid-template-rows: 1fr auto; gap: 8px; min-height: 0; flex: 1; }
+  .bars { display: flex; align-items: flex-end; gap: 3px; min-height: 0; position: relative; border-bottom: 1px solid var(--seam); }
+  .bars div { flex: 1 1 0; max-width: 26px; background: var(--parchment); opacity: .8; position: relative; min-height: 2px; }
+  .bars div.fighting { background: var(--blood); }
+  .bars div.fleeing { background: var(--ember); }
+  .bars div.other { background: #6b6a5f; }
+  .bars div.now { background: transparent; outline: 1px dashed var(--gold); opacity: 1; }
+  .bars .median { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--faded); max-width: none; opacity: 1; background: none; flex: none; }
+  .legend { display: flex; gap: 14px; font: 18px var(--pixel); color: var(--faded); flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; }
+  .last { font: 19px var(--pixel); color: var(--parchment); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bars div.older { opacity: .35; }
+  .strats { font: 18px var(--pixel); color: var(--faded); display: flex; gap: 14px; overflow: hidden; white-space: nowrap; }
+  .strats b { color: var(--parchment); font-weight: 400; }
+
+  @keyframes beat { 50% { opacity: .35; } }
+  @keyframes dots { from { width: 0; } to { width: 2em; } }
+  @keyframes stamp { 0% { opacity: 0; transform: scale(1.5); letter-spacing: .3em; } 18% { opacity: 1; transform: scale(1); letter-spacing: .08em; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+
+  @media (max-width: 1500px) { :root { --chat: 320px; --dock: 172px; } .caption { font-size: 26px; } .odds { font-size: 19px; } }
+  @media (max-height: 950px) { :root { --dock: 168px; } .fighter { padding: 6px 10px 8px; } }
+  @media (max-width: 900px) {
+    body { overflow: auto; }
+    .app { height: auto; grid-template: "top" auto "stage" auto "chat" auto "dock" auto / minmax(0, 1fr); }
+    .top { flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; }
+    .game { order: 3; flex-basis: 100%; gap: 12px; font-size: 20px; }
+    .check { display: none; }
+    .controls button { padding: 6px 10px; font-size: 12px; }
+    .brand { font-size: 17px; }
+    .stage { padding-top: 330px; background-size: auto 360px; background-position: center top; background-color: var(--night); }
+    .stage::before { bottom: auto; height: 360px; }
+    .hud { left: 10px; right: 10px; top: 10px; gap: 8px; }
+    .fighter { width: 50%; padding: 6px 8px; }
+    .who strong { font-size: 15px; }
+    .who span { font-size: 17px; }
+    .who { flex-wrap: wrap; gap: 0 8px; }
+    .foe { top: 180px; height: 150px; }
+    .stamp { top: 160px; }
+    .third { position: relative; left: auto; right: auto; bottom: auto; padding: 0 10px 12px; }
+    .caption { font-size: 26px; padding: 6px 10px; justify-self: stretch; justify-content: flex-start; }
+    .odds .head { display: none; }
+    .odds .track { grid-column: 1 / -1; }
+    .odds .gain { text-align: left; }
+    .odds .move { grid-column: 1 / -1; }
+    .odds .risk { grid-column: 1 / -1; }
+    .odds { grid-template-columns: repeat(3, auto); justify-content: start; gap: 4px 16px; padding: 6px 10px; }
+    .dock h2 { flex-wrap: wrap; }
+    .chat { border-left: 0; border-top: 1px solid var(--seam); height: 60vh; }
+    .dock { grid-template-columns: minmax(0, 1fr); }
+    .strats { flex-direction: column; gap: 2px; }
+    .last { white-space: normal; }
+    .dock > section + section { border-left: 0; border-top: 1px solid var(--seam); }
+    .stats { grid-template-columns: repeat(3, 1fr); }
+    .gear { grid-template-columns: repeat(4, 1fr); }
+    .slot img { height: 40px; }
+    .bars { height: 110px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+    .stamp.show { opacity: 1; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <img src="/assets/skull.png" alt="">
-  <h1>Death Mountain Agent</h1>
-  <span id="check" class="pix dim"></span>
-  <span id="status" class="pix dim">connecting…</span>
-  <button class="primary" onclick="post('/api/play', {})">Run benchmark</button>
-  <button onclick="post('/api/stop')">Stop</button>
-</header>
-<main>
-  <section>
-    <h2>Adventurer</h2>
-    <div id="adv" class="dim">No game yet.</div>
-  </section>
-  <section class="stage">
-    <div id="scene" class="scene calm"><div class="who">Waiting for the next game</div></div>
-    <div><h2>Odds the agent sees</h2><div id="odds" class="odds pix dim">–</div></div>
-    <div><h2>Agent's mind</h2><div id="mind" class="mind">…</div><div id="chips" class="chips" style="margin-top:8px"></div></div>
-    <div style="display:flex;flex-direction:column;min-height:0"><h2>Timeline</h2><div id="timeline" class="timeline scroll"></div></div>
-  </section>
-  <section>
-    <h2>Strategies</h2>
-    <div class="scroll" style="flex:0 1 auto;max-height:38%"><table><thead><tr><th>Strategy</th><th>Games</th><th>Median</th><th>Best</th></tr></thead><tbody id="strategies"></tbody></table></div>
-    <h2>Games <span id="summary" class="dim"></span></h2>
-    <div class="scroll"><table><thead><tr><th>#</th><th>Lvl</th><th>Ending</th></tr></thead><tbody id="games"></tbody></table></div>
-  </section>
-</main>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand"><img src="/assets/skull.png" alt="">Death Mountain</div>
+    <span class="onair"><i></i><span id="onair">Offline</span></span>
+    <div class="game" id="game"></div>
+    <div class="controls">
+      <span class="check" id="check"></span>
+      <button class="go" id="play" type="button">Run benchmark</button>
+      <button id="stop" type="button">Stop</button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage" aria-label="Game stage">
+    <img class="foe" id="foe" alt="">
+    <div class="hud">
+      <div class="fighter us">
+        <div class="who"><strong id="usName">Adventurer</strong><span id="usMeta"></span></div>
+        <div class="hp" id="usHp"><div class="trail"></div><div class="fill"></div><b></b></div>
+      </div>
+      <div class="fighter them">
+        <div class="who"><strong id="themName"></strong><span id="themMeta"></span></div>
+        <div class="hp" id="themHp"><div class="trail"></div><div class="fill"></div><b></b></div>
+      </div>
+    </div>
+    <div class="stamp" id="stamp" aria-live="polite"></div>
+    <div class="third">
+      <div class="caption" id="caption"><span class="said">Waiting for the next game</span></div>
+      <div class="odds" id="odds" hidden></div>
+    </div>
+  </main>
+
+  <aside class="chat" id="chat">
+    <h2>Jev's log <span id="moves"></span></h2>
+    <div class="log" id="log" role="log" aria-live="off"></div>
+    <button class="jump" id="jump" type="button">Back to live</button>
+  </aside>
+
+  <footer class="dock">
+    <section>
+      <h2>Adventurer <span id="bag"></span></h2>
+      <div class="purse" id="purse"></div>
+      <div class="stats" id="stats"></div>
+      <div class="gear" id="gear"></div>
+    </section>
+    <section>
+      <h2>Recent games <span id="runsum"></span></h2>
+      <div class="run">
+        <div class="bars" id="bars" role="img"></div>
+        <div class="legend"><span><i style="background:var(--parchment)"></i>died exploring</span><span><i style="background:var(--blood)"></i>died fighting</span><span><i style="background:var(--ember)"></i>died fleeing</span></div>
+      </div>
+      <div class="last" id="last"></div>
+      <div class="strats" id="strats"></div>
+    </section>
+  </footer>
+</div>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 const post = (url, body) => fetch(url, { method: "POST", body: body && JSON.stringify(body) });
+const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 const STATS = [["strength", "Strength", "STR"], ["dexterity", "Dexterity", "DEX"], ["vitality", "Vitality", "VIT"], ["intelligence", "Intelligence", "INT"], ["wisdom", "Wisdom", "WIS"], ["charisma", "Charisma", "CHA"]];
 const SLOTS = ["weapon", "chest", "head", "waist", "foot", "hand", "neck", "ring"];
-let items = {};
-let state = null;
+const MOVE = { attack: "Fight", flee: "Flee", explore: "Explore" };
+const quiet = matchMedia("(prefers-reduced-motion: reduce)");
 
-function renderState(s) {
-  if (!s) return;
-  state = s;
-  for (const g of [...s.equipment, ...s.bag, ...s.market]) items[g.id] = g;
-  const bySlot = Object.fromEntries(s.equipment.map((g) => [g.slot, g]));
-  const gear = SLOTS.map((slot) => {
-    const g = bySlot[slot];
-    return g ? `<div class="slot"><img src="/assets/loot/${slug(g.name)}.png" alt=""><span>${esc(g.name)}<small>T${g.tier} ${esc(g.type)} · G${g.greatness}${g.suffix ? ` · ${esc(g.suffix)}` : ""}</small></span></div>` : `<div class="slot empty pix">no ${slot}</div>`;
-  }).join("");
-  const stats = STATS.map(([k, icon, short]) => `<span class="pix" title="${short}"><img src="/assets/icons/${icon}.svg" alt="">${short} ${s.stats[k]}</span>`).join("");
-  $("adv").innerHTML = `
-    <div class="row"><span class="big">Level ${s.level}</span><span class="pix dim">${s.over ? "slain" : s.beast ? "in battle" : "exploring"}</span></div>
-    <div class="row pix"><span>${s.health} / ${s.maxHealth} HP</span><span class="dim">${s.gold} gold · ${s.xp} xp</span></div>
-    <div class="bar"><div style="width:${Math.min(100, (100 * s.health) / s.maxHealth)}%;background:${s.health / s.maxHealth < 0.35 ? "var(--bad)" : "var(--hp)"}"></div></div>
-    <div class="pix dim">potions ${s.potionPrice} gold · ${s.statUpgradesAvailable ? `<span style="color:var(--bright)">${s.statUpgradesAvailable} stat points</span>` : "no stat points"}</div>
-    <div class="stats">${stats}</div>
-    <div class="gear">${gear}</div>
-    <div class="pix dim">bag: ${s.bag.map((g) => esc(g.name)).join(", ") || "empty"}</div>`;
-  $("scene").className = s.beast ? "scene" : "scene calm";
-  $("scene").innerHTML = s.over
-    ? `<img src="/assets/skull.png" alt=""><div><div class="who">Slain at level ${s.level}</div></div>`
-    : s.beast
-      ? `<img src="/assets/beasts/${slug(s.beast.baseName)}.png" alt=""><div><div class="who">${esc(s.beast.name)}</div><div class="pix">level ${s.beast.level} · T${s.beast.tier} ${esc(s.beast.type)} · ${s.beast.health} HP</div></div>`
-      : `<div><div class="who">Exploring the mountain</div><div class="pix dim">level ${s.level} · ${s.health}/${s.maxHealth} HP · ${s.gold} gold</div></div>`;
+const items = {};
+const live = { state: null, prev: null, beastMax: {}, lastMove: null, game: null, strategy: null, moves: 0, ending: null, running: false };
+let dirty = false;
+
+function setRunning(on) {
+  live.running = on;
+  $("app").classList.toggle("live", on);
+  $("onair").textContent = on ? "Live" : "Offline";
+  $("play").disabled = on;
+  $("stop").disabled = !on;
 }
 
-function actionChip(a) {
+function hpBar(el, now, max) {
+  const pct = max ? Math.max(0, Math.min(100, (100 * now) / max)) : 0;
+  el.querySelector(".fill").style.width = `${pct}%`;
+  el.querySelector(".trail").style.width = `${pct}%`;
+  el.querySelector("b").textContent = `${now} / ${max}`;
+  el.classList.toggle("low", pct < 30);
+}
+
+let fallenShown = false;
+function renderStage() {
+  dirty = false;
+  const holding = Date.now() < live.holdUntil && live.fallen;
+  const s = holding ? live.fallen : live.state;
+  if (!s) return;
+  if (holding) setTimeout(schedule, live.holdUntil - Date.now());
+  if (s.over !== fallenShown) {
+    fallenShown = s.over;
+    stampQueue.length = 0;
+    $("stamp").innerHTML = s.over ? `Slain<small>at level ${s.level}</small>` : "";
+    $("stamp").className = s.over ? "stamp bad hold" : "stamp";
+  }
+  const b = live.shown;
+  $("stage").classList.toggle("fight", !!b && !s.over);
+  $("stage").classList.toggle("gone", !!b?.gone);
+  $("stage").classList.toggle("fallen", s.over);
+  $("usName").textContent = `Level ${s.level}`;
+  $("usMeta").textContent = s.over ? "fallen" : b ? "in battle" : "exploring";
+  hpBar($("usHp"), s.health, s.maxHealth);
+  if (b) {
+    const key = `${b.name}:${b.level}`;
+    live.beastMax[key] = Math.max(live.beastMax[key] ?? 0, b.health);
+    const src = `/assets/beasts/${slug(b.baseName)}.png`;
+    if ($("foe").getAttribute("src") !== src) $("foe").src = src;
+    $("foe").alt = b.name;
+    $("themName").textContent = b.name;
+    $("themMeta").textContent = b.gone ?? `level ${b.level}  tier ${b.tier} ${b.type.toLowerCase()}`;
+    hpBar($("themHp"), b.health, live.beastMax[key]);
+  }
+  if (!holding) renderCall(s);
+  renderDock(s);
+}
+
+function renderDock(s) {
+  for (const g of [...s.equipment, ...s.bag, ...s.market]) items[g.id] = g;
+  const next = (s.level + 1) ** 2, base = s.level ** 2;
+  $("purse").innerHTML = `<span><b>${s.gold}</b> gold</span><span><b>${s.xp}</b> xp</span><div class="xpbar" title="${next - s.xp} xp to level ${s.level + 1}"><div style="width:${Math.min(100, (100 * (s.xp - base)) / (next - base))}%"></div></div><span>potion ${s.potionPrice}g</span>${s.statUpgradesAvailable ? `<span class="points">${s.statUpgradesAvailable} stat point${s.statUpgradesAvailable > 1 ? "s" : ""}</span>` : ""}`;
+  $("stats").innerHTML = STATS.map(([k, icon, short]) => `<div title="${icon}"><img src="/assets/icons/${icon}.svg" alt="">${s.stats[k]}<small>${short}</small></div>`).join("");
+  const bySlot = Object.fromEntries(s.equipment.map((g) => [g.slot, g]));
+  $("gear").innerHTML = SLOTS.map((slot) => {
+    const g = bySlot[slot];
+    return g
+      ? `<div class="slot${g.suffix ? " suffixed" : ""}" title="${esc(g.name)}${g.suffix ? ` ${esc(g.suffix)}` : ""}, tier ${g.tier} ${esc(g.type)}, greatness ${g.greatness}"><img src="/assets/loot/${slug(g.name)}.png" alt="${esc(g.name)}"><span>T${g.tier} G${g.greatness}</span></div>`
+      : `<div class="slot empty" title="No ${slot}"><img src="/assets/icons/${slot}.svg" alt="No ${slot}"><span>empty</span></div>`;
+  }).join("");
+  $("bag").textContent = s.bag.length ? `bag: ${s.bag.map((g) => g.name).join(", ")}` : "bag empty";
+}
+
+function schedule() {
+  if (!dirty) { dirty = true; requestAnimationFrame(renderStage); }
+}
+
+const stampQueue = [];
+let stampBusy = false;
+function stamp(text, sub = "") {
+  if (fallenShown) return;
+  stampQueue.length = 0;
+  stampQueue.push({ text, sub });
+  if (!stampBusy) nextStamp();
+}
+function nextStamp() {
+  const m = stampQueue.shift();
+  const el = $("stamp");
+  if (!m || fallenShown) {
+    stampBusy = false;
+    if (!fallenShown) el.className = "stamp";
+    return;
+  }
+  stampBusy = true;
+  el.className = "stamp";
+  el.innerHTML = `${esc(m.text)}${m.sub ? `<small>${esc(m.sub)}</small>` : ""}`;
+  void el.offsetWidth;
+  el.className = `stamp ${quiet.matches ? "hold" : "show"}`;
+  setTimeout(nextStamp, 1100);
+}
+
+function parseThought(t) {
+  const parts = String(t ?? "").split(" · ");
+  const picks = parts.map((p) => p.match(/^(.{1,40}?)\s+(\d{1,3})%$/));
+  return picks.every(Boolean) ? picks.map((m) => ({ label: m[1], p: Number(m[2]) })) : null;
+}
+
+function thoughtHtml(t) {
+  const picks = parseThought(t);
+  if (!picks) return `<span class="said">${esc(t)}</span>`;
+  return picks.map((k) => `<span class="pick">${esc(k.label)} <meter min="0" max="100" value="${k.p}" title="${k.p}% sure"></meter><em>${k.p}%</em></span>`).join("");
+}
+
+function actionHtml(a) {
   const icon = (id) => (items[id] ? `<img src="/assets/loot/${slug(items[id].name)}.png" alt="">` : "");
   const name = (id) => esc(items[id]?.name ?? `item ${id}`);
+  const till = a.tillHealth ? ` until ${a.tillHealth} HP` : "";
   switch (a.type) {
-    case "explore": return `<span class="chip move">explore</span>`;
-    case "attack": return `<span class="chip move">fight${a.tillHealth ? ` until ${a.tillHealth} HP` : ""}</span>`;
-    case "flee": return `<span class="chip move">flee${a.tillHealth ? ` until ${a.tillHealth} HP` : ""}</span>`;
-    case "upgrade": return `<span class="chip">+${a.amount} ${a.stat.slice(0, 3).toUpperCase()}</span>`;
-    case "buy": return `<span class="chip">${icon(a.item)}buy ${name(a.item)}${a.equip ? " (equip)" : ""}</span>`;
-    case "equip": return `<span class="chip">${icon(a.item)}equip ${name(a.item)}</span>`;
-    case "drop": return `<span class="chip">drop ${name(a.item)}</span>`;
-    case "potions": return `<span class="chip">${a.qty} potion${a.qty > 1 ? "s" : ""}</span>`;
-    default: return `<span class="chip">${esc(a.type)}</span>`;
+    case "explore": return `<span class="act move">explore</span>`;
+    case "attack": return `<span class="act move">fight${till}</span>`;
+    case "flee": return `<span class="act move">flee${till}</span>`;
+    case "upgrade": return `<span class="act">+${a.amount} ${a.stat.slice(0, 3).toUpperCase()}</span>`;
+    case "buy": return `<span class="act">${icon(a.item)}buy ${name(a.item)}${a.equip ? ", equip" : ""}</span>`;
+    case "equip": return `<span class="act">${icon(a.item)}equip ${name(a.item)}</span>`;
+    case "drop": return `<span class="act">drop ${name(a.item)}</span>`;
+    case "potions": return `<span class="act">drink ${a.qty} potion${a.qty > 1 ? "s" : ""}</span>`;
+    default: return `<span class="act">${esc(a.type)}</span>`;
   }
 }
 
-function renderOdds(options, actions) {
-  const chosen = actions?.at(-1)?.type;
-  $("odds").innerHTML = options?.length
-    ? options.map((o) => o.error
-        ? `<div class="odd"><span>${esc(o.label)}</span><span class="bad">rejected: ${esc(o.error)}</span><span></span></div>`
-        : `<div class="odd ${o.move === chosen ? "chosen" : ""}"><span class="pix">${esc(o.label)}</span><div class="meter"><div style="width:${Math.round(100 * o.death)}%"></div><span>death ${Math.round(100 * o.death)}%</span></div><span class="pix dim">HP after ${o.hp[1]} (${o.hp[0]}–${o.hp[2]}) · +${o.xp} xp · ${o.gold >= 0 ? "+" : ""}${o.gold} gold</span></div>`).join("")
-    : `<span class="pix dim">stat points pending: upgrades and shopping first</span>`;
+let called = null;
+function renderCall(s) {
+  const d = live.decision;
+  const key = s.beast && d?.phase !== "battle" ? `size:${s.beast.name}` : d;
+  if (key === called) return;
+  called = key;
+  if (!d || typeof key === "string") {
+    $("odds").hidden = true;
+    $("caption").innerHTML = `<span class="name">Jev</span><span class="said thinking">${s.beast ? `sizing up the ${esc(s.beast.name)}` : "getting ready"}</span>`;
+    return;
+  }
+  $("caption").innerHTML = `<span class="name">Jev</span>${thoughtHtml(d.thought || d.note)}${chips(d, "span")}`;
+  renderOdds(d);
 }
 
-function timeline(e) {
+function renderOdds(e) {
+  const box = $("odds");
+  const s = e.before ?? live.state;
+  const chosen = e.actions?.at(-1)?.type;
+  const max = s?.maxHealth || 1;
+  if (!e.options?.length) {
+    box.hidden = false;
+    box.innerHTML = `<div class="note">Level up: spending stat points and shopping before the next move</div>`;
+    return;
+  }
+  box.hidden = false;
+  const pos = (v) => `${Math.max(0, Math.min(100, (100 * v) / max))}%`;
+  box.innerHTML = `<span class="head">Move</span><span class="head">Death risk</span><span class="head">HP after, worst to best</span><span class="head">Likely HP</span><span class="head">XP</span><span class="head">Gold</span>` + e.options.map((o) => {
+    const cls = o.move === chosen ? "move chosen" : "move";
+    if (o.error) return `<span class="${cls}">${MOVE[o.move] ?? esc(o.move)}</span><span class="note" style="grid-column:2/-1" title="${esc(o.error)}">${/^RPC|starknet|fetch|timeout/i.test(o.error) ? "odds unavailable, the simulation did not answer" : esc(o.error.slice(0, 90))}</span>`;
+    const d = Math.round(100 * o.death);
+    return `<span class="${cls}">${MOVE[o.move] ?? esc(o.move)}</span>
+      <span class="risk ${d === 0 ? "safe" : d >= 50 ? "dead" : ""}"><span class="bar"><div style="width:${d}%"></div></span><b>${d}%</b></span>
+      <span class="track" title="HP after: worst ${o.hp[0]}, median ${o.hp[1]}, best ${o.hp[2]}"><span class="band" style="left:${pos(o.hp[0])};right:calc(100% - ${pos(o.hp[2])})"></span><span class="mid" style="left:${pos(o.hp[1])}"></span><span class="now" style="left:${pos(s?.health ?? 0)}"></span></span>
+      <span class="gain"><b>${o.hp[1]}</b> HP</span><span class="gain">+${o.xp} xp</span><span class="gain">${o.gold >= 0 ? "+" : ""}${o.gold} gold</span>`;
+  }).join("");
+}
+
+const log = $("log");
+let pinned = true;
+log.addEventListener("scroll", () => {
+  pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  $("chat").classList.toggle("scrolled", !pinned);
+});
+$("jump").onclick = () => { log.scrollTop = log.scrollHeight; };
+let streak = null;
+function say(html, cls = "") {
   const div = document.createElement("div");
-  if (e.kind === "decision") div.innerHTML = `<div class="chips">${e.actions.map(actionChip).join("")}${e.reserve ? `<span class="chip">keep ${e.reserve} gold</span>` : ""}</div><div>${esc(e.thought ?? e.note)}</div>${e.note && e.thought ? `<div class="note">note: ${esc(e.note)}</div>` : ""}`;
-  else if (e.kind === "rejected") div.innerHTML = `<div class="bad">rejected by the game: ${esc(e.reason)}</div>`;
-  else if (e.kind === "preview") div.innerHTML = `<div class="dim">simulated ${esc(JSON.stringify(e.actions))}: ${esc(e.result)}</div>`;
-  else if (e.kind === "status") div.innerHTML = `<div style="color:var(--hp)">${esc(e.text)}</div>`;
-  else return;
-  const t = $("timeline");
-  t.prepend(div);
-  while (t.childElementCount > 120) t.lastElementChild.remove();
+  if (cls) div.className = cls;
+  div.innerHTML = html;
+  log.append(div);
+  while (log.childElementCount > 160) log.firstElementChild.remove();
+  if (pinned) log.scrollTop = log.scrollHeight;
+  return div;
 }
 
-function onEvent(e) {
-  if (e.kind === "state") return renderState(e.state);
-  if (e.kind === "decision") {
-    renderOdds(e.options, e.actions);
-    $("mind").textContent = e.thought ?? e.note;
-    $("chips").innerHTML = e.actions.map(actionChip).join("") + (e.reserve ? `<span class="chip">keep ${e.reserve} gold</span>` : "");
-  }
-  if (e.kind === "status") {
-    $("status").textContent = e.text;
-    if (/finished|died|stopped|failed|game \d+ on/.test(e.text)) loadHistory();
-  }
-  timeline(e);
+function chips(e, tag = "div") {
+  const shown = parseThought(e.thought) ? e.actions.filter((a) => (!MOVE[a.type] && a.type !== "upgrade") || a.tillHealth) : e.actions;
+  const html = shown.map(actionHtml).join("") + (e.reserve ? `<span class="act">keep ${e.reserve} gold</span>` : "");
+  return html ? `<${tag} class="acts">${html}</${tag}>` : "";
 }
 
+function chatDecision(e) {
+  const plain = e.actions.length === 1 && e.actions[0].type === "explore" && /^explore$/.test(e.thought ?? "");
+  if (plain && streak?.isConnected && log.lastElementChild === streak) {
+    streak.count++;
+    streak.querySelector(".times").textContent = `explores, ${streak.count} steps in a row`;
+    if (pinned) log.scrollTop = log.scrollHeight;
+    return;
+  }
+  const div = say(plain
+    ? `<span class="by">Jev</span><span class="times">explores</span>`
+    : `<span class="by">Jev</span>${esc(e.thought || e.note)}${chips(e)}${e.note && e.thought ? `<div class="sys">${esc(e.note)}</div>` : ""}`);
+  streak = plain ? div : null;
+  if (plain) div.count = 1;
+}
+
+function moment(text, tone = "") {
+  streak = null;
+  say(esc(text), `moment ${tone}`);
+}
+
+function onState(s, replaying) {
+  const prev = live.state;
+  live.state = s;
+  for (const g of [...s.equipment, ...s.bag, ...s.market]) items[g.id] = g;
+  if (prev && !replaying) {
+    if (!prev.beast && s.beast) { moment(`${s.beast.name} appears, level ${s.beast.level}`); stamp(s.beast.name, `level ${s.beast.level} ${s.beast.type.toLowerCase()} appears`); }
+    if (prev.beast && !s.beast && !s.over) {
+      if (live.lastMove === "flee") { moment(`Escaped the ${prev.beast.name}`, "good"); stamp("Escaped"); }
+      else { moment(`Slew the ${prev.beast.name}, +${s.xp - prev.xp} xp, +${s.gold - prev.gold} gold`, "good"); stamp("Victory", `${prev.beast.name} slain`); }
+    }
+    if (s.level > prev.level && !s.over) { moment(`Reached level ${s.level}`, "good"); if (!stampBusy) stamp(`Level ${s.level}`); }
+    if (s.over && !prev.over) moment(`Slain at level ${s.level}`, "bad");
+  }
+  if (s.over) { live.fallen = s; live.holdUntil = Date.now() + 4500; }
+  clearTimeout(live.linger);
+  if (s.beast) live.shown = s.beast;
+  else if (live.shown && prev?.beast && !replaying) {
+    const fled = live.lastMove === "flee";
+    live.shown = { ...prev.beast, health: fled ? prev.beast.health : 0, gone: fled ? "escaped" : "slain" };
+    live.linger = setTimeout(() => { live.shown = null; schedule(); }, 2400);
+  } else live.shown = null;
+  schedule();
+}
+
+function onDecision(e, replaying) {
+  live.moves++;
+  live.lastMove = e.actions?.at(-1)?.type ?? live.lastMove;
+  live.decision = { ...e, before: live.state };
+  schedule();
+  chatDecision(e);
+  $("moves").textContent = `${live.moves} decisions`;
+  if (!replaying && e.phase === "battle" && MOVE[live.lastMove]) stamp(MOVE[live.lastMove]);
+}
+
+function onStatus(text, replaying) {
+  const start = text.match(/^game (\d+) on (\w+)/);
+  if (start) {
+    live.game = start[1];
+    live.ending = null;
+    live.beastMax = {};
+    if (!replaying) { live.moves = 0; streak = null; say(`Game ${live.game} begins`, "split"); setRunning(true); }
+    renderGame();
+    loadHistory();
+    return;
+  }
+  const end = text.match(/^game (\d+) (died .*|stopped.*|failed.*)/);
+  if (end) { live.ending = end[2]; renderGame(); loadHistory(); say(esc(`Game ${end[1]} ${end[2]}`), "moment bad"); return; }
+  if (/agent running/.test(text)) setRunning(true);
+  if (/agent idle|batch done/.test(text)) setRunning(false);
+  if (/CONTRACT MISMATCH|retry|failed/.test(text)) say(esc(text), "sys");
+}
+
+function onEvent(e, replaying = false) {
+  if (e.kind === "state") return onState(e.state, replaying);
+  if (e.kind === "decision") return onDecision(e, replaying);
+  if (e.kind === "status") return onStatus(e.text, replaying);
+  if (e.kind === "rejected") { streak = null; say(`The game refused that move: ${esc(e.reason)}`, "sys"); }
+}
+
+function renderGame() {
+  const s = live.state;
+  $("game").innerHTML = live.game
+    ? `<span>Game <b>${live.game}</b></span>${live.strategy ? `<span>strategy <b>${esc(live.strategy)}</b></span>` : ""}${live.ending ? `<span>${esc(live.ending)}</span>` : ""}`
+    : `<span>No game yet. Run the benchmark to start one.</span>`;
+}
+
+const ENDING = (g) => (!g.ended_at ? "now" : /while fighting/.test(g.ending) ? "fighting" : /while fleeing/.test(g.ending) ? "fleeing" : /while exploring/.test(g.ending) ? "" : "other");
 async function loadHistory() {
-  const [strategies, games] = await Promise.all([fetch("/api/strategies").then((r) => r.json()), fetch("/api/games").then((r) => r.json())]);
-  $("strategies").innerHTML = strategies.map((r) => `<tr><td><details><summary>${r.hash}</summary><pre style="white-space:pre-wrap;font:14px VT323,monospace;max-height:40vh;overflow:auto">${esc(r.text)}</pre></details></td><td>${r.games}</td><td>${r.median ?? "–"}</td><td>${r.best ?? "–"}</td></tr>`).join("");
-  const done = games.filter((g) => g.ended_at && g.mode === "practice");
-  const levels = done.map((g) => g.level).sort((a, b) => a - b);
-  $("summary").textContent = levels.length ? `· median ${levels[Math.floor(levels.length / 2)]} · best ${levels.at(-1)}` : "";
-  $("games").innerHTML = games.slice(0, 60).map((g) => `<tr><td>${g.id}</td><td>${g.level ?? "…"}</td><td class="ending">${g.ended_at ? esc(g.ending ?? "") + (g.mismatches ? ` · <span class="bad">${g.mismatches} mismatches</span>` : "") : "playing"}</td></tr>`).join("");
+  const [strategies, games] = await Promise.all([get("/api/strategies"), get("/api/games")]);
+  if (!games) return;
+  const recent = games.filter((g) => g.mode === "practice").slice(0, 36).reverse();
+  const current = recent.at(-1);
+  if (current) { live.strategy = current.strategy; if (!live.game) live.game = String(current.id); renderGame(); }
+  const done = recent.filter((g) => g.ended_at && g.strategy === current?.strategy).map((g) => g.level).sort((a, b) => a - b);
+  const top = Math.max(10, ...recent.map((g) => g.level ?? 0), live.state?.level ?? 0);
+  const median = done[Math.floor(done.length / 2)];
+  $("runsum").textContent = done.length ? `median level ${median}, best ${done.at(-1)} over ${done.length} games` : "first game of this strategy";
+  $("bars").innerHTML = recent.map((g) => {
+    const lvl = g.ended_at ? g.level : live.state?.level ?? 1;
+    return `<div class="${ENDING(g)}${g.strategy === current.strategy ? "" : " older"}" style="height:${(100 * lvl) / top}%" title="Game ${g.id}, strategy ${esc(g.strategy)}: ${g.ended_at ? esc(g.ending) : `playing, level ${lvl}`}"></div>`;
+  }).join("") + (median ? `<div class="median" style="bottom:${(100 * median) / top}%" title="median level ${median}"></div>` : "");
+  $("bars").setAttribute("aria-label", `Levels reached in recent games: ${recent.map((g) => g.level ?? "playing").join(", ") || "none yet"}`);
+  const last = recent.filter((g) => g.ended_at).at(-1);
+  $("last").textContent = last ? `Game ${last.id} ${last.ending}` : "";
+  $("strats").innerHTML = (strategies ?? []).slice(0, 4).map((r) => `<span title="${esc(r.text.slice(0, 600))}"><b>${esc(r.hash)}</b> ${r.games} games, median ${r.median ?? "–"}, best ${r.best ?? "–"}</span>`).join("");
 }
 
-const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+$("play").onclick = () => { setRunning(true); post("/api/play", {}); };
+$("stop").onclick = () => post("/api/stop");
+
+setRunning(false);
+renderGame();
+const pending = [];
+let flushing = false;
 const source = new EventSource("/events");
-source.onopen = () => ($("status").textContent = "live");
-source.onerror = () => ($("status").textContent = "reconnecting…");
-source.onmessage = (m) => onEvent(JSON.parse(m.data));
-get("/api/state").then(renderState);
-get("/api/recent").then((events) => (events ?? []).forEach(onEvent));
-loadHistory().catch(() => {});
+source.onerror = () => { $("onair").textContent = "Reconnecting"; };
+source.onmessage = (m) => {
+  pending.push(JSON.parse(m.data));
+  if (!flushing) { flushing = true; requestAnimationFrame(() => { flushing = false; const batch = pending.splice(0); batch.forEach((e, i) => onEvent(e, false)); }); }
+};
+Promise.all([get("/api/state"), get("/api/recent"), get("/api/items")]).then(([state, events, table]) => {
+  for (const g of table ?? []) items[g.id] ??= g;
+  (events ?? []).forEach((e) => onEvent(e, true));
+  if (state) onState(state, true);
+  if (state && !state.over && events?.length) setRunning(true);
+});
+loadHistory();
+setInterval(() => { if (live.running && live.state) loadHistory(); }, 15000);
 get("/api/check").then((c) => {
   if (!c) return;
-  $("check").textContent = `contract check ${c.failed ? `FAILED (${c.failed})` : "ok"}`;
-  $("check").style.color = c.failed ? "var(--bad)" : "var(--hp)";
+  $("check").textContent = c.failed ? `contract check failed ${c.failed}` : "contract check ok";
+  $("check").classList.toggle("bad", !!c.failed);
 });
 </script>
 </body>

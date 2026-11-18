@@ -1,16 +1,17 @@
 import { createHash, randomBytes } from "node:crypto";
 import { GAME_CORE } from "./config.ts";
 import { decodeAdventurer, decodeBag, encodePacket, type Action, type Adventurer, type Item } from "./codec.ts";
+import { fromSnapshot, step, toSnapshot, type Local } from "./engine/engine.ts";
 import { provider } from "./wallet.ts";
 
 export type Snapshot = { adventurer: Adventurer; bag: Item[]; over: boolean };
-export type Game = { id: string; packets: bigint[] };
+export type Game = { id: string; packets: bigint[]; start: Snapshot; local: Local };
 
 const FAR_BLOCK = 4_000_000_000n;
 
 const randomHash = () => "0x" + randomBytes(31).toString("hex");
-const luck = (game: Game, move: number) => "0x" + createHash("sha256").update(`${game.id}:${move}`).digest("hex").slice(0, 62);
-export const hashes = (game: Game) => game.packets.map((_, i) => luck(game, i));
+const luck = (game: Pick<Game, "id">, move: number) => "0x" + createHash("sha256").update(`${game.id}:${move}`).digest("hex").slice(0, 62);
+export const hashes = (game: Pick<Game, "id" | "packets">) => game.packets.map((_, i) => luck(game, i));
 
 const MAX_IN_FLIGHT = 4;
 let inFlight = 0;
@@ -38,7 +39,7 @@ async function call(request: Parameters<typeof provider.callContract>[0], attemp
   }
 }
 
-export async function replay(game: Game, packets = game.packets, luckHashes = hashes(game)): Promise<Snapshot> {
+export async function replay(game: Pick<Game, "id" | "packets">, packets = game.packets, luckHashes = hashes(game)): Promise<Snapshot> {
   const blocks = packets.map((_, i) => (FAR_BLOCK + BigInt(i)).toString());
   const calldata = [game.id, String(packets.length), ...packets.map(String), String(blocks.length), ...blocks, String(luckHashes.length), ...luckHashes, "0"];
   const out = await call({ contractAddress: GAME_CORE, entrypoint: "replay_transcript", calldata });
@@ -46,22 +47,30 @@ export async function replay(game: Game, packets = game.packets, luckHashes = ha
   return { adventurer, bag: decodeBag(BigInt(out[4])), over: adventurer.health === 0 && packets.length > 0 };
 }
 
-export function newPracticeGame(id: string): Game {
-  return { id, packets: [] };
+const starts = new Map<string, Snapshot>();
+
+export async function newPracticeGame(id: string): Promise<Game> {
+  if (!starts.has(id)) starts.set(id, await replay({ id, packets: [] }));
+  const start = starts.get(id)!;
+  return { id, packets: [], start, local: fromSnapshot(start) };
 }
 
-export async function act(game: Game, actions: Action[]): Promise<Snapshot> {
+export function act(game: Game, actions: Action[]): Snapshot {
   const packet = encodePacket(actions);
-  const snapshot = await replay(game, [...game.packets, packet], [...hashes(game), luck(game, game.packets.length)]);
+  game.local = step(game.local, game.id, packet, luck(game, game.packets.length));
   game.packets.push(packet);
-  return snapshot;
+  return toSnapshot(game.local);
 }
 
-export async function preview(game: Game, actions: Action[], samples: number): Promise<Snapshot[]> {
+export function preview(game: Game, actions: Action[], samples: number): Snapshot[] {
   const packet = encodePacket(actions);
-  return Promise.all(
-    Array.from({ length: samples }, () => replay(game, [...game.packets, packet], [...hashes(game), randomHash()])),
-  );
+  return Array.from({ length: samples }, () => toSnapshot(step(game.local, game.id, packet, randomHash())));
+}
+
+export async function audit(game: Game): Promise<string | undefined> {
+  const [local, contract] = [toSnapshot(game.local), await replay(game)];
+  const same = JSON.stringify([local.adventurer, local.bag]) === JSON.stringify([contract.adventurer, contract.bag]);
+  if (!same) return `after ${game.packets.length} moves the contract has ${JSON.stringify(contract.adventurer)}, local ${JSON.stringify(local.adventurer)}`;
 }
 
 export function revertReason(err: unknown): string {
