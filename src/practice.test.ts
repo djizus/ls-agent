@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { act, newPracticeGame, preview, replay } from "./practice.ts";
+
+test("a practice game starts fresh, takes a move, and previews differ by luck", { timeout: 60_000 }, async () => {
+  const game = await newPracticeGame();
+  const start = await replay(game);
+  assert.equal(start.adventurer.xp, 0);
+  assert.equal(start.adventurer.equipment.weapon.id, 12);
+  const after = await act(game, [{ type: "explore" }]);
+  assert.equal(game.packets.length, 1);
+  assert.ok(after.adventurer.xp > 0 || after.adventurer.gold !== start.adventurer.gold || after.adventurer.health !== start.adventurer.health);
+  const outcomes = await preview(game, [{ type: after.adventurer.beast_health > 0 ? "attack" : "explore" }], 8);
+  assert.ok(new Set(outcomes.map((o) => JSON.stringify(o.adventurer))).size > 1);
+});
