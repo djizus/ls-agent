@@ -6,7 +6,7 @@ import { currentGame, describe } from "./play.ts";
 import { plan } from "./policy.ts";
 import type { Game } from "./practice.ts";
 
-export type Future = { survival: number; xp: number; gold: number };
+export type Future = { survival: number; xp: number; gold: number; meanXp: number };
 
 const luck = (run: number, move: number) => "0x" + createHash("sha256").update(`rollout:${run}:${move}`).digest("hex").slice(0, 62);
 
@@ -30,7 +30,7 @@ export function future(game: Game, first: Action[], runs: number, horizon: numbe
     gold.push(local.adventurer.gold - start.gold);
   }
   const median = (v: number[]) => v.sort((a, b) => a - b)[Math.floor(v.length / 2)] ?? 0;
-  return { survival: alive / runs, xp: median(xp), gold: median(gold) };
+  return { survival: alive / runs, meanXp: xp.reduce((x, y) => x + y, 0) / Math.max(1, xp.length), xp: median(xp), gold: median(gold) };
 }
 
 const RUNS = 24;

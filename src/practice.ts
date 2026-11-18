@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { GAME_CORE, VAR_DIR } from "./config.ts";
 import { decodeAdventurer, decodeBag, encodePacket, type Action, type Adventurer, type Item } from "./codec.ts";
-import { fromSnapshot, step, toSnapshot, type Local } from "./engine/engine.ts";
+import { fromSnapshot, replayLocal, step, toSnapshot, type Local } from "./engine/engine.ts";
 import { provider } from "./wallet.ts";
 
 export type Snapshot = { adventurer: Adventurer; bag: Item[]; over: boolean };
@@ -75,9 +75,19 @@ export function preview(game: Game, actions: Action[], samples: number): Snapsho
 }
 
 export async function audit(game: Game): Promise<string | undefined> {
-  const [local, contract] = [toSnapshot(game.local), await replay(game)];
-  const same = JSON.stringify([local.adventurer, local.bag]) === JSON.stringify([contract.adventurer, contract.bag]);
-  if (!same) return `after ${game.packets.length} moves the contract has ${JSON.stringify(contract.adventurer)}, local ${JSON.stringify(local.adventurer)}`;
+  for (let moves = game.packets.length; moves > 0; moves = Math.floor(moves * 0.8)) {
+    const [packets, luckHashes] = [game.packets.slice(0, moves), hashes(game).slice(0, moves)];
+    let contract: Snapshot;
+    try {
+      contract = await replay(game, packets, luckHashes);
+    } catch (err) {
+      if (/out of gas/i.test(revertReason(err))) continue;
+      throw err;
+    }
+    const local = replayLocal(game.start, game.id, packets, luckHashes);
+    const same = JSON.stringify([local.adventurer, local.bag]) === JSON.stringify([contract.adventurer, contract.bag]);
+    return same ? undefined : `after ${moves} moves the contract has ${JSON.stringify(contract.adventurer)}, local ${JSON.stringify(local.adventurer)}`;
+  }
 }
 
 export function revertReason(err: unknown): string {
