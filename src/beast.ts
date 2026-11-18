@@ -1,3 +1,4 @@
+import { levelOf } from "./items.ts";
 import { hash } from "starknet";
 import type { Adventurer } from "./codec.ts";
 
@@ -20,7 +21,6 @@ const NAMES = "Warlock Typhon Jiangshi Anansi Basilisk Gorgon Kitsune Lich Chime
 
 const poseidon = (values: bigint[]) => BigInt(hash.computePoseidonHashOnElements(values));
 
-const levelOf = (xp: number) => Math.max(1, Math.floor(Math.sqrt(xp)));
 
 function bonus(level: number): number {
   if (level >= 50) return 80;

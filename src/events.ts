@@ -4,7 +4,8 @@ export type AgentEvent =
   | { kind: "tool"; name: string; input: unknown }
   | { kind: "result"; name: string; output: string }
   | { kind: "turn"; costUsd: number; durationMs: number; error: boolean }
-  | { kind: "status"; text: string };
+  | { kind: "status"; text: string }
+  | { kind: "state"; game: string; state: object };
 
 type Listener = (e: AgentEvent & { at: number }) => void;
 const listeners = new Set<Listener>();

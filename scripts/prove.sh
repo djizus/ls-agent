@@ -10,14 +10,14 @@ mkdir -p "$out"
 LS_PORT="$port" LS_VAR_DIR="$out/" node --disable-warning=ExperimentalWarning "$root/src/main.ts" > "$out/service.log" 2>&1 &
 service=$!
 trap 'kill $service 2>/dev/null; wait $service 2>/dev/null || true' EXIT
-for _ in $(seq 40); do curl -sf "localhost:$port/" > /dev/null && break; sleep 0.5; done
+for _ in $(seq 40); do curl -sf "127.0.0.1:$port/" > /dev/null && break; sleep 0.5; done
 
-curl -sN "localhost:$port/events" | sed -un 's/^data: //p' > "$out/events.jsonl" &
+curl -sN "127.0.0.1:$port/events" | sed -un 's/^data: //p' > "$out/events.jsonl" &
 stream=$!
-curl -sf -XPOST "localhost:$port/api/play" -d "{\"games\":$games}" > /dev/null
+curl -sf -XPOST "127.0.0.1:$port/api/play" -d "{\"games\":$games}" > /dev/null
 timeout "${LS_PROVE_TIMEOUT:-3600}" bash -c "until grep -q '\"text\":\"batch done\"' '$out/events.jsonl'; do sleep 2; done" || echo "timed out" >> "$out/service.log"
 kill $stream 2>/dev/null || true
-curl -sf "localhost:$port/api/games" > "$out/games.json"
+curl -sf "127.0.0.1:$port/api/games" > "$out/games.json"
 
 node -e '
 const g = require(process.argv[1]);

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { running, send, start, stop } from "./agent.ts";
 import { db } from "./db.ts";
 import { emit, subscribe } from "./events.ts";
+import { levelOf } from "./items.ts";
 import { currentGame, gameOver, reset, snapshot } from "./play.ts";
 
 const promptFile = new URL("../strategy/prompt.md", import.meta.url).pathname;
@@ -41,7 +42,7 @@ function begin(): void {
 function finish(): void {
   const s = snapshot();
   db.prepare("UPDATE games SET game_id = ?, ended_at = ?, level = ?, xp = ?, moves = ?, cost_usd = ? WHERE id = ?").run(
-    currentGame()?.id ?? "", Date.now(), s ? Math.max(1, Math.floor(Math.sqrt(s.adventurer.xp))) : 0, s?.adventurer.xp ?? 0, currentGame()?.packets.length ?? 0, cost, row!,
+    currentGame()?.id ?? "", Date.now(), s ? levelOf(s.adventurer.xp) : 0, s?.adventurer.xp ?? 0, currentGame()?.packets.length ?? 0, cost, row!,
   );
   emit({ kind: "status", text: `game ${row} finished at xp ${s?.adventurer.xp ?? 0}` });
   row = undefined;

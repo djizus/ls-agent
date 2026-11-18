@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { readFileSync } from "node:fs";
-import { PORT } from "./config.ts";
+import { HOST, PORT } from "./config.ts";
 import { running, send } from "./agent.ts";
 import { db } from "./db.ts";
 import { halt, playGames } from "./runner.ts";
@@ -48,5 +48,5 @@ export function serve(): void {
       return res.end(readFileSync(page));
     }
     res.writeHead(404).end();
-  }).listen(PORT, "127.0.0.1", () => console.log(`ls-agent on http://127.0.0.1:${PORT}`));
+  }).listen(PORT, HOST, () => console.log(`ls-agent on http://${HOST}:${PORT}`));
 }
