@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
 import { BENCHMARK } from "./config.ts";
 import { db } from "./db.ts";
-import { cancel, decide } from "./decide.ts";
+import { EFFORT, MODEL, PREAMBLE, cancel, decide } from "./decide.ts";
 import { emit, subscribe } from "./events.ts";
 import { begin, commit, movesMade, options, phase, render, snapshot, type Phase } from "./play.ts";
 
@@ -20,11 +20,12 @@ subscribe((e) => {
 });
 
 export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
-  const hash = createHash("sha256").update(text).digest("hex").slice(0, 8);
+  const full = `${MODEL} effort ${EFFORT}\n\n${PREAMBLE}\n\n${text}`;
+  const hash = createHash("sha256").update(full).digest("hex").slice(0, 8);
   const [common, ...rest] = text.split(/^<!-- phase:(\w+) -->$/m);
   const sections: Record<string, string> = {};
   for (let i = 0; i < rest.length; i += 2) sections[rest[i]] = rest[i + 1].trim();
-  return { hash, text, rules: (p: Phase) => [common.trim(), sections[p] ?? ""].filter(Boolean).join("\n\n") };
+  return { hash, text: full, rules: (p: Phase) => [common.trim(), sections[p] ?? ""].filter(Boolean).join("\n\n") };
 }
 
 async function playGame(id: string): Promise<void> {
