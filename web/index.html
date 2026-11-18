@@ -3,45 +3,62 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LS Agent</title>
+<title>Death Mountain Agent</title>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=VT323&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #0f1113; --panel: #171a1d; --line: #262a2f; --text: #e6e6e3; --dim: #8b9096; --accent: #e0a64b; --hp: #5fb36f; --bad: #d9614c; }
+  :root { --bg: #111111; --panel: #1b1a1c; --well: #282729; --line: #3a372f; --gold: #d0c98d; --bright: #edcf33; --orange: #f59100; --text: #d0c98d; --dim: rgba(208, 201, 141, .55); --hp: #80ff00; --bad: #e0503c; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 ui-sans-serif, system-ui, sans-serif; }
+  body { margin: 0; background: radial-gradient(ellipse at top, #1e1c18 0%, var(--bg) 60%) fixed; color: var(--text); font: 15px/1.4 Cinzel, Georgia, serif; }
   header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  h1 { font-size: 16px; margin: 0 auto 0 0; letter-spacing: .02em; }
-  #status { color: var(--dim); font-size: 13px; }
-  button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
-  button.primary { background: var(--accent); color: #1a1408; border-color: var(--accent); font-weight: 600; }
-  main { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 16px; padding: 16px; }
-  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 0 0 10px; font-weight: 600; }
-  .big { font-size: 28px; font-weight: 600; }
-  .row { display: flex; justify-content: space-between; gap: 8px; }
-  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin: 6px 0 12px; }
-  .bar > div { height: 100%; background: var(--hp); transition: width .3s; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; font-size: 13px; margin-bottom: 12px; }
+  header img { width: 32px; height: 32px; image-rendering: pixelated; }
+  h1 { font-size: 20px; margin: 0 auto 0 0; letter-spacing: .06em; font-weight: 700; color: var(--bright); }
+  #status { color: var(--dim); font: 18px VT323, monospace; }
+  button { background: var(--well); color: var(--gold); border: 1px solid var(--line); border-radius: 4px; padding: 6px 14px; font: 600 13px Cinzel, serif; letter-spacing: .04em; cursor: pointer; }
+  button:hover { border-color: var(--gold); }
+  button.primary { background: var(--gold); color: #111; border-color: var(--gold); }
+  main { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 16px; padding: 16px; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; min-width: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); margin: 0 0 10px; font-weight: 600; }
+  .big { font-size: 26px; font-weight: 700; color: var(--bright); }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .pix { font: 18px/1.2 VT323, monospace; }
   .dim { color: var(--dim); }
-  .beast { border-left: 3px solid var(--bad); padding: 6px 10px; margin-bottom: 12px; }
-  ul { list-style: none; margin: 0; padding: 0; font-size: 13px; }
-  #feed { height: 60vh; overflow-y: auto; font-size: 13px; }
-  #feed div { padding: 4px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
-  .k-say { color: var(--text); }
-  .k-thinking { color: var(--dim); font-style: italic; }
-  .k-tool { color: var(--accent); font-family: ui-monospace, monospace; }
-  .k-result { color: var(--dim); font-family: ui-monospace, monospace; }
+  .bar { height: 10px; background: var(--well); border: 1px solid var(--line); margin: 6px 0 12px; }
+  .bar > div { height: 100%; background: var(--hp); transition: width .3s; }
+  .beast { display: flex; gap: 12px; align-items: center; background: var(--well); border-left: 3px solid var(--bad); padding: 8px; margin-bottom: 12px; }
+  .beast img { width: 72px; height: 72px; object-fit: contain; }
+  .beast b { color: var(--bad); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+  .stats span { display: flex; align-items: center; gap: 6px; background: var(--well); padding: 4px 6px; }
+  .stats img { width: 16px; height: 16px; }
+  .gear { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .gear div { display: flex; align-items: center; gap: 6px; background: var(--well); padding: 4px; font-size: 12px; min-width: 0; }
+  .gear img { width: 32px; height: 32px; flex: none; }
+  .gear small { display: block; color: var(--dim); font: 15px VT323, monospace; }
+  #feed { height: 64vh; overflow-y: auto; font: 18px/1.25 VT323, monospace; }
+  #feed div { padding: 3px 0; border-bottom: 1px solid #262420; overflow-wrap: anywhere; }
+  .k-say { color: var(--gold); }
+  .k-thinking { color: var(--dim); }
+  .k-tool { color: var(--bright); }
+  .k-result { color: #8f8a68; }
   .k-status { color: var(--hp); }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  td, th { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--line); }
-  th { color: var(--dim); font-weight: 500; }
+  .k-turn { color: var(--orange); }
+  table { width: 100%; border-collapse: collapse; font: 18px VT323, monospace; }
+  td, th { text-align: right; padding: 3px 8px; border-bottom: 1px solid #262420; }
+  th { color: var(--dim); font: 600 12px Cinzel, serif; letter-spacing: .06em; text-transform: uppercase; }
   td:first-child, th:first-child { text-align: left; }
   .wide { grid-column: 1 / -1; }
+  .tablewrap { overflow-x: auto; max-height: 50vh; }
 </style>
 </head>
 <body>
 <header>
-  <h1>LS Agent</h1>
+  <img src="/assets/skull.png" alt="">
+  <h1>Death Mountain Agent</h1>
   <span id="status">connecting…</span>
   <button class="primary" onclick="play(10)">Play 10 practice games</button>
   <button onclick="play(1)">Play 1</button>
@@ -58,33 +75,34 @@
   </section>
   <section class="wide">
     <h2>Games <span id="summary" class="dim"></span></h2>
-    <table><thead><tr><th>#</th><th>Mode</th><th>Strategy</th><th>Level</th><th>XP</th><th>Moves</th><th>Cost</th><th>Ended</th></tr></thead><tbody id="games"></tbody></table>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Mode</th><th>Strategy</th><th>Level</th><th>XP</th><th>Moves</th><th>Cost</th><th>Ended</th></tr></thead><tbody id="games"></tbody></table></div>
   </section>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 const post = (url, body) => fetch(url, { method: "POST", body: body && JSON.stringify(body) });
 const play = (games) => post("/api/play", { games });
+const STAT_ICONS = { strength: "Strength", dexterity: "Dexterity", vitality: "Vitality", intelligence: "Intelligence", wisdom: "Wisdom", charisma: "Charisma" };
 
 function renderState(s) {
   if (!s) return;
-  const maxHp = s.maxHealth;
-  const gear = Object.values(s.equipment).map((g) => `<li>${esc(g.name)} <span class="dim">T${g.tier} · G${g.greatness}</span></li>`).join("");
-  const beast = s.beast ? `<div class="beast">${esc(s.beast.name)} <span class="dim">lvl ${s.beast.level} · T${s.beast.tier} ${s.beast.type} · ${s.beast.health} hp</span></div>` : "";
-  const st = s.stats;
+  const beast = s.beast ? `<div class="beast"><img src="/assets/beasts/${slug(s.beast.baseName)}.png" alt=""><div><b>${esc(s.beast.name)}</b><div class="pix dim">lvl ${s.beast.level} · T${s.beast.tier} ${esc(s.beast.type)} · ${s.beast.health} hp</div></div></div>` : "";
+  const stats = Object.entries(STAT_ICONS).map(([k, icon]) => `<span class="pix"><img src="/assets/icons/${icon}.svg" alt="">${s.stats[k]}</span>`).join("");
+  const gear = Object.values(s.equipment).map((g) => `<div><img src="/assets/loot/${slug(g.name)}.png" alt=""><span>${esc(g.name)}<small>T${g.tier} ${esc(g.type)} · G${g.greatness}</small></span></div>`).join("");
   $("adv").innerHTML = `
-    <div class="row"><span class="big">Level ${s.level}</span><span class="dim">${s.over ? "dead" : s.inBattle ? "in battle" : "exploring"}</span></div>
-    <div class="row dim"><span>${s.health} / ${maxHp} hp</span><span>${s.gold} gold · ${s.xp} xp</span></div>
-    <div class="bar"><div style="width:${Math.min(100, (100 * s.health) / maxHp)}%"></div></div>
+    <div class="row"><span class="big">Level ${s.level}</span><span class="pix dim">${s.over ? "slain" : s.inBattle ? "in battle" : "exploring"}</span></div>
+    <div class="row pix"><span>${s.health} / ${s.maxHealth} hp</span><span class="dim">${s.gold} gold · ${s.xp} xp</span></div>
+    <div class="bar"><div style="width:${Math.min(100, (100 * s.health) / s.maxHealth)}%"></div></div>
     ${beast}
-    <div class="grid"><span>STR ${st.strength}</span><span>DEX ${st.dexterity}</span><span>VIT ${st.vitality}</span><span>INT ${st.intelligence}</span><span>WIS ${st.wisdom}</span><span>CHA ${st.charisma}</span></div>
-    <ul>${gear}</ul>`;
+    <div class="stats">${stats}</div>
+    <div class="gear">${gear}</div>`;
 }
 
 function line(e) {
-  const text = e.kind === "tool" ? `${e.name} ${JSON.stringify(e.input)}`
-    : e.kind === "result" ? `→ ${e.output.slice(0, 160)}`
+  const text = e.kind === "tool" ? `> ${e.name} ${JSON.stringify(e.input)}`
+    : e.kind === "result" ? `  ${e.output.slice(0, 160)}`
     : e.kind === "turn" ? `turn done · $${e.costUsd.toFixed(3)}`
     : e.text;
   const div = document.createElement("div");
@@ -99,8 +117,7 @@ function line(e) {
 
 async function loadGames() {
   const games = await (await fetch("/api/games")).json();
-  const done = games.filter((g) => g.ended_at);
-  const levels = done.map((g) => g.level).sort((a, b) => a - b);
+  const levels = games.filter((g) => g.ended_at).map((g) => g.level).sort((a, b) => a - b);
   $("summary").textContent = levels.length ? `· ${levels.length} played · median level ${levels[Math.floor(levels.length / 2)]} · best ${levels.at(-1)}` : "";
   $("games").innerHTML = games.map((g) => `<tr><td>${g.id}</td><td>${g.mode}</td><td class="dim">${g.strategy}</td><td>${g.level ?? "…"}</td><td>${g.xp ?? ""}</td><td>${g.moves ?? ""}</td><td>$${g.cost_usd.toFixed(2)}</td><td class="dim">${g.ended_at ? new Date(g.ended_at).toLocaleString() : "playing"}</td></tr>`).join("");
 }

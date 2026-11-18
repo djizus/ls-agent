@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage } from "node:http";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { HOST, PORT } from "./config.ts";
 import { running, send } from "./agent.ts";
 import { db } from "./db.ts";
@@ -48,6 +48,12 @@ export function serve(): void {
     if (url.pathname === "/api/say" && req.method === "POST") {
       send(String(((await json(req)) as { text?: string })?.text ?? ""));
       return res.end("ok");
+    }
+    if (url.pathname.startsWith("/assets/") && /^\/assets\/[a-z]+\/?[A-Za-z0-9_]*\.(png|svg)$/.test(url.pathname)) {
+      const file = new URL(`../web${url.pathname}`, import.meta.url).pathname;
+      if (!existsSync(file)) return res.writeHead(404).end();
+      res.writeHead(200, { "content-type": file.endsWith(".svg") ? "image/svg+xml" : "image/png", "cache-control": "public, max-age=86400" });
+      return res.end(readFileSync(file));
     }
     if (url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html" });
