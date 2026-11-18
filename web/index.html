@@ -70,7 +70,7 @@ const play = (games) => post("/api/play", { games });
 function renderState(s) {
   if (!s) return;
   const maxHp = s.maxHealth;
-  const gear = Object.values(s.equipment).map((g) => `<li>${esc(g.name)} <span class="dim">T${g.tier} · lvl ${g.level}</span></li>`).join("");
+  const gear = Object.values(s.equipment).map((g) => `<li>${esc(g.name)} <span class="dim">T${g.tier} · G${g.greatness}</span></li>`).join("");
   const beast = s.beast ? `<div class="beast">${esc(s.beast.name)} <span class="dim">lvl ${s.beast.level} · T${s.beast.tier} ${s.beast.type} · ${s.beast.health} hp</span></div>` : "";
   const st = s.stats;
   $("adv").innerHTML = `

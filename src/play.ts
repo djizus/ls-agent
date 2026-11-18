@@ -10,7 +10,7 @@ let last: Snapshot | undefined;
 
 const gear = (i: Item) => {
   const item = itemOf(i.id);
-  return item && { id: i.id, name: item.name, slot: item.slot, type: item.type, tier: item.tier, level: levelOf(i.xp) };
+  return item && { id: i.id, name: item.name, slot: item.slot, type: item.type, tier: item.tier, greatness: levelOf(i.xp) };
 };
 
 export function describe(s: Snapshot): object {
@@ -30,7 +30,7 @@ export function describe(s: Snapshot): object {
     equipment: Object.fromEntries(Object.entries(a.equipment).filter(([, i]) => i.id).map(([slot, i]) => [slot, gear(i)])),
     bag: s.bag.map(gear),
     market: a.stat_upgrades_available > 0 && game
-      ? marketOf(a, game.id).map((o) => ({ ...gear({ id: o.id, xp: 0 })!, level: undefined, price: priceOf(o.id, a.stats.charisma) }))
+      ? marketOf(a, game.id).map((o) => ({ ...gear({ id: o.id, xp: 0 })!, greatness: undefined, price: priceOf(o.id, a.stats.charisma) }))
       : "closed: opens when stat upgrades are available",
   };
 }
