@@ -24,18 +24,19 @@ const { values } = parseArgs({
     reach: { type: "string" },
     keep: { type: "string" },
     late: { type: "string" },
+    rank: { type: "string" },
   },
 });
 type Kept = { id: string; moves: number; local: Local };
 const kept: Kept[] = values.late ? JSON.parse(readFileSync(values.late, "utf8")) : [];
-const rolled = DUNGEON.rolledStart && !values.ids && !values.late;
+const rolled = DUNGEON.rolledStart && !values.ids && !values.late && !values.rank;
 const [from, to] = (values.seeds ?? (rolled ? "0-1" : values.late ? "0-20" : "0-500")).split("-").map(Number);
 const ids: (string | number | Kept)[] = values.late
   ? kept
   : rolled
   ? Array.from({ length: Number(values.starts) }, (_, i) => Number(values.from) + i)
-  : values.ids
-    ? JSON.parse(readFileSync(values.ids, "utf8")).map((x: string | { game: string }) => (typeof x === "string" ? x : x.game))
+  : values.ids ?? values.rank
+    ? JSON.parse(readFileSync((values.ids ?? values.rank)!, "utf8")).map((x: string | { game: string }) => (typeof x === "string" ? x : x.game))
     : DUNGEON.benchmark;
 const games = ids.flatMap((id) => Array.from({ length: to - from }, (_, i) => [id, from + i] as const));
 const procs = Number(values.procs);
@@ -166,6 +167,18 @@ if (process.send) {
   const baselines: Record<string, { mean: number; "30+": number; named?: number }> = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : {};
   const now = summary(order.map(([share, at]) => shares[share].rows[0][at][0]!));
   const kills = summary(order.map(([share, at]) => shares[share].rows[0][at][NAMED]!)).mean;
+  if (values.rank) {
+    const rows: Record<string, unknown>[] = JSON.parse(readFileSync(values.rank, "utf8"));
+    const fresh = rows.map((row, n) => {
+      const own = order.slice(n * (to - from), (n + 1) * (to - from)).map(([share, at]) => shares[share].rows[0][at]);
+      const levels = own.map((g) => g[0]!).sort((a, b) => a - b);
+      const s = summary(levels);
+      const kills = summary(own.map((g) => g[NAMED]!));
+      const share = (level: number) => +((100 * levels.filter((l) => l >= level).length) / levels.length).toFixed(1);
+      return { ...row, mean: +s.mean.toFixed(1), med: s.median, p90: levels[Math.floor(levels.length * 0.9)], best: s.best, ge25: share(25), ge30: share(30), ge35: share(35), kills: kills.mean, killsSe: kills.se, games: levels.length };
+    });
+    writeFileSync(values.rank, JSON.stringify(fresh.sort((a, b) => b.mean - a.mean)));
+  }
   if (values.keep) writeFileSync(values.keep, JSON.stringify(shares.flatMap((s) => s.snaps)));
   if (values.save) {
     baselines[DUNGEON_KEY] = { mean: now.mean, "30+": now["30+"], named: kills };
