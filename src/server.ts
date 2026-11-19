@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import { DUNGEON, DUNGEONS, HOST, PORT, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
@@ -66,9 +67,11 @@ const beasts = cached(60_000, () => {
   );
 });
 
+const OWN = new Set(Object.values(networkInterfaces()).flatMap((list) => (list ?? []).map((i) => i.address)));
+
 async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown> {
   const url = new URL(req.url ?? "/", "http://x");
-  const own = [HOST, "127.0.0.1", "::1"].includes((req.socket.remoteAddress ?? "").replace("::ffff:", ""));
+  const own = OWN.has((req.socket.remoteAddress ?? "").replace("::ffff:", ""));
   if (!own && (req.method !== "GET" || url.pathname === "/mcp")) return res.writeHead(403).end();
   if (url.pathname === "/api/me") return reply(res, { control: own });
   if (url.pathname === "/mcp") return handleMcp(req, res, req.method === "POST" ? await json(req) : undefined);
