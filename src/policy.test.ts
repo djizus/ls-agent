@@ -118,3 +118,8 @@ test("armor that takes less from this beast is put on in the fight when that bea
 test("after the fight the real armor goes back on", () => {
   assert.deepEqual(plan(state({ equipment: [gear(SHIRT, 20)], bag: [gear(HOLY_CHESTPLATE, 20)] })).actions, [{ type: "equip", item: HOLY_CHESTPLATE }, { type: "explore" }]);
 });
+
+test("the chance to escape counts every failed try as a hit taken", () => {
+  const cornered = state({ level: 4, health: 100, stats: { ...stats, dexterity: 3 }, beast: beast(1000), hits: hits(4, 60, 60) });
+  assert.match(plan(cornered).why, /94% to escape/);
+});
