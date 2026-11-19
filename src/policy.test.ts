@@ -45,10 +45,10 @@ test("a tier 1 weapon replaces the worn one only when it would catch up by great
   assert.equal(buys(SHORT_SWORD, 1, FALCHION), false);
 });
 
-test("gold needed to heal to full is not spent on gear", () => {
+test("an armor upgrade is bought with the gold left after a full heal now and half a full heal kept back", () => {
   const maxed = { equipment: [gear(PLATE_MAIL, 20)], market: [offer(HOLY_CHESTPLATE, 10)], health: 60 };
-  assert.deepEqual(plan(state({ ...maxed, gold: 14 })).actions, [{ type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "potions", qty: 4 }, { type: "explore" }]);
-  assert.deepEqual(plan(state({ ...maxed, gold: 13 })).actions, [{ type: "potions", qty: 4 }, { type: "explore" }]);
+  assert.deepEqual(plan(state({ ...maxed, gold: 19 })).actions, [{ type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "potions", qty: 4 }, { type: "explore" }]);
+  assert.deepEqual(plan(state({ ...maxed, gold: 18 })).actions, [{ type: "potions", qty: 4 }, { type: "explore" }]);
 });
 
 test("a maxed ring makes way for the next one, bought only with two full heals of gold to spare", () => {
@@ -66,6 +66,39 @@ test("a drop that takes vitality or charisma away is counted before healing and 
   const stash = JUNK.slice(1).map((id) => gear(id, 15, { vitality: 3 }));
   const sturdy = state({ ...maxed, maxHealth: 115, health: 105, bag: [gear(SHIRT, 15, { vitality: 1 }), ...stash] });
   assert.deepEqual(plan(sturdy).actions, [{ type: "drop", item: SHIRT }, { type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "explore" }]);
-  const charming = state({ ...maxed, health: 60, gold: 14, bag: [gear(SHIRT, 15, { charisma: 1 }), ...stash] });
-  assert.deepEqual(plan(charming).actions, [{ type: "drop", item: SHIRT }, { type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "potions", qty: 1 }, { type: "explore" }]);
+  const charming = state({ ...maxed, health: 60, gold: 19, bag: [gear(SHIRT, 15, { charisma: 1 }), ...stash] });
+  assert.deepEqual(plan(charming).actions, [{ type: "drop", item: SHIRT }, { type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "potions", qty: 4 }, { type: "explore" }]);
+});
+
+const beast = (health: number) => ({ id: 29, name: "Dragon", baseName: "Dragon", tier: 1, type: "Blade" as const, level: 30, health, specialPrefix: null, specialSuffix: null, isCollectable: false });
+const hits = (yours: number, normal: number, crit: number) => ({ yours: { normal: yours, crit: 2 * yours }, theirs: Array.from({ length: 5 }, () => ({ normal, crit })) });
+
+test("a fight that can be lost is taken one exchange at a time, while winning it is at most 25 points less likely than escaping", () => {
+  const twoBlows = { beast: beast(100), hits: hits(50, 10, 200), health: 100 };
+  assert.deepEqual(plan(state({ ...twoBlows, level: 20 })).actions, [{ type: "attack", tillHealth: 99 }]);
+  assert.deepEqual(plan(state({ ...twoBlows, level: 30, stats: { ...stats, dexterity: 30 } })).actions, [{ type: "flee" }]);
+  assert.deepEqual(plan(state({ ...twoBlows, level: 30, stats: { ...stats, dexterity: 15 } })).actions, [{ type: "attack", tillHealth: 99 }]);
+  assert.deepEqual(plan(state({ beast: beast(50), hits: hits(50, 200, 400), health: 1 })).actions, [{ type: "attack" }]);
+  assert.deepEqual(plan(state({ beast: beast(1000), hits: hits(4, 200, 400), health: 100, stats: { ...stats, dexterity: 0 } })).actions, [{ type: "attack", tillHealth: 99 }]);
+});
+
+test("a move never holds more than 15 actions: a purchase that does not fit waits", () => {
+  const better = [17, 22, 27, 32, 37];
+  const busy = state({
+    level: 60,
+    gold: 500,
+    maxHealth: 550,
+    health: 500,
+    statUpgradesAvailable: 6,
+    stats: { strength: 0, dexterity: 30, vitality: 30, intelligence: 0, wisdom: 0, charisma: 29 },
+    equipment: [gear(SHORT_SWORD, 20), ...JUNK.slice(0, 5).map((id) => gear(id, 20)), gear(TITANIUM_RING, 20), gear(3, 20)],
+    bag: [KATANA, ...better, ...JUNK.slice(5, 14)].map((id) => gear(id, 1)),
+    market: [offer(GOLD_RING, 1), offer(1, 1)],
+  });
+  const actions = plan(busy).actions;
+  assert.equal(actions.length, 15);
+  assert.deepEqual(actions.at(-1), { type: "explore" });
+  assert.equal(actions.filter((a) => a.type === "upgrade").length, 4);
+  assert.equal(actions.filter((a) => a.type === "equip").length, 6);
+  assert.equal(actions.filter((a) => a.type === "buy").length, 1);
 });
