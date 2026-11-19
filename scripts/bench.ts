@@ -139,7 +139,12 @@ if (process.send) {
       const k = summary(games.map((g, i) => g[NAMED]! - first[i]));
       console.log(`  against the first: named kills ${k.mean > 0 ? "+" : ""}${k.mean} ± ${k.se}; ${d.mean > 0 ? "+" : ""}${d.mean} ± ${d.se} levels; share in points: ${moved.join(", ")}`);
     }
-    if (values["by-id"]) ids.forEach((id, n) => console.log(" ", String(id).slice(-8), JSON.stringify(summary(levels.slice(n * (to - from), (n + 1) * (to - from))))));
+    if (values["by-id"])
+      ids.forEach((id, n) => {
+        const own = games.slice(n * (to - from), (n + 1) * (to - from));
+        const kills = summary(own.map((g) => g[NAMED]!));
+        console.log(" ", String(typeof id === "object" ? id.id : id).slice(-8), JSON.stringify({ ...summary(own.map((g) => g[0]!)), "named kills": kills.mean, "named se": kills.se }));
+      });
   });
   const baselineFile = new URL("baseline.json", import.meta.url);
   const baselines: Record<string, { mean: number; "30+": number; named?: number }> = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : {};
