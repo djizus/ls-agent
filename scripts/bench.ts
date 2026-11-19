@@ -45,6 +45,9 @@ const DEEP = values.late ? [35, 40, 45] : [30, 35, 40];
 const MARKS = [35, 40];
 const [KILLS, NAMED, KINDS, MET, FLED, DIED] = [4, 5, 6, 7, 8, 9];
 const NAMED_SLACK = 0.1;
+const [CAUSE, TIER, GAP, HEALTH] = [10, 11, 12, 13];
+const CAUSES = ["fleeing", "fighting", "ambush", "trap"];
+const BANDS = [[1, 9], [10, 14], [15, 19], [20, 29], [30, 99]];
 const reach = Number(values.reach ?? 0);
 const defaults = { ...RULES };
 
@@ -67,6 +70,8 @@ async function play(share: number): Promise<Run> {
       let snapped = v > 0 || !reach;
       const tally = { kills: 0, named: 0, met: 0, fled: 0, died: 0 };
       const kinds = new Set<string>();
+      let last = state;
+      let lastMove = "explore";
       while (!state.over) {
         const spare = Object.values(state.baseStats).reduce((a, b) => a + b, 0) + state.statUpgradesAvailable - (state.level - 1);
         MARKS.forEach((mark, k) => (points[k] ??= state.level >= mark ? spare : null));
@@ -76,6 +81,8 @@ async function play(share: number): Promise<Run> {
         }
         const before = state;
         const move = plan(state).actions[0].type;
+        last = before;
+        lastMove = move;
         state = describe(act(game, plan(before).actions), game.id);
         const named = before.beast?.specialPrefix != null;
         if (!before.beast && state.beast?.specialPrefix != null) tally.met++;
@@ -89,7 +96,8 @@ async function play(share: number): Promise<Run> {
         if (before.beast && named && !state.beast && !state.over && move === "flee") tally.fled++;
         if (before.beast && named && state.over) tally.died++;
       }
-      out.push([state.level, game.packets.length - first, ...points, tally.kills, tally.named, kinds.size, tally.met, tally.fled, tally.died]);
+      const cause = last.beast ? (lastMove === "flee" ? 0 : 1) : /trap/.test(state.happened.at(-1) ?? "") ? 3 : 2;
+      out.push([state.level, game.packets.length - first, ...points, tally.kills, tally.named, kinds.size, tally.met, tally.fled, tally.died, cause, last.beast?.tier ?? null, last.beast ? last.beast.level - last.level : null, last.maxHealth]);
     }
     rows.push(out);
   }
@@ -128,6 +136,14 @@ if (process.send) {
     const of = (column: number) => +((100 * total(column)) / Math.max(1, total(MET))).toFixed(1);
     console.log(rules, JSON.stringify({ ...summary(levels), moves: average(1), ...Object.fromEntries(MARKS.map((mark, k) => [`points at ${mark}`, average(2 + k)])) }));
     console.log(`  kills per game ${(total(KILLS) / games.length).toFixed(2)}; named ${named.mean} ± ${named.se}, distinct ${(total(KINDS) / games.length).toFixed(2)}, per 100 moves ${((100 * total(NAMED)) / total(1)).toFixed(2)}; named beasts met ${(total(MET) / games.length).toFixed(2)}: killed ${of(NAMED)}%, fled ${of(FLED)}%, died to ${of(DIED)}%`);
+    for (const [low, high] of BANDS) {
+      const dead = games.filter((g) => g[0]! >= low && g[0]! <= high);
+      if (!dead.length) continue;
+      const by = CAUSES.map((name, c) => `${name} ${Math.round((100 * dead.filter((g) => g[CAUSE] === c).length) / dead.length)}%`);
+      const battle = dead.filter((g) => g[TIER] !== null);
+      const mean = (column: number, of = dead) => (of.reduce((n, g) => n + g[column]!, 0) / Math.max(1, of.length)).toFixed(column === TIER ? 1 : 0);
+      console.log(`  deaths at level ${low}-${high === 99 ? "" : high}: ${((100 * dead.length) / games.length).toFixed(1)}% of games; ${by.join(", ")}; max health ${mean(HEALTH)}; in battle: beast tier ${mean(TIER, battle)}, ${mean(GAP, battle)} levels above us`);
+    }
     if (v > 0) {
       const base = order.map(([share, at]) => shares[share].rows[0][at][0]!);
       const d = summary(levels.map((l, i) => l - base[i]));
