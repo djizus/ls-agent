@@ -30,7 +30,7 @@ Beast Mode: plays the rule policy from 10,000 generated starts (the same every r
 luck) in about 15 seconds, and prints mean, spread and the share of games reaching level 26, 30, 35 and 40. `--starts` sets how many
 and `--from` where they begin, so a result can be confirmed on starts it was not chosen on. Under the level figures it prints beasts killed per game, named beasts (level 19+) killed with the standard error,
 named kills per 100 moves, and what became of the named beasts met (killed, fled, died to). `--reach 30 --keep file` saves the state
-of every game at the moment it reaches level 30; `--late file` plays those states forward on `--seeds` luck seeds each, to measure
+of every game at the moment it reaches level 30 (`--reach weapon`: at the moment the worn weapon reaches greatness 20); `--late file` plays those states forward on `--seeds` luck seeds each, to measure
 late-game rules on many more deep games than a run from level 1 gives. Loot Dungeon starts are
 fixed by the bag, so there it plays each game id for 500 luck seeds (`--seeds 0-500`); `--ids file.json` takes a list of game
 ids and `--by-id` adds a line per id. `--rank file.json` takes the loot bag list the page shows (rows with a `game` id), plays every bag and rewrites

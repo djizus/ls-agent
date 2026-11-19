@@ -49,7 +49,8 @@ const NAMED_SLACK = 0.1;
 const [CAUSE, TIER, GAP, HEALTH] = [10, 11, 12, 13];
 const CAUSES = ["fleeing", "fighting", "ambush", "trap"];
 const BANDS = [[1, 9], [10, 14], [15, 19], [20, 29], [30, 99]];
-const reach = Number(values.reach ?? 0);
+const reach = values.reach === "weapon" ? 1 : Number(values.reach ?? 0);
+const reached = (state: ReturnType<typeof describe>) => (values.reach === "weapon" ? (state.equipment.find((g) => g.slot === "weapon")?.greatness ?? 0) >= 20 : state.level >= reach);
 const defaults = { ...RULES };
 
 type Run = { rows: (number | null)[][][]; snaps: Kept[] };
@@ -76,7 +77,7 @@ async function play(share: number): Promise<Run> {
       while (!state.over) {
         const spare = Object.values(state.baseStats).reduce((a, b) => a + b, 0) + state.statUpgradesAvailable - (state.level - 1);
         MARKS.forEach((mark, k) => (points[k] ??= state.level >= mark ? spare : null));
-        if (!snapped && state.level >= reach && !state.beast) {
+        if (!snapped && reached(state) && !state.beast) {
           snaps.push({ id: game.id, moves: game.packets.length, local: game.local });
           snapped = true;
         }
