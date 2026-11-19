@@ -10,7 +10,7 @@ import { emit, subscribe } from "./events.ts";
 import { type Option, type State, auditGame, begin, commit, describeOptions, movesMade, options, phase, render, shape, snapshot, type Phase } from "./play.ts";
 
 export const DECIDER = process.env.LS_DECIDER ?? "rules";
-const DECIDER_SOURCE = ["policy.ts", "jev.ts", "rollout.ts"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("");
+const DECIDER_SOURCE = ["policy.ts", "jev.ts"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("");
 const promptFile = process.env.LS_STRATEGY ?? new URL("../strategy/prompt.md", import.meta.url).pathname;
 const MAX_REJECTIONS = 3;
 const PACE_MS = Number(process.env.LS_PACE_MS ?? 0);
