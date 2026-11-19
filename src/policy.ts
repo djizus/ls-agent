@@ -3,7 +3,7 @@ import { beastHit, yourHit } from "./combat.ts";
 import { potionPrice } from "./items.ts";
 import { shape, type State } from "./play.ts";
 
-export const RULES = { potionPrice: 1, dexPerLevel: 1, weaponTier: 2, jewelryLevel: 12 };
+export const RULES = { potionPrice: 1, dexPerLevel: 1, weaponTier: 2, weaponCatchUp: 10, jewelryLevel: 12, jewelryReserve: 2 };
 
 const RINGS = ["Titanium Ring", "Silver Ring", "Gold Ring", "Platinum Ring", "Bronze Ring"];
 
@@ -11,11 +11,16 @@ const NECK: Record<string, string> = { Cloth: "Amulet", Hide: "Pendant", Metal: 
 
 const MAX_GREATNESS = 20;
 const MAX_STAT = 31;
-const MAX_DROPS = 3;
+const BAG_SIZE = 15;
 const FALLBACK = ["vitality", "strength", "dexterity", "charisma", "intelligence", "wisdom"] as const;
 const ARMOR = ["chest", "head", "waist", "foot", "hand"];
+const JEWELRY = ["neck", "ring"];
 
 export type Plan = { actions: Action[]; why: string };
+type Gear = State["bag"][number];
+type Offer = State["market"][number];
+
+const maxed = (g: Gear) => g.greatness >= MAX_GREATNESS;
 
 export function plan(s: State): Plan {
   const worn = (slot: string) => s.equipment.find((g) => g.slot === slot);
@@ -26,10 +31,8 @@ export function plan(s: State): Plan {
     const fight = toKill < toDie || s.stats.dexterity === 0;
     return { actions: [{ type: fight ? "attack" : "flee" }], why: `${toKill} blows to kill it, ${toDie} to die: ${fight ? "fight" : "flee"}` };
   }
-  const kept = (g: State["bag"][number]) => g.bonus?.vitality || g.bonus?.charisma || g.slot === "neck" || g.slot === "ring";
-  const useless = s.bag.filter((g) => !kept(g)).slice(0, MAX_DROPS);
-  const actions: Action[] = useless.map((g) => ({ type: "drop", item: g.id }));
-  const why: string[] = useless.map((g) => `drop ${g.name}`);
+  const upgrades: Action[] = [];
+  const why: string[] = [];
   const stats = { ...s.stats };
   const base = { ...s.baseStats };
   for (let i = 0; i < s.statUpgradesAvailable; i++) {
@@ -41,36 +44,72 @@ export function plan(s: State): Plan {
     const stat = wanted.find((w) => base[w] < MAX_STAT)!;
     stats[stat]++;
     base[stat]++;
-    const same = actions.find((a) => a.type === "upgrade" && a.stat === stat);
+    const same = upgrades.find((a) => a.type === "upgrade" && a.stat === stat);
     if (same && same.type === "upgrade") same.amount++;
-    else actions.push({ type: "upgrade", stat, amount: 1 });
+    else upgrades.push({ type: "upgrade", stat, amount: 1 });
   }
-  for (const a of actions) if (a.type === "upgrade") why.push(`+${a.amount} ${a.stat.slice(0, 3).toUpperCase()}`);
+  for (const a of upgrades) if (a.type === "upgrade") why.push(`+${a.amount} ${a.stat.slice(0, 3).toUpperCase()}`);
+  const fullHeal = potionPrice(s.level, stats.charisma) * Math.ceil((s.maxHealth + 15 * (stats.vitality - s.stats.vitality)) / 10);
   let gold = s.gold;
-  const price = (m: State["market"][number]) => Math.max(1, m.price - (stats.charisma - s.stats.charisma));
+  const price = (m: Offer) => Math.max(1, m.price - (stats.charisma - s.stats.charisma));
+  const bag = [...s.bag];
+  let room = BAG_SIZE - bag.length;
+  const drops: Action[] = [];
+  const equips: Action[] = [];
+  const buys: Action[] = [];
   const owned = new Set([...s.equipment, ...s.bag].map((g) => g.id));
-  const buy = (m: State["market"][number], reason: string, equip = true) => {
-    actions.push({ type: "buy", item: m.id, equip });
-    owned.add(m.id);
-    gold -= price(m);
-    why.push(`${m.name} (${reason})`);
+  const use = (g: Gear) => (JEWELRY.includes(g.slot) ? 2 : g.tier < (worn(g.slot)?.tier ?? 6) ? 1 : 0);
+  const makeRoom = () => {
+    if (room > 0) return true;
+    const out = bag.filter((g) => !g.bonus?.vitality && !g.bonus?.charisma).sort((a, b) => use(a) - use(b) || b.tier - a.tier || a.greatness - b.greatness)[0];
+    if (!out) return false;
+    bag.splice(bag.indexOf(out), 1);
+    drops.push({ type: "drop", item: out.id });
+    why.push(`drop ${out.name}`);
+    room++;
+    return true;
   };
-  const offers = (slot: string) => s.market.filter((m) => m.slot === slot && !owned.has(m.id) && price(m) <= gold);
-  const weapon = offers("weapon").filter((m) => m.tier <= RULES.weaponTier && m.tier < (worn("weapon")?.tier ?? 6)).sort((a, b) => a.tier - b.tier)[0];
-  if (weapon) buy(weapon, `T${weapon.tier} weapon`);
+  const take = (pick: Gear | Offer, reason: string) => {
+    if ("greatness" in pick) {
+      equips.push({ type: "equip", item: pick.id });
+      bag.splice(bag.indexOf(pick), 1);
+    } else {
+      if (worn(pick.slot) && !makeRoom()) return;
+      if (worn(pick.slot)) room--;
+      buys.push({ type: "buy", item: pick.id, equip: true });
+      owned.add(pick.id);
+      gold -= price(pick);
+    }
+    why.push(`${pick.name} (${reason})`);
+  };
+  const stowed = (slot: string) => bag.filter((g) => g.slot === slot);
+  const offers = (slot: string, reserve = 0) => s.market.filter((m) => m.slot === slot && !owned.has(m.id) && price(m) <= gold - reserve);
+  const next = (slot: string, tier: number): Gear | Offer | undefined => [...stowed(slot), ...offers(slot)].filter((c) => c.tier < tier).sort((a, b) => a.tier - b.tier)[0];
+
+  const weapon = worn("weapon");
+  const blade = next("weapon", Math.min(RULES.weaponTier + 1, weapon?.tier ?? 6));
+  if (blade && (!weapon || maxed(weapon) || weapon.greatness * (6 - weapon.tier) <= RULES.weaponCatchUp * (6 - blade.tier))) take(blade, `T${blade.tier} weapon`);
   for (const slot of ARMOR) {
     const now = worn(slot);
-    if (now && (now.greatness < MAX_GREATNESS || now.tier === 1)) continue;
-    const pick = offers(slot).filter((m) => !now || m.tier < now.tier).sort((a, b) => (now ? a.tier - b.tier : 0) || price(a) - price(b))[0];
-    if (pick) buy(pick, now ? `${slot} maxed, T${pick.tier} next` : `empty ${slot}`);
+    const pick = now ? maxed(now) && next(slot, now.tier) : offers(slot).sort((a, b) => price(a) - price(b))[0];
+    if (pick) take(pick, now ? `${slot} maxed, T${pick.tier} next` : `empty ${slot}`);
   }
-  if (s.level >= RULES.jewelryLevel) {
-    const types = ARMOR.map((slot) => worn(slot)?.type).filter(Boolean) as string[];
-    const main = [...new Set(types)].sort((a, b) => types.filter((t) => t === b).length - types.filter((t) => t === a).length)[0];
-    const neck = !worn("neck") && offers("neck").sort((a, b) => Number(b.name === NECK[main]) - Number(a.name === NECK[main]))[0];
-    if (neck) buy(neck, "empty neck");
-    const ring = !worn("ring") && offers("ring").sort((a, b) => RINGS.indexOf(a.name) - RINGS.indexOf(b.name))[0];
-    if (ring) buy(ring, "empty ring");
+  const types = ARMOR.map((slot) => worn(slot)?.type).filter(Boolean) as string[];
+  const main = [...new Set(types)].sort((a, b) => types.filter((t) => t === b).length - types.filter((t) => t === a).length)[0];
+  const liked: Record<string, (name: string) => number> = { neck: (name) => -Number(name === NECK[main]), ring: (name) => RINGS.indexOf(name) };
+  for (const slot of JEWELRY) {
+    const now = worn(slot);
+    const order = (a: { name: string }, b: { name: string }) => liked[slot](a.name) - liked[slot](b.name);
+    if (!now) {
+      const pick = s.level >= RULES.jewelryLevel && offers(slot).sort(order)[0];
+      if (pick) take(pick, `empty ${slot}`);
+      continue;
+    }
+    if (!maxed(now)) continue;
+    const fresh = stowed(slot).filter((g) => !maxed(g)).sort((a, b) => b.greatness - a.greatness)[0] ?? offers(slot, RULES.jewelryReserve * fullHeal).sort(order)[0];
+    const best = stowed(slot).sort(order)[0];
+    if (fresh) take(fresh, `${slot} maxed, level the next`);
+    else if (best && order(best, now) < 0) take(best, `best ${slot}`);
   }
-  return { actions: shape(s, [...actions, { type: "explore" }]), why: why.join(", ") || "explore" };
+  return { actions: shape(s, [...drops, ...upgrades, ...equips, ...buys, { type: "explore" }]), why: why.join(", ") || "explore" };
 }
