@@ -1,16 +1,19 @@
 import { beastOf, type Beast } from "./beast.ts";
-import type { Action, Item } from "./codec.ts";
+import { STATS, type Action, type Item, type Stats } from "./codec.ts";
 import { emit } from "./events.ts";
-import { itemOf, levelOf, potionPrice, priceOf, type LootItem } from "./items.ts";
-import { beastHit, yourHit } from "./combat.ts";
+import { itemOf, levelOf, potionPrice, priceOf, type ItemType, type LootItem } from "./items.ts";
+import { MAX_GREATNESS, beastHit, yourHit } from "./combat.ts";
 import { marketOf } from "./market.ts";
 import { MARKET } from "./settings.ts";
-import { SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
+import { BAG_STATS, SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
+import { NECK } from "./engine/damage.ts";
 import { actLive, liveGame } from "./live.ts";
-import { toSnapshot } from "./engine/engine.ts";
+import { ARMOR_SLOTS, toSnapshot } from "./engine/engine.ts";
 import { act, audit, newPracticeGame, preview, revertReason, type Game, type Snapshot } from "./practice.ts";
 
-type Gear = LootItem & { greatness: number; xp: number; suffix?: string; bonus?: Partial<State["stats"]> };
+type Worn = LootItem & { greatness: number; xp: number; suffix?: string; bonus?: Partial<Stats> };
+type Gear = Worn & { toNext: number; power: number; grants: string[] };
+type Offer = LootItem & { price: number };
 export type State = {
   over: boolean;
   level: number;
@@ -20,25 +23,89 @@ export type State = {
   gold: number;
   beast: Beast | null;
   statUpgradesAvailable: number;
-  stats: Snapshot["adventurer"]["stats"];
-  baseStats: Snapshot["adventurer"]["stats"];
+  stats: Stats;
+  baseStats: Stats;
   equipment: Gear[];
   bag: Gear[];
-  market: (LootItem & { price: number })[];
+  market: Offer[];
   potionPrice: number;
   happened: string[];
+  luck: number;
+  buys: { attack: number; flee: number; trap: number; ambush: number; crit: number };
+  purse: { potions: number; toFull: number; deal: (Offer & { why: string }) | null };
+};
+type Stored = Pick<State, "over" | "level" | "health" | "maxHealth" | "xp" | "gold" | "beast" | "statUpgradesAvailable" | "stats" | "market"> &
+  Partial<Pick<State, "baseStats" | "potionPrice" | "happened">> & { equipment: Legacy[] | Record<string, Legacy>; bag: Legacy[] };
+type Legacy = Omit<Worn, "greatness" | "xp"> & { greatness?: number; xp?: number; level?: number };
+
+const ABBR: Record<string, string> = { strength: "STR", dexterity: "DEX", vitality: "VIT", intelligence: "INT", wisdom: "WIS", charisma: "CHA" };
+const JEWELRY = ["neck", "ring"];
+const DOUBLE_LUCK = "Silver Ring";
+const ARMOR: string[] = [...ARMOR_SLOTS];
+const RING: Record<string, (percent: number) => string> = {
+  "Titanium Ring": (p) => `critical hits add ${p}% of attack`,
+  "Gold Ring": (p) => `+${p}% gold from beasts`,
+  "Platinum Ring": (p) => `+${p}% name-match damage`,
 };
 
-
+export function enrich(s: Stored): State {
+  const worn = Object.values(s.equipment);
+  const armor = worn.filter((g) => ARMOR.includes(g.slot));
+  const market = Array.isArray(s.market) ? s.market : [];
+  const gear = (held: boolean) => (g: Legacy): Gear => {
+    const greatness = Math.min(MAX_GREATNESS, g.greatness ?? g.level ?? 1);
+    const xp = g.xp ?? greatness ** 2;
+    const jewel = JEWELRY.includes(g.slot);
+    const bonus = Object.entries(g.bonus ?? {}).filter(([stat]) => held || BAG_STATS.includes(stat as keyof Stats));
+    const matching = armor.filter((a) => NECK[a.type] === g.name).length;
+    return {
+      ...g,
+      greatness,
+      xp,
+      toNext: greatness >= MAX_GREATNESS ? 0 : (greatness + 1) ** 2 - xp,
+      power: jewel ? greatness * 5 : greatness * (6 - g.tier),
+      grants: [
+        ...bonus.map(([stat, n]) => `+${n} ${ABBR[stat]}`),
+        ...(jewel ? [held && g.name === DOUBLE_LUCK ? `+${2 * greatness} luck (doubled while worn)` : `+${greatness} luck`] : []),
+        ...(held && g.slot === "neck" ? [`${Object.keys(NECK).find((type) => NECK[type as ItemType] === g.name)} armor blocks ${3 * greatness}% more (${matching} of ${ARMOR.length} worn)`] : []),
+        ...(held && RING[g.name] ? [RING[g.name](3 * greatness)] : []),
+      ],
+    };
+  };
+  const equipment = worn.map(gear(true));
+  const bag = s.bag.map(gear(false));
+  const granted = (stat: keyof Stats) => [...equipment, ...bag.filter(() => BAG_STATS.includes(stat))].reduce((n, g) => n + (g.bonus?.[stat] ?? 0), 0);
+  const luck = [...equipment, ...bag].reduce((n, g) => n + (JEWELRY.includes(g.slot) ? g.greatness * (g.name === DOUBLE_LUCK && equipment.includes(g) ? 2 : 1) : 0), 0);
+  const chance = (stat: number) => Math.min(100, Math.round((100 * stat) / s.level));
+  const price = s.potionPrice ?? potionPrice(s.level, s.stats.charisma);
+  const owned = new Set([...equipment, ...bag].map((g) => g.id));
+  const deals = market.flatMap((m) => {
+    const now = equipment.find((g) => g.slot === m.slot);
+    if (owned.has(m.id) || (now && (JEWELRY.includes(m.slot) || m.tier >= now.tier))) return [];
+    return [{ ...m, why: now ? `tier ${m.tier} over tier ${now.tier}` : `empty ${m.slot}` }];
+  });
+  return {
+    ...s,
+    equipment,
+    bag,
+    market,
+    baseStats: s.baseStats ?? (Object.fromEntries(STATS.map((stat) => [stat, s.stats[stat] - granted(stat)])) as Stats),
+    potionPrice: price,
+    happened: s.happened ?? [],
+    luck,
+    buys: { attack: 10 * s.stats.strength, flee: chance(s.stats.dexterity), trap: chance(s.stats.intelligence), ambush: chance(s.stats.wisdom), crit: Math.min(100, luck) },
+    purse: { potions: Math.floor(s.gold / price), toFull: Math.ceil((s.maxHealth - s.health) / 10), deal: deals.sort((a, b) => a.price - b.price || a.tier - b.tier)[0] ?? null },
+  };
+}
 
 export function describe(s: Snapshot, id: string): State {
   const a = { ...s.adventurer, stats: effectiveStats(s.adventurer, s.bag, id) };
-  const gear = (i: Item): Gear => {
+  const gear = (i: Item): Worn => {
     const greatness = levelOf(i.xp);
     const suffix = greatness >= SUFFIX_GREATNESS ? suffixOf(i.id, a.item_specials_salt, id) : undefined;
     return { ...itemOf(i.id)!, greatness, xp: i.xp, ...(suffix && { suffix, bonus: SUFFIXES[suffix] }) };
   };
-  return {
+  return enrich({
     over: s.over,
     level: levelOf(a.xp),
     health: a.health,
@@ -54,13 +121,12 @@ export function describe(s: Snapshot, id: string): State {
     potionPrice: potionPrice(levelOf(a.xp), a.stats.charisma),
     happened: s.log ?? [],
     market: a.beast_health === 0 ? marketOf(a, id, MARKET).map((o) => ({ ...itemOf(o.id)!, price: o.price })) : [],
-  };
+  });
 }
 
-const ABBR: Record<string, string> = { strength: "STR", dexterity: "DEX", vitality: "VIT", intelligence: "INT", wisdom: "WIS", charisma: "CHA" };
 const item = (g: LootItem) => `${g.name} [${g.id}] T${g.tier} ${g.type}`;
 const attack = (g: LootItem, greatness: number) => (g.slot === "weapon" ? `attack ${greatness * (6 - g.tier)}` : "");
-const growth = (g: Gear) => (g.greatness >= 20 ? "maxed" : `${(g.greatness + 1) ** 2 - g.xp} xp to G${g.greatness + 1}${g.greatness < 15 ? `, suffix at G15` : ""}`);
+const growth = (g: Gear) => (g.toNext === 0 ? "maxed" : `${g.toNext} xp to G${g.greatness + 1}${g.greatness < 15 ? `, suffix at G15` : ""}`);
 const owned = (g: Gear) =>
   `${item(g)} G${g.greatness}${g.suffix ? ` ${g.suffix} (${Object.entries(g.bonus!).map(([k, v]) => `+${v} ${ABBR[k]}`).join(" ")})` : ""} (${[attack(g, g.greatness), growth(g)].filter(Boolean).join(", ")})`;
 

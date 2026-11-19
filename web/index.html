@@ -3,313 +3,388 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Death Mountain</title>
+<meta name="theme-color" content="#000000">
+<title>Loot Survivor agent</title>
 <link rel="icon" href="/assets/favicon.png">
+<link rel="preload" href="/assets/scenes/portal.png" as="image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=VT323&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;700;900&family=VT323&display=swap" rel="stylesheet">
 <style>
   :root {
-    --night: #111; --stone: #282729; --rock: #1b1a1c; --seam: #3a372f;
-    --parchment: #d0c98d; --faded: rgba(208, 201, 141, .62); --gold: #edcf33; --ember: #f59100; --life: #80ff00; --blood: #e5523d;
-    --rail: 280px; --chat: 360px; --dock: 196px;
-    --display: Cinzel, Georgia, serif; --pixel: VT323, ui-monospace, monospace;
+    --void: #000; --panel: #0b0b0a; --raise: #151513; --line: #26241f;
+    --bone: #e8dcc4; --dim: #a89980; --faint: #6f6555;
+    --gold: #ffe97f; --lime: #80ff00; --blood: #ff5a47;
+    --left: 272px; --right: 348px;
+    --title: Cinzel, Georgia, serif; --pixel: VT323, ui-monospace, monospace;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { height: 100%; }
-  body { margin: 0; background: var(--night); color: var(--parchment); font: 16px/1.3 var(--display); overflow: hidden; }
+  body { margin: 0; background: var(--void); color: var(--bone); font: 18px/1.15 var(--pixel); overflow: hidden; -webkit-font-smoothing: antialiased; }
   img { display: block; }
-  button { font: 700 14px var(--display); letter-spacing: .04em; border-radius: 3px; padding: 7px 16px; cursor: pointer; border: 1px solid var(--seam); background: var(--stone); color: var(--parchment); }
-  button.go { background: var(--gold); border-color: var(--gold); color: var(--night); }
-  button:disabled { opacity: .4; cursor: default; }
+  h2 { margin: 0; font: 700 12px var(--title); letter-spacing: .16em; text-transform: uppercase; color: var(--gold); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  h2 small { font: 16px var(--pixel); letter-spacing: 0; text-transform: none; color: var(--dim); }
+  button { font: 18px var(--pixel); color: var(--bone); background: var(--raise); border: 1px solid var(--line); border-radius: 3px; padding: 4px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--dim); }
+  button:disabled { opacity: .35; cursor: default; }
   :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-  .px { font-family: var(--pixel); }
+  .good { color: var(--lime); }
+  .bad { color: var(--blood); }
+  .mute { color: var(--dim); }
 
-  .app { height: 100vh; display: grid; grid-template: "top top top" auto "rail stage chat" 1fr "rail dock chat" var(--dock) / var(--rail) minmax(0, 1fr) var(--chat); }
+  .app { height: 100vh; display: grid; grid-template-columns: var(--left) minmax(0, 1fr) var(--right); }
+  .side { display: flex; flex-direction: column; min-height: 0; background: var(--panel); overflow-y: auto; overscroll-behavior: contain; }
+  .side.l { border-right: 1px solid var(--line); }
+  .side.r { border-left: 1px solid var(--line); }
+  .side > section { padding: 14px 16px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; align-content: start; }
+  .mark { padding: 16px 16px 12px; border-bottom: 1px solid var(--line); }
+  .mark img { width: 168px; height: auto; image-rendering: pixelated; }
+  .mark p { margin: 8px 0 0; font: 500 11px var(--title); letter-spacing: .3em; text-transform: uppercase; color: var(--dim); }
 
-  .top { grid-area: top; display: flex; align-items: center; gap: 18px; padding: 8px 16px; border-bottom: 1px solid var(--seam); background: var(--rock); }
-  .brand { display: flex; align-items: center; gap: 10px; font: 800 20px var(--display); color: var(--gold); letter-spacing: .05em; white-space: nowrap; }
-  .brand img { width: 30px; height: 30px; }
-  .onair { display: inline-flex; align-items: center; gap: 7px; font: 22px var(--pixel); color: var(--faded); padding: 0 10px; border: 1px solid var(--seam); border-radius: 3px; white-space: nowrap; }
-  .onair i { width: 9px; height: 9px; border-radius: 50%; background: var(--faded); }
-  .live .onair { color: #fff; background: #b8231a; border-color: #b8231a; }
-  .live .onair i { background: #fff; animation: beat 1.6s ease-in-out infinite; }
-  .replay .onair { color: var(--night); background: var(--gold); border-color: var(--gold); }
-  .replay .onair i { border-radius: 0; background: none; width: 0; height: 0; border: 6px solid transparent; border-left: 9px solid var(--night); border-right: 0; }
-  .game { font: 22px var(--pixel); display: flex; gap: 18px; white-space: nowrap; overflow: hidden; min-width: 0; flex: 1; }
-  .game b { color: var(--gold); font-weight: 400; }
-  .game span { color: var(--faded); }
-  .game .chain { color: var(--life); }
-  .game .fate { overflow: hidden; text-overflow: ellipsis; color: var(--parchment); }
-  .top .controls { margin-left: auto; display: flex; gap: 8px; align-items: center; white-space: nowrap; }
-  #golive { background: #b8231a; border-color: #b8231a; color: #fff; }
-  #chain { border-color: var(--life); color: var(--life); }
-  .check { font: 18px var(--pixel); color: var(--faded); margin-right: 6px; }
-  .check.bad { color: var(--blood); }
+  .funds { font-size: 44px; line-height: .9; }
+  .funds small { font-size: 20px; color: var(--dim); }
+  .floor { height: 6px; background: var(--raise); position: relative; }
+  .floor i { position: absolute; inset: 0 auto 0 0; background: var(--lime); }
+  .floor b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--bone); }
+  .pairs { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; align-items: center; margin: 0; }
+  .pairs dt { display: flex; align-items: center; gap: 7px; color: var(--dim); }
+  .pairs dt img { width: 18px; height: 18px; image-rendering: pixelated; }
+  .pairs dd { margin: 0; text-align: right; }
+  .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .acts #chain { grid-column: 1 / -1; border-color: var(--gold); color: var(--gold); display: flex; justify-content: space-between; }
+  .acts #chain span { color: var(--dim); }
+  .ask { display: grid; gap: 8px; border: 1px solid var(--gold); border-radius: 3px; padding: 10px; }
+  .ask p { margin: 0; }
+  .ask div { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .ask #spend { background: var(--gold); border-color: var(--gold); color: var(--void); }
+  .none { display: grid; justify-items: center; gap: 4px; text-align: center; padding: 6px 0 2px; color: var(--dim); }
+  .none img { width: 96px; height: 96px; image-rendering: pixelated; filter: brightness(0) invert(.22); }
+  .none b { font: 700 13px var(--title); letter-spacing: .08em; color: var(--bone); }
+  .herd { display: grid; gap: 8px; }
+  .herd h3 { margin: 4px 0 0; font: 16px var(--pixel); color: var(--dim); display: flex; justify-content: space-between; }
+  .beast { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0 8px; align-items: center; }
+  .beast.bare { grid-template-columns: minmax(0, 1fr); }
+  .beast.bare > * { grid-column: 1; }
+  .beast img { width: 40px; height: 40px; image-rendering: pixelated; grid-row: 1 / 4; }
+  .beast b { font: 700 12px/1.3 var(--title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; grid-column: 2; }
+  .beast span { color: var(--dim); grid-column: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1; }
+  .beast em { font-style: normal; color: var(--bone); }
+  .beast em.good { color: var(--lime); }
+  .foot { margin: auto 0 0; padding: 10px 16px; color: var(--faint); font-size: 16px; }
 
-  .stage { grid-area: stage; position: relative; overflow: hidden; background: #0c160a url(/assets/scenes/portal.png) center 38% / cover no-repeat; min-height: 0; }
-  .stage.fallen { background-image: url(/assets/scenes/fallen.png); background-position: center 80%; }
-  .stage::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 75% 70% at 50% 40%, transparent 40%, rgba(0, 0, 0, .78)), linear-gradient(transparent 55%, rgba(0, 0, 0, .85)); pointer-events: none; }
-  .foe { position: absolute; left: 50%; top: 40%; height: 46%; aspect-ratio: 1; transform: translate(-50%, -50%); image-rendering: pixelated; mix-blend-mode: screen; -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent); mask-image: radial-gradient(closest-side, #000 72%, transparent); opacity: 0; transition: opacity .35s; }
-  .fight .foe { opacity: 1; }
-  .gone .foe { opacity: .3; filter: grayscale(1); transition-duration: 1.2s; }
-  .fallen .foe { opacity: 0; }
+  .centre { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto auto; min-height: 0; min-width: 0; }
+  .head { display: grid; gap: 7px; padding: 10px 16px 8px; }
+  .id { display: flex; align-items: center; gap: 12px; min-width: 0; white-space: nowrap; }
+  .onair { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 3px; color: var(--dim); }
+  .onair i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .live .onair { color: var(--lime); border-color: var(--lime); }
+  .live .onair i { animation: beat 1.6s ease-in-out infinite; }
+  .replay .onair { color: var(--bone); border-color: var(--bone); }
+  .id strong { font: 700 17px var(--title); letter-spacing: .06em; color: var(--gold); }
+  .id .meta { color: var(--dim); overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .vitals { display: grid; grid-template-columns: auto minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: 14px; align-items: center; }
+  .vitals .lv { font: 700 15px var(--title); letter-spacing: .06em; }
+  .meter { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+  .meter img { width: 16px; height: 16px; image-rendering: pixelated; }
+  .meter span { min-width: 7ch; text-align: right; }
+  .track { position: relative; height: 9px; background: var(--raise); overflow: hidden; }
+  .track i { position: absolute; inset: 0 auto 0 0; }
+  .track .trail { background: #fff5; transition: width .7s .3s; }
+  .track .fill { background: var(--lime); transition: width .25s; }
+  .track.low .fill { background: var(--blood); }
+  .track.xp { height: 5px; }
+  .track.xp .fill { background: var(--dim); }
+  .coin { display: flex; align-items: center; gap: 6px; }
+  .coin img { width: 18px; height: 18px; image-rendering: pixelated; }
+  .points { color: var(--void); background: var(--lime); padding: 0 6px; border-radius: 2px; }
+  .stats { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .stat { display: grid; gap: 1px; background: var(--panel); border: 1px solid var(--line); padding: 3px 7px 4px; min-width: 0; }
+  .stat .v { display: flex; align-items: center; gap: 5px; font-size: 24px; line-height: 1; white-space: nowrap; }
+  .stat .v img { width: 14px; height: 16px; opacity: .8; }
+  .stat .v small { font-size: 15px; color: var(--dim); }
+  .stat .v em { font-style: normal; font-size: 16px; color: var(--dim); margin-left: auto; }
+  .stat .v em b { font-weight: 400; color: var(--lime); }
+  .stat .w { font-size: 15px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .hud { position: absolute; top: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; gap: 16px; z-index: 1; }
-  .fighter { width: min(380px, 44%); background: rgba(17, 17, 17, .82); border: 1px solid var(--seam); border-radius: 4px; padding: 8px 12px 10px; }
-  .fighter.them { text-align: right; visibility: hidden; border-color: rgba(245, 145, 0, .5); }
-  .fight .fighter.them { visibility: visible; }
-  .who { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-  .them .who { flex-direction: row-reverse; }
-  .who strong { font: 700 20px var(--display); color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .them .who strong { color: var(--ember); }
-  .who span { font: 20px var(--pixel); color: var(--faded); white-space: nowrap; }
-  .hp { position: relative; height: 16px; margin-top: 6px; background: #22201a; border: 1px solid #000; }
-  .hp div { position: absolute; inset: 0 auto 0 0; }
-  .hp .trail { background: #fff3; transition: width .6s .35s; }
-  .hp .fill { background: var(--life); transition: width .2s; }
-  .them .hp div { inset: 0 0 0 auto; }
-  .them .hp .fill { background: var(--ember); }
-  .hp.low .fill { background: var(--blood); }
-  .hp b { position: absolute; inset: -3px 6px auto auto; font: 400 20px var(--pixel); color: #fff; text-shadow: 0 1px 0 #000, 0 0 3px #000; }
-  .them .hp b { inset: -3px auto auto 6px; }
+  .stage { position: relative; overflow: hidden; min-height: 0; background: #050805 url(/assets/scenes/portal.png) center 42% / cover no-repeat; image-rendering: pixelated; border-block: 1px solid var(--line); isolation: isolate; container-type: size; }
+  .stage.dead { background-image: url(/assets/scenes/fallen.png); background-position: center 70%; }
+  .light, .wash, .flash, .grain, .veil { position: absolute; inset: 0; pointer-events: none; }
+  .light { background: linear-gradient(rgba(0, 0, 0, .45), rgba(0, 0, 0, .3) 45%, rgba(0, 0, 0, .65)); transition: background .6s; }
+  .open .light { background: radial-gradient(ellipse 38% 46% at 50% 40%, rgba(128, 255, 0, .3), transparent 70%), linear-gradient(rgba(0, 0, 0, .25), transparent 30%, transparent 65%, rgba(0, 0, 0, .6)); animation: pulse 5s ease-in-out infinite; }
+  .night .light { background: linear-gradient(rgba(0, 0, 0, .78), rgba(0, 0, 0, .58) 60%, rgba(0, 0, 0, .86)); }
+  .wash { opacity: 0; transition: opacity .6s; background: radial-gradient(ellipse 34% 46% at 72% 62%, rgba(255, 120, 60, .26), transparent 70%); }
+  .night .wash { opacity: 1; }
+  .flare .light { background: radial-gradient(ellipse 44% 52% at 50% 40%, rgba(255, 233, 127, .5), rgba(0, 0, 0, .5) 78%); animation: none; }
+  .dead .light { background: linear-gradient(rgba(0, 0, 0, .35), rgba(0, 0, 0, .7)); animation: none; }
+  .flash { opacity: 0; background: var(--tint, #fff); mix-blend-mode: screen; }
+  .flash.go { animation: flash .5s ease-out; }
+  .grain { inset: -20%; opacity: .3; mix-blend-mode: overlay; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.95  0 0 0 0 0.85  0 0 0 0 0.5  0 0 0 0.16 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.55'/></svg>"); }
+  .veil { mix-blend-mode: screen; background-image: repeating-linear-gradient(to bottom, rgba(128, 255, 0, .03) 0 1px, transparent 1px 3px); }
 
-  .stamp { position: absolute; left: 0; right: 0; top: 46%; text-align: center; font: 900 clamp(40px, 6vw, 84px)/1 var(--display); color: var(--gold); letter-spacing: .08em; text-shadow: 0 0 28px rgba(0, 0, 0, .9), 0 3px 0 #000; opacity: 0; pointer-events: none; z-index: 2; }
-  .stamp small { display: block; font: 400 clamp(22px, 2vw, 30px) var(--pixel); color: var(--parchment); letter-spacing: 0; margin-top: 6px; }
-  .stamp.bad { color: var(--blood); }
-  .stamp.show { animation: stamp 1.3s cubic-bezier(.2, .9, .3, 1) both; }
-  .stamp.hold { opacity: 1; animation: none; }
+  .odds { position: absolute; z-index: 3; top: 12px; left: 14px; right: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: rgba(0, 0, 0, .72); border: 1px solid #3a372f; border-radius: 3px; padding: 1px 9px; white-space: nowrap; font-size: 20px; }
+  .chip.pick { border-color: var(--gold); }
+  .chip.pick::before { content: "▸ "; color: var(--gold); }
+  .chip b { font-weight: 400; }
+  .fighter { position: absolute; z-index: 2; bottom: 7%; width: 30%; display: grid; justify-items: center; gap: 6px; transition: opacity .4s; }
+  .fighter.us { left: 12%; }
+  .fighter.them { right: 10%; opacity: 0; }
+  .fight .fighter.them { opacity: 1; }
+  .gone .fighter.them { opacity: .35; transition-duration: 1.2s; }
+  .gone .fighter.them .sprite { filter: grayscale(1) brightness(.6); }
+  .dead .fighter.us { opacity: 0; }
+  .sprite { image-rendering: pixelated; filter: drop-shadow(0 14px 12px rgba(0, 0, 0, .7)); }
+  .us .sprite { height: min(60cqh, 256px); width: auto; aspect-ratio: 1; }
+  .them .sprite { height: min(72cqh, 320px); width: auto; aspect-ratio: 1; }
+  .sprite.hit { animation: hit .3s steps(2); }
+  .plate { width: min(100%, 250px); display: grid; gap: 3px; text-align: center; text-shadow: 0 1px 0 #000, 0 0 6px #000; }
+  .plate .nm { font: 700 14px var(--title); letter-spacing: .05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .plate .sub { color: var(--dim); font-size: 17px; white-space: nowrap; }
+  .plate .track { height: 8px; border: 1px solid #000; background: rgba(0, 0, 0, .7); }
+  .them .track .fill { background: var(--blood); }
+  .dmg { position: absolute; z-index: 4; bottom: 58%; font-size: 40px; color: var(--blood); text-shadow: 0 2px 0 #000, 0 0 14px rgba(255, 90, 71, .6); animation: rise 1.4s ease-out both; pointer-events: none; }
+  .dmg.good { color: var(--lime); text-shadow: 0 2px 0 #000, 0 0 14px rgba(128, 255, 0, .6); }
+  .dmg.crit { font-size: 56px; }
+  .banner { position: absolute; z-index: 3; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; opacity: 0; font: 900 clamp(34px, 4.6vw, 72px)/1 var(--title); letter-spacing: .1em; text-transform: uppercase; color: var(--gold); text-shadow: 0 0 30px rgba(0, 0, 0, .9), 0 3px 0 #000; }
+  .banner small { display: block; margin-top: 8px; font: 22px var(--pixel); letter-spacing: 0; text-transform: none; color: var(--bone); }
+  .banner.show { animation: stamp 1.6s cubic-bezier(.2, .9, .3, 1) both; }
+  .banner.hold { opacity: 1; color: var(--blood); }
+  .unseen { position: absolute; z-index: 3; left: 50%; top: 34%; transform: translateX(-50%); width: min(480px, 84%); margin: 0; text-align: center; background: rgba(0, 0, 0, .82); border: 1px solid var(--line); padding: 14px 18px; }
+  .unseen b { display: block; font: 700 14px var(--title); letter-spacing: .08em; color: var(--gold); margin-bottom: 4px; }
+  .blind .fighter { visibility: hidden; }
+  .sheet { position: absolute; z-index: 5; inset: 0 0 0 auto; width: min(430px, 100%); background: rgba(5, 5, 4, .95); border-left: 1px solid var(--line); display: grid; grid-template-rows: auto minmax(0, 1fr); image-rendering: auto; }
+  .sheet h2 { padding: 10px 14px; border-bottom: 1px solid var(--line); align-items: center; }
+  .log { overflow-y: auto; padding: 6px 14px 12px; overscroll-behavior: contain; }
+  .log > div { padding: 3px 0; }
+  .log .by { font: 700 12px var(--title); letter-spacing: .08em; color: var(--gold); margin-right: 8px; }
+  .log .said { color: var(--gold); }
+  .log .sys { color: var(--dim); }
+  .log .split { color: var(--gold); font: 700 12px var(--title); letter-spacing: .12em; text-transform: uppercase; border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; }
 
-  .third { position: absolute; left: 16px; right: 16px; bottom: 14px; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .caption { justify-self: center; max-width: 100%; display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 6px 18px; background: rgba(17, 17, 17, .9); border-left: 4px solid var(--gold); padding: 8px 20px; font: 38px/1.05 var(--pixel); color: #f6f0c8; min-height: 58px; }
-  .caption .name { font: 700 18px var(--display); color: var(--gold); }
-  .caption .said { overflow-wrap: anywhere; }
-  .caption .thinking { color: var(--faded); }
-  .caption .thinking::after { content: "..."; animation: dots 1.2s steps(4) infinite; display: inline-block; width: 1.5em; overflow: hidden; vertical-align: bottom; white-space: nowrap; }
-  .pick { display: inline-flex; align-items: center; gap: 8px; }
-  .pick meter { width: 70px; height: 12px; }
-  .pick em { font-style: normal; color: var(--gold); }
-  meter { appearance: none; background: #33301f; border: 0; }
-  meter::-webkit-meter-bar { background: #33301f; border: 0; border-radius: 0; height: 10px; }
-  meter::-webkit-meter-optimum-value, meter::-webkit-meter-suboptimum-value, meter::-webkit-meter-even-less-good-value { background: var(--gold); border-radius: 0; }
-  meter::-moz-meter-bar { background: var(--gold); }
-  .acts { display: inline-flex; flex-wrap: wrap; gap: 6px; }
-  .act { display: inline-flex; align-items: center; gap: 4px; font: 20px var(--pixel); background: #33301f; color: var(--parchment); border-radius: 2px; padding: 0 7px; white-space: nowrap; }
-  .act img { width: 20px; height: 20px; }
-  .act.move { background: var(--parchment); color: var(--night); }
+  .ticker { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; align-items: center; padding: 6px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .ticker .lines { display: grid; min-height: 42px; align-content: center; }
+  .ticker .lines div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--faint); }
+  .ticker .lines div::before { content: "› "; color: var(--faint); }
+  .ticker .lines .now { color: var(--bone); font-size: 20px; }
+  .ticker .lines .now.good { color: var(--lime); }
+  .ticker .lines .now.bad { color: var(--blood); }
 
-  .reel { display: flex; align-items: center; gap: 8px; background: rgba(17, 17, 17, .92); border: 1px solid var(--gold); border-radius: 4px; padding: 6px 10px; font: 21px var(--pixel); }
-  .reel button { padding: 4px 12px; }
-  .reel #toggle { min-width: 84px; }
-  .reel #speed { font: 21px var(--pixel); letter-spacing: 0; padding: 1px 10px; }
-  .reel input { flex: 1; min-width: 60px; accent-color: var(--gold); }
-  .reel span { color: var(--faded); white-space: nowrap; }
-  .reel span b { color: var(--parchment); font-weight: 400; }
-  .unseen { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); width: min(520px, 80%); margin: 0; text-align: center; background: rgba(17, 17, 17, .88); border: 1px solid var(--seam); border-radius: 4px; padding: 14px 18px; font: 24px/1.15 var(--pixel); z-index: 1; }
-  .unseen b { display: block; font: 700 18px var(--display); color: var(--gold); margin-bottom: 4px; }
-  .blind .hud { visibility: hidden; }
+  .dock { display: grid; gap: 8px; padding: 9px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .call { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 12px; min-height: 30px; }
+  .call .by { font: 700 12px var(--title); letter-spacing: .16em; text-transform: uppercase; color: var(--gold); }
+  .call .said { color: var(--gold); font-size: 22px; overflow-wrap: anywhere; }
+  .call .wait { color: var(--dim); font-size: 20px; }
+  .live .call .wait::after { content: "..."; display: inline-block; width: 1.5em; overflow: hidden; vertical-align: bottom; white-space: nowrap; animation: dots 1.2s steps(4) infinite; }
+  .did { display: inline-flex; flex-wrap: wrap; gap: 5px; }
+  .act { display: inline-flex; align-items: center; gap: 4px; background: var(--raise); border: 1px solid var(--line); border-radius: 2px; padding: 0 7px; white-space: nowrap; }
+  .act img { width: 20px; height: 20px; image-rendering: pixelated; }
+  .act.move { background: var(--bone); border-color: var(--bone); color: var(--void); }
+  .reel { display: flex; align-items: center; gap: 8px; }
+  .reel #toggle { min-width: 76px; background: var(--bone); border-color: var(--bone); color: var(--void); }
+  .reel input { flex: 1; min-width: 60px; accent-color: var(--bone); }
+  .reel span { color: var(--dim); white-space: nowrap; }
 
-  .odds { background: rgba(17, 17, 17, .88); border: 1px solid var(--seam); border-radius: 4px; padding: 6px 14px 8px; display: grid; grid-template-columns: auto minmax(110px, .7fr) minmax(160px, 1.6fr) auto auto auto; gap: 4px 18px; align-items: center; font: 21px var(--pixel); }
-  .odds .head { color: var(--faded); font: 600 13px var(--display); letter-spacing: .04em; }
-  .odds .move { font: 700 17px var(--display); color: var(--parchment); white-space: nowrap; }
-  .odds .chosen { color: var(--gold); }
-  .odds .chosen::before { content: "▸ "; }
-  .odds .note { grid-column: 1 / -1; color: var(--faded); font: 21px var(--pixel); }
-  .risk { display: grid; grid-template-columns: 1fr 52px; gap: 8px; align-items: center; }
-  .risk .bar { height: 12px; background: #2a3a1c; }
-  .risk .bar div { height: 100%; background: var(--blood); }
-  .risk b { font-weight: 400; text-align: right; }
-  .risk.safe b { color: var(--life); }
-  .risk.dead b { color: var(--blood); }
-  .track { position: relative; height: 14px; background: #22201a; }
-  .track .band { position: absolute; top: 2px; bottom: 2px; background: rgba(128, 255, 0, .35); }
-  .track .mid { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px; background: var(--life); }
-  .track .now { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--parchment); }
-  .gain { color: var(--faded); white-space: nowrap; text-align: right; }
-  .gain b { color: var(--parchment); font-weight: 400; }
+  .kit { display: grid; gap: 7px; padding: 10px 16px 12px; }
+  .gear { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .slot { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 3px 8px; align-content: start; background: var(--panel); border: 1px solid var(--line); padding: 5px 8px 6px; min-height: 82px; }
+  .slot > img { width: 40px; height: 40px; image-rendering: pixelated; }
+  .slot .nm { font: 700 12px/1.3 var(--title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slot .tg { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slot .tg b { font-weight: 400; color: var(--bone); }
+  .slot .pw { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 16px; color: var(--dim); }
+  .slot .pw .track { height: 4px; }
+  .slot .pw .fill { background: var(--bone); }
+  .slot .gr { grid-column: 1 / -1; font-size: 16px; line-height: 1; color: var(--lime); overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .slot.weak .pw .fill { background: var(--blood); }
+  .slot.weak .pw b { font-weight: 400; color: var(--blood); }
+  .slot.empty { border: 1px dashed var(--blood); align-items: center; align-content: center; }
+  .slot.empty > img { opacity: .4; padding: 6px; }
+  .slot.empty .nm { color: var(--blood); }
+  .carry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; align-items: start; }
+  .carry h2 { display: inline; margin-right: 10px; }
+  .sack { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 28px; color: var(--dim); }
+  .sack .it { display: inline-flex; align-items: center; gap: 5px; color: var(--lime); }
+  .sack .it img { width: 26px; height: 26px; image-rendering: pixelated; }
+  .sack .it.inert img { filter: grayscale(1); opacity: .4; }
+  .purse { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; color: var(--dim); }
+  .purse .sum { display: inline-flex; align-items: center; gap: 6px; font-size: 26px; line-height: 1; color: var(--bone); }
+  .purse .sum img { width: 20px; height: 20px; image-rendering: pixelated; }
+  .purse .verdict { font: 700 13px var(--title); letter-spacing: .08em; text-transform: uppercase; color: var(--bone); }
+  .purse .verdict.good { color: var(--lime); }
+  .purse .verdict.bad { color: var(--blood); }
+  .purse b { font-weight: 400; color: var(--bone); }
+  .purse b.bad { color: var(--blood); }
+  .blank { margin: 0; color: var(--dim); }
 
-  .chat { grid-area: chat; display: flex; flex-direction: column; min-height: 0; background: var(--rock); border-left: 1px solid var(--seam); }
-  .chat h2, .dock h2, .rail h2 { margin: 0; font: 700 15px var(--display); color: var(--faded); letter-spacing: .04em; }
-  .chat h2 { padding: 10px 14px; border-bottom: 1px solid var(--seam); display: flex; justify-content: space-between; align-items: baseline; }
-  .chat h2 span { font: 18px var(--pixel); }
-  .log { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 14px; font: 20px/1.2 var(--pixel); overscroll-behavior: contain; }
-  .log > div { padding: 4px 0; }
-  .log .by { font: 700 14px var(--display); color: var(--gold); margin-right: 6px; }
-  .log .acts { margin-top: 3px; display: flex; }
-  .log .act { font-size: 18px; }
-  .log .times { color: var(--faded); }
-  .log .moment { color: var(--ember); text-align: center; padding: 6px 0; }
-  .log .moment.good { color: var(--life); }
-  .log .moment.bad { color: var(--blood); }
-  .log .sys { color: var(--faded); }
-  .log .split { color: var(--gold); text-align: center; border-top: 1px solid var(--seam); margin-top: 8px; padding-top: 8px; font: 700 14px var(--display); }
-  .jump { margin: 0 14px 10px; display: none; }
-  .scrolled .jump { display: block; }
+  .runs { flex: 1; min-height: 180px; grid-template-rows: auto minmax(0, 1fr); }
+  .rows { overflow-y: auto; overscroll-behavior: contain; margin: 0 -16px -14px; }
+  .rows h3 { margin: 0; padding: 8px 16px 4px; font: 16px var(--pixel); color: var(--dim); display: flex; justify-content: space-between; position: sticky; top: 0; background: var(--panel); z-index: 1; }
+  .rows p { margin: 0; padding: 2px 16px 8px; color: var(--faint); }
+  .row { display: grid; grid-template-columns: 4ch 8ch minmax(0, 1fr) auto; gap: 0 10px; width: 100%; text-align: left; border: 0; border-left: 3px solid transparent; border-radius: 0; background: none; padding: 3px 16px 3px 13px; color: var(--dim); white-space: nowrap; }
+  .row:hover { background: var(--raise); }
+  .row b { font-weight: 400; color: var(--bone); }
+  .row .how { overflow: hidden; text-overflow: ellipsis; }
+  .row .cost { text-align: right; }
+  .row.chain { grid-template-columns: 4ch minmax(0, 1fr) auto; padding-block: 6px; }
+  .row.chain .how { grid-column: 2 / -1; }
+  .row.on { border-left-color: var(--gold); background: var(--raise); }
+  .row.on b:first-child { color: var(--gold); }
+  .row .air { color: var(--lime); }
+  table { width: 100%; border-collapse: collapse; }
+  th { font: 16px var(--pixel); color: var(--dim); text-align: right; padding: 0 0 3px 8px; }
+  td { text-align: right; padding: 2px 0 2px 8px; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; padding-left: 0; }
+  td.txt { text-align: left; color: var(--dim); overflow: hidden; text-overflow: ellipsis; max-width: 0; width: 46%; }
+  tr.lead td { color: var(--bone); }
+  td { color: var(--dim); }
+  td b { font-weight: 400; color: var(--bone); }
 
-  .rail { grid-area: rail; display: flex; flex-direction: column; min-height: 0; background: var(--rock); border-right: 1px solid var(--seam); }
-  .rail h2 { padding: 10px 12px 8px; display: flex; justify-content: space-between; align-items: center; }
-  .filter { display: flex; }
-  .filter button { font: 19px var(--pixel); letter-spacing: 0; padding: 0 9px; border-radius: 0; color: var(--faded); }
-  .filter button + button { border-left: 0; }
-  .filter button[aria-pressed="true"] { background: var(--parchment); border-color: var(--parchment); color: var(--night); }
-  .rows { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid var(--seam); }
-  .rows p { margin: 0; padding: 12px; font: 20px var(--pixel); color: var(--faded); }
-  .row { display: grid; grid-template-columns: 4ch 8ch 1fr auto; white-space: nowrap; overflow: hidden; gap: 8px; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid #232224; border-left: 3px solid transparent; border-radius: 0; padding: 3px 10px 3px 9px; font: 19px var(--pixel); letter-spacing: 0; color: var(--faded); background: linear-gradient(90deg, rgba(208, 201, 141, .09) var(--reach), transparent var(--reach)) var(--rock); }
-  .row:hover { color: var(--parchment); }
-  .row b { color: var(--parchment); font-weight: 400; }
-  .row .chain { color: var(--life); }
-  .row .end { color: var(--parchment); text-align: right; }
-  .row .bad { color: var(--blood); }
-  .row.on { border-left-color: var(--gold); background-color: var(--stone); }
-  .row.on b { color: var(--gold); }
-  .row .air { color: #fff; background: #b8231a; padding: 0 6px; }
-  .rail .strats { border-top: 1px solid var(--seam); padding: 8px 12px; flex-direction: column; gap: 0; font-size: 17px; }
-
-  .dock { grid-area: dock; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); border-top: 1px solid var(--seam); background: var(--rock); min-height: 0; }
-  .dock > section { padding: 10px 16px; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-  .dock > section + section { border-left: 1px solid var(--seam); }
-  .dock h2 { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-  .dock h2 span { font: 19px var(--pixel); color: var(--faded); font-weight: 400; }
-  .purse { display: flex; gap: 16px; font: 21px var(--pixel); align-items: center; flex-wrap: wrap; }
-  .purse b { color: var(--gold); font-weight: 400; }
-  .purse .points { color: var(--night); background: var(--gold); padding: 0 6px; }
-  .xpbar { flex: 1; min-width: 80px; height: 6px; background: #33301f; }
-  .xpbar div { height: 100%; background: var(--gold); }
-  .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
-  .stats div { display: flex; align-items: baseline; gap: 6px; font: 22px var(--pixel); background: var(--stone); padding: 1px 8px; }
-  .stats img { width: 15px; height: 17px; opacity: .85; align-self: center; }
-  .stats small { font-size: 17px; color: var(--faded); }
-  .gear, .bag { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; flex: 1; min-height: 0; }
-  .bag { grid-auto-rows: minmax(0, 72px); align-content: start; }
-  .bag .slot span { font-size: 14px; }
-  .none { font: 20px var(--pixel); color: var(--faded); margin: 0; }
-  .slot { background: var(--stone); display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center; padding: 3px; min-height: 0; position: relative; }
-  .slot img { width: 100%; max-width: 46px; height: 100%; max-height: 46px; object-fit: contain; min-height: 0; }
-  .slot.empty img { opacity: .28; width: 24px; height: 24px; }
-  .slot span { font: 16px var(--pixel); color: var(--faded); white-space: nowrap; }
-  .slot.suffixed { box-shadow: inset 0 0 0 1px var(--gold); }
-
-  .strats { font: 18px var(--pixel); color: var(--faded); display: flex; gap: 14px; overflow: hidden; white-space: nowrap; }
-  .strats b { color: var(--parchment); font-weight: 400; }
-
-  @keyframes beat { 50% { opacity: .35; } }
+  @keyframes beat { 50% { opacity: .3; } }
+  @keyframes pulse { 50% { opacity: .7; } }
   @keyframes dots { from { width: 0; } to { width: 2em; } }
-  @keyframes stamp { 0% { opacity: 0; transform: scale(1.5); letter-spacing: .3em; } 18% { opacity: 1; transform: scale(1); letter-spacing: .08em; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+  @keyframes flash { 0% { opacity: .5; } 100% { opacity: 0; } }
+  @keyframes hit { 50% { filter: brightness(3) drop-shadow(0 14px 12px rgba(0, 0, 0, .7)); } }
+  @keyframes rise { 0% { transform: translateY(10px); opacity: 0; } 12% { opacity: 1; } 65% { opacity: 1; } 100% { transform: translateY(-46px); opacity: 0; } }
+  @keyframes stamp { 0% { opacity: 0; transform: scale(1.4); } 16% { opacity: 1; transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-12px); } }
 
-  @media (max-width: 1500px) { :root { --rail: 280px; --chat: 300px; --dock: 172px; } .caption { font-size: 26px; } .odds { font-size: 19px; } }
-  @media (max-height: 950px) { :root { --dock: 168px; } .fighter { padding: 6px 10px 8px; } }
-  @media (max-width: 900px) {
+  @media (min-width: 1800px) {
+    :root { --left: 320px; --right: 420px; }
+    body { font-size: 20px; }
+    .slot { grid-template-columns: 52px minmax(0, 1fr); min-height: 100px; }
+    .slot > img { width: 52px; height: 52px; }
+    .slot .nm { font-size: 14px; }
+    .slot .pw, .slot .gr { font-size: 18px; }
+    .stat .v { font-size: 28px; }
+    .stat .w, .stat .v em { font-size: 18px; }
+    th { font-size: 18px; }
+  }
+  @media (max-width: 1100px) {
     body { overflow: auto; }
-    .app { height: auto; grid-template: "top" auto "stage" auto "rail" auto "chat" auto "dock" auto / minmax(0, 1fr); }
-    .rail { border-right: 0; border-top: 1px solid var(--seam); max-height: 300px; }
+    .app { height: auto; grid-template-columns: minmax(0, 1fr); }
+    .centre { order: -1; grid-template-rows: auto 320px auto auto auto; }
+    .side { overflow: visible; border: 0; border-top: 1px solid var(--line); }
+    .runs { max-height: 420px; }
+    .foot { margin-top: 0; }
+  }
+  @media (max-width: 640px) {
+    .head { padding-inline: 10px; }
+    .id { flex-wrap: wrap; gap: 4px 10px; }
+    .id .meta { flex-basis: 100%; }
+    .vitals { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .vitals .meter.xp { grid-column: 1 / -1; order: 5; }
+    .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .stat { padding-inline: 5px; }
+    .fighter { width: 44%; }
+    .fighter.us { left: 3%; }
+    .fighter.them { right: 3%; }
+    .chip { font-size: 17px; padding-inline: 6px; }
+    .dmg { font-size: 30px; }
+    .ticker, .dock, .kit { padding-inline: 10px; }
+    .carry { grid-template-columns: minmax(0, 1fr); }
+    .gear { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .reel { flex-wrap: wrap; }
     .reel input { flex-basis: 100%; order: 9; }
-    .game { flex-wrap: wrap; gap: 0 12px; }
-    .game .fate { white-space: normal; }
-    .top { flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; }
-    .game { order: 3; flex-basis: 100%; gap: 12px; font-size: 20px; }
-    .check { display: none; }
-    .controls button { padding: 6px 10px; font-size: 12px; }
-    .brand { font-size: 17px; }
-    .stage { padding-top: 330px; background-size: auto 360px; background-position: center top; background-color: var(--night); }
-    .stage::before { bottom: auto; height: 360px; }
-    .hud { left: 10px; right: 10px; top: 10px; gap: 8px; }
-    .fighter { width: 50%; padding: 6px 8px; }
-    .who strong { font-size: 15px; }
-    .who span { font-size: 17px; }
-    .who { flex-wrap: wrap; gap: 0 8px; }
-    .foe { top: 180px; height: 150px; }
-    .stamp { top: 160px; }
-    .third { position: relative; left: auto; right: auto; bottom: auto; padding: 0 10px 12px; }
-    .caption { font-size: 26px; padding: 6px 10px; justify-self: stretch; justify-content: flex-start; }
-    .odds .head { display: none; }
-    .odds .track { grid-column: 1 / -1; }
-    .odds .gain { text-align: left; }
-    .odds .move { grid-column: 1 / -1; }
-    .odds .risk { grid-column: 1 / -1; }
-    .odds { grid-template-columns: repeat(3, auto); justify-content: start; gap: 4px 16px; padding: 6px 10px; }
-    .dock h2 { flex-wrap: wrap; }
-    .chat { border-left: 0; border-top: 1px solid var(--seam); height: 60vh; }
-    .dock { grid-template-columns: minmax(0, 1fr); }
-    .dock > section + section { border-left: 0; border-top: 1px solid var(--seam); }
-    .stats { grid-template-columns: repeat(3, 1fr); }
-    .gear { grid-template-columns: repeat(4, 1fr); }
-    .slot img { height: 40px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
-    .stamp.show { opacity: 1; }
+    .banner.show { opacity: 1; }
   }
 </style>
 </head>
 <body>
 <div class="app" id="app">
-  <header class="top">
-    <div class="brand"><img src="/assets/skull.png" alt="">Death Mountain</div>
-    <span class="onair"><i></i><span id="onair"></span></span>
-    <div class="game" id="game"></div>
-    <div class="controls">
-      <button id="golive" type="button" hidden>Watch live</button>
-      <span class="check" id="check"></span>
-      <button class="go" id="play" type="button">Run benchmark</button>
-      <button id="chain" type="button">Play on-chain</button>
-      <button id="stop" type="button">Stop</button>
-    </div>
-  </header>
+  <aside class="side l">
+    <div class="mark"><img src="/assets/logo.png" alt="Loot Survivor 2"><p>Agent war room</p></div>
+    <section aria-label="Wallet">
+      <h2>Wallet <small id="address"></small></h2>
+      <div id="wallet"></div>
+    </section>
+    <section aria-label="Start a run">
+      <div class="acts" id="acts">
+        <button id="chain" type="button">Play on-chain <span>spends STRK</span></button>
+        <button id="play" type="button">Run practice</button>
+        <button id="stop" type="button">Stop</button>
+      </div>
+      <div class="ask" id="ask" hidden>
+        <p id="askText"></p>
+        <div><button id="spend" type="button">Spend STRK and play</button><button id="cancel" type="button">Cancel</button></div>
+      </div>
+    </section>
+    <section aria-label="Beasts">
+      <h2>Beasts</h2>
+      <div id="beasts"></div>
+    </section>
+    <p class="foot" id="check"></p>
+  </aside>
 
-  <nav class="rail" aria-label="Games">
-    <h2>Games <span class="filter" id="filter"><button type="button" data-only="">All</button><button type="button" data-only="1">On-chain</button></span></h2>
-    <div class="rows" id="rows"></div>
-    <div class="strats" id="strats"></div>
-  </nav>
+  <main class="centre">
+    <header class="head">
+      <div class="id"><span class="onair"><i></i><span id="onair"></span></span><strong id="title"></strong><span class="meta" id="meta"></span><button id="golive" type="button" hidden>Watch live</button></div>
+      <div class="vitals" id="vitals"></div>
+      <div class="stats" id="stats"></div>
+    </header>
 
-  <main class="stage" id="stage" aria-label="Game stage">
-    <img class="foe" id="foe" alt="">
-    <div class="hud">
+    <div class="stage" id="stage" aria-label="Game stage">
+      <div class="light"></div><div class="wash"></div><div class="flash" id="flash"></div><div class="grain"></div><div class="veil"></div>
+      <div class="odds" id="odds"></div>
       <div class="fighter us">
-        <div class="who"><strong id="usName">Adventurer</strong><span id="usMeta"></span></div>
-        <div class="hp" id="usHp"><div class="trail"></div><div class="fill"></div><b></b></div>
+        <img class="sprite" id="hero" src="/assets/adventurer.png" alt="Adventurer">
+        <div class="plate"><div class="track" id="usHp"><i class="trail"></i><i class="fill"></i></div><div class="sub" id="usSub"></div></div>
       </div>
       <div class="fighter them">
-        <div class="who"><strong id="themName"></strong><span id="themMeta"></span></div>
-        <div class="hp" id="themHp"><div class="trail"></div><div class="fill"></div><b></b></div>
+        <img class="sprite" id="foe" alt="">
+        <div class="plate"><div class="nm bad" id="themName"></div><div class="track" id="themHp"><i class="trail"></i><i class="fill"></i></div><div class="sub" id="themSub"></div></div>
       </div>
+      <p class="unseen" id="unseen" hidden></p>
+      <div class="banner" id="banner" aria-live="polite"></div>
+      <aside class="sheet" id="sheet" hidden>
+        <h2>Full log <button id="closeLog" type="button">Close</button></h2>
+        <div class="log" id="log" role="log" aria-live="off"></div>
+      </aside>
     </div>
-    <p class="unseen" id="unseen" hidden></p>
-    <div class="stamp" id="stamp" aria-live="polite"></div>
-    <div class="third">
-      <div class="caption" id="caption"></div>
-      <div class="odds" id="odds" hidden></div>
+
+    <div class="ticker">
+      <div class="lines" id="lines"></div>
+      <button id="openLog" type="button">Full log</button>
+    </div>
+
+    <div class="dock">
+      <div class="call" id="call"></div>
       <div class="reel" id="reel" hidden>
         <button id="back" type="button" title="Previous decision (left arrow)">Back</button>
-        <button id="toggle" type="button" class="go" title="Space"></button>
+        <button id="toggle" type="button" title="Space"></button>
         <button id="next" type="button" title="Next decision (right arrow)">Next</button>
         <input id="seek" type="range" min="0" step="1" aria-label="Position in the game">
         <span id="where"></span>
         <button id="speed" type="button" title="Playback speed"></button>
       </div>
     </div>
+
+    <section class="kit" aria-label="Gear, bag and purse">
+      <h2>Gear <small id="gearsum"></small></h2>
+      <div class="gear" id="gear"></div>
+      <div class="carry">
+        <div class="sack" id="bag"></div>
+        <div class="purse" id="purse"></div>
+      </div>
+    </section>
   </main>
 
-  <aside class="chat" id="chat">
-    <h2>Agent's log <span id="moves"></span></h2>
-    <div class="log" id="log" role="log" aria-live="off"></div>
-    <button class="jump" id="jump" type="button">Back to latest</button>
+  <aside class="side r">
+    <section class="runs" aria-label="Runs">
+      <h2>Runs</h2>
+      <div class="rows" id="rows"></div>
+    </section>
+    <section aria-label="Policy results">
+      <h2>Policy results <small>practice games</small></h2>
+      <div id="policy"></div>
+    </section>
+    <section aria-label="Loot bags for sale">
+      <h2>Loot bags for sale <small>by simulated level</small></h2>
+      <div id="bags"></div>
+    </section>
   </aside>
-
-  <footer class="dock">
-    <section>
-      <h2>Adventurer</h2>
-      <div class="purse" id="purse"></div>
-      <div class="stats" id="stats"></div>
-      <div class="gear" id="gear"></div>
-    </section>
-    <section>
-      <h2>Bag <span id="bagsum"></span></h2>
-      <div class="bag" id="bag"></div>
-    </section>
-  </footer>
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -317,19 +392,30 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 const post = (url, body) => fetch(url, { method: "POST", body: body && JSON.stringify(body) });
 const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-const STATS = [["strength", "Strength", "STR"], ["dexterity", "Dexterity", "DEX"], ["vitality", "Vitality", "VIT"], ["intelligence", "Intelligence", "INT"], ["wisdom", "Wisdom", "WIS"], ["charisma", "Charisma", "CHA"]];
+const round = (n, digits = 0) => Number(n).toLocaleString("en", { maximumFractionDigits: digits });
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const STATS = [
+  ["strength", "Strength", "STR", (s) => `+${s.buys.attack}% attack`],
+  ["dexterity", "Dexterity", "DEX", (s) => `flee ${s.buys.flee}%`],
+  ["vitality", "Vitality", "VIT", (s) => `${s.maxHealth} max HP`],
+  ["intelligence", "Intelligence", "INT", (s) => `trap dodge ${s.buys.trap}%`],
+  ["wisdom", "Wisdom", "WIS", (s) => `ambush dodge ${s.buys.ambush}%`],
+  ["charisma", "Charisma", "CHA", (s) => `potion ${s.potionPrice}g`],
+];
 const SLOTS = ["weapon", "chest", "head", "waist", "foot", "hand", "neck", "ring"];
 const MOVE = { attack: "Fight", flee: "Flee", explore: "Explore" };
+const TINT = [[/^Found \d+ gold/, "#ffb000"], [/^Found a health potion/, "#80ff00"], [/^Found /, "#ffffff"], [/^A .* hits your/, "#ff5a47"]];
 const SPEEDS = [1, 2, 4, 8];
 const TICK_MS = 800;
 const DEATH_HOLD_MS = 4000;
+const WEAK_PER_LEVEL = 2;
+const WALLET_MS = 60_000;
 const quiet = matchMedia("(prefers-reduced-motion: reduce)");
 
 const items = {};
 let games = [];
 let liveRow = null;
 let follow = true;
-let onlyChain = false;
 const view = { id: null, game: null, events: [], stops: [0], cursor: 0, loading: false, inbox: [], playing: false, speed: SPEEDS[0], timer: 0 };
 let scene = {};
 let dirty = false;
@@ -337,34 +423,72 @@ let dirty = false;
 const isLive = () => view.id !== null && view.id === liveRow;
 const tail = (g) => g.game_id.slice(-8);
 const atEnd = () => view.cursor >= view.events.length;
+const tone = (line) => (/hits your|Failed|^Slain|^Game \d+ (died|failed|stopped)/.test(line) ? "bad" : /^Found|^Dodged|^Avoided|^Slew|^Escaped|^Reached|^You hit/.test(line) ? "good" : "");
 
-function hpBar(el, now, max) {
+function bar(el, now, max) {
   const pct = max ? Math.max(0, Math.min(100, (100 * now) / max)) : 0;
   el.querySelector(".fill").style.width = `${pct}%`;
   el.querySelector(".trail").style.width = `${pct}%`;
-  el.querySelector("b").textContent = `${now} / ${max}`;
   el.classList.toggle("low", pct < 30);
 }
 
-let fallenShown = false;
+function float(side, text, cls, wait) {
+  if (quiet.matches) return;
+  const el = document.createElement("div");
+  el.className = `dmg ${cls}`;
+  el.textContent = text;
+  el.style[side === "us" ? "left" : "right"] = `${20 + Math.random() * 8}%`;
+  el.style.animationDelay = `${wait}ms`;
+  $("stage").append(el);
+  const sprite = $(side === "us" ? "hero" : "foe");
+  setTimeout(() => { if (!cls.includes("good") || side === "them") { sprite.classList.remove("hit"); void sprite.offsetWidth; sprite.classList.add("hit"); } }, wait);
+  setTimeout(() => el.remove(), wait + 1500);
+}
+
+function flash(tint) {
+  const el = $("flash");
+  el.style.setProperty("--tint", tint);
+  el.classList.remove("go");
+  void el.offsetWidth;
+  el.classList.add("go");
+}
+
+function blows(prev, s) {
+  const hits = s.happened.flatMap((line) => {
+    const n = line.match(/for (\d+)/)?.[1];
+    if (!n) return [];
+    return [/^You hit/.test(line) ? ["them", `-${n}`, "good"] : ["us", `-${n}`, ""]].map((h) => [...h, / critical/.test(line) ? " crit" : ""]);
+  });
+  if (!hits.length && prev) {
+    if (prev.health > s.health) hits.push(["us", `-${prev.health - s.health}`, "", ""]);
+    if (prev.beast && s.beast && prev.beast.health > s.beast.health) hits.push(["them", `-${prev.beast.health - s.beast.health}`, "good", ""]);
+  }
+  if (prev && s.health > prev.health) hits.push(["us", `+${s.health - prev.health}`, "good", ""]);
+  hits.slice(-6).forEach(([side, text, cls, crit], i) => float(side, text, cls + crit, (i * 260) / view.speed));
+  const tint = TINT.find(([re]) => s.happened.some((line) => re.test(line)))?.[1];
+  if (tint) flash(tint);
+}
+
 function renderStage() {
   dirty = false;
   const s = scene.state;
   const b = s && scene.shown;
-  $("stage").classList.toggle("blind", !s);
-  $("stage").classList.toggle("fight", !!b && !s.over);
-  $("stage").classList.toggle("gone", !!b?.gone);
-  $("stage").classList.toggle("fallen", !!s?.over);
-  if (!!s?.over !== fallenShown) {
-    fallenShown = !!s?.over;
-    stampQueue.length = 0;
-    $("stamp").innerHTML = fallenShown ? `Slain<small>at level ${s.level}</small>` : "";
-    $("stamp").className = fallenShown ? "stamp bad hold" : "stamp";
-  }
+  const stage = $("stage").classList;
+  stage.toggle("blind", !s);
+  stage.toggle("fight", !!b);
+  stage.toggle("gone", !!b?.gone);
+  stage.toggle("night", !!b && !b.gone && !s.over);
+  stage.toggle("dead", !!s?.over);
+  stage.toggle("flare", !!scene.flare);
+  stage.toggle("open", !!s && !s.over && !b && (isLive() || view.playing));
+  const banner = $("banner");
+  if (s?.over) {
+    banner.className = "banner hold";
+    banner.innerHTML = `Slain<small>level ${s.level}, ${s.xp} xp${view.game?.ending && atEnd() ? `. ${esc(view.game.ending.replace(/^died at level \d+ while /, "Died "))}` : ""}</small>`;
+  } else if (banner.classList.contains("hold")) banner.className = "banner";
   if (s) {
-    $("usName").textContent = `Level ${s.level}`;
-    $("usMeta").textContent = s.over ? "fallen" : b ? "in battle" : "exploring";
-    hpBar($("usHp"), s.health, s.maxHealth);
+    bar($("usHp"), s.health, s.maxHealth);
+    $("usSub").textContent = `${s.health} / ${s.maxHealth}`;
   }
   if (b) {
     const key = `${b.name}:${b.level}`;
@@ -373,69 +497,84 @@ function renderStage() {
     if ($("foe").getAttribute("src") !== src) $("foe").src = src;
     $("foe").alt = b.name;
     $("themName").textContent = b.name;
-    $("themMeta").textContent = b.gone ?? `level ${b.level}  tier ${b.tier} ${b.type.toLowerCase()}`;
-    hpBar($("themHp"), b.health, scene.beastMax[key]);
+    $("themSub").textContent = b.gone ?? `level ${b.level}, tier ${b.tier} ${b.type.toLowerCase()}, ${b.health} HP`;
+    bar($("themHp"), b.health, scene.beastMax[key]);
   }
+  renderHead(s);
   renderCall(s);
-  renderDock(s);
+  renderKit(s);
+  renderTicker();
   renderReel();
 }
 
-const slotHtml = (g) => `<div class="slot${g.suffix ? " suffixed" : ""}" title="${esc(g.name)}${g.suffix ? ` ${esc(g.suffix)}` : ""}, tier ${g.tier} ${esc(g.type)}, greatness ${g.greatness}"><img src="/assets/loot/${slug(g.name)}.png" alt="${esc(g.name)}"><span>T${g.tier} G${g.greatness}</span></div>`;
-
-function renderDock(s) {
+function renderHead(s) {
   if (!s) {
-    $("purse").innerHTML = view.game ? `<p class="none">Not recorded for this game</p>` : "";
-    for (const id of ["stats", "gear", "bag", "bagsum"]) $(id).innerHTML = "";
+    $("vitals").innerHTML = "";
+    $("stats").innerHTML = "";
     return;
   }
   const next = (s.level + 1) ** 2, base = s.level ** 2;
-  $("purse").innerHTML = `<span><b>${s.gold}</b> gold</span><span><b>${s.xp}</b> xp</span><div class="xpbar" title="${next - s.xp} xp to level ${s.level + 1}"><div style="width:${Math.min(100, (100 * (s.xp - base)) / (next - base))}%"></div></div><span>potion ${s.potionPrice}g</span>${s.statUpgradesAvailable ? `<span class="points">${s.statUpgradesAvailable} stat point${s.statUpgradesAvailable > 1 ? "s" : ""}</span>` : ""}`;
-  $("stats").innerHTML = STATS.map(([k, icon, short]) => `<div title="${icon}"><img src="/assets/icons/${icon}.svg" alt="">${s.stats[k]}<small>${short}</small></div>`).join("");
+  const points = s.statUpgradesAvailable;
+  $("vitals").innerHTML = `<span class="lv">Level ${s.level}</span>
+    <div class="meter"><img src="/assets/icons/health.png" alt="Health"><div class="track${s.health / s.maxHealth < 0.3 ? " low" : ""}"><i class="fill" style="width:${(100 * s.health) / s.maxHealth}%"></i></div><span>${s.health} / ${s.maxHealth}</span></div>
+    <div class="meter xp" title="${next - s.xp} xp to level ${s.level + 1}"><span class="mute">xp</span><div class="track xp"><i class="fill" style="width:${Math.min(100, (100 * (s.xp - base)) / (next - base))}%"></i></div><span>${s.xp} / ${next}</span></div>
+    ${points ? `<span class="points">${plural(points, "stat point")} to spend</span>` : `<span class="coin"><img src="/assets/icons/gold.png" alt="">${s.gold} gold</span>`}`;
+  const tile = (icon, short, value, base, buys) => `<div class="stat" title="${icon}${value - base ? `: ${base} from level-ups, ${value - base} from items` : ""}"><span class="v"><img src="/assets/icons/${icon}.svg" alt="">${value}<small>${short}</small>${value - base ? `<em>${base}<b>+${value - base}</b></em>` : ""}</span><span class="w">${buys}</span></div>`;
+  $("stats").innerHTML = STATS.map(([k, icon, short, buys]) => tile(icon, short, s.stats[k], s.baseStats[k], buys(s))).join("") + tile("Luck", "LUCK", s.luck, s.luck, `critical hit ${s.buys.crit}%`);
+}
+
+function slotHtml(g, slot, weak) {
+  if (!g) return `<div class="slot empty"><img src="/assets/icons/${slot}.svg" alt=""><span class="nm">No ${slot}</span></div>`;
+  const growth = g.toNext ? `${g.toNext} xp to G${g.greatness + 1}` : "maxed";
+  return `<div class="slot${weak ? " weak" : ""}" title="${esc(g.name)}${g.suffix ? ` ${esc(g.suffix)}` : ""}: tier ${g.tier} ${esc(g.type)}, greatness ${g.greatness}, ${growth}. ${esc(g.grants.join(". "))}">
+    <img src="/assets/loot/${slug(g.name)}.png" alt="">
+    <div><div class="nm">${esc(g.name)}</div><div class="tg">${esc(g.type)} <b>T${g.tier}</b> <b>G${g.greatness}</b></div></div>
+    <div class="pw"><div class="track"><i class="fill" style="width:${g.power}%"></i></div><span>${weak ? "<b>weak</b>, " : ""}${growth}</span></div>
+    <div class="gr">${esc(g.grants.join(", "))}</div>
+  </div>`;
+}
+
+function renderKit(s) {
+  if (!s) {
+    $("gear").innerHTML = view.game ? `<p class="blank">Not recorded for this game.</p>` : "";
+    for (const id of ["bag", "purse", "gearsum"]) $(id).innerHTML = "";
+    return;
+  }
   const bySlot = Object.fromEntries(s.equipment.map((g) => [g.slot, g]));
-  $("gear").innerHTML = SLOTS.map((slot) => (bySlot[slot] ? slotHtml(bySlot[slot]) : `<div class="slot empty" title="No ${slot}"><img src="/assets/icons/${slot}.svg" alt="No ${slot}"><span>empty</span></div>`)).join("");
-  $("bagsum").textContent = s.bag.length ? `${s.bag.length} item${s.bag.length > 1 ? "s" : ""}` : "";
-  $("bag").innerHTML = s.bag.length ? s.bag.map(slotHtml).join("") : `<p class="none">empty</p>`;
+  const weak = (g) => !!g && g.power < WEAK_PER_LEVEL * s.level;
+  const empty = SLOTS.filter((slot) => !bySlot[slot]).length;
+  const weaks = s.equipment.filter(weak).length;
+  $("gearsum").innerHTML = [empty ? `<span class="bad">${plural(empty, "empty slot")}</span>` : "", weaks ? `<span class="bad">${weaks} weak for level ${s.level}</span>` : "", !empty && !weaks ? `<span class="good">geared up</span>` : ""].filter(Boolean).join(", ");
+  $("gear").innerHTML = SLOTS.map((slot) => slotHtml(bySlot[slot], slot, weak(bySlot[slot]))).join("");
+  $("bag").innerHTML = `<h2>Bag</h2>` + (s.bag.length
+    ? s.bag.map((g) => `<span class="it${g.grants.length ? "" : " inert"}" title="${esc(g.name)}, greatness ${g.greatness}${g.grants.length ? "" : ", grants nothing from the bag"}"><img src="/assets/loot/${slug(g.name)}.png" alt="${esc(g.name)}">${esc(g.grants.join(", "))}</span>`).join("")
+    : `<span>empty</span>`);
+  const p = s.purse;
+  const heal = p.toFull * s.potionPrice;
+  const left = s.gold - heal;
+  const verdict = p.potions === 0 ? ["bad", "Broke"] : left < 0 ? ["", "Tight"] : p.deal && left >= p.deal.price ? ["", "Unspent gold"] : ["good", "Comfortable"];
+  $("purse").innerHTML = `<h2>Purse</h2><span class="sum"><img src="/assets/icons/gold.png" alt="">${s.gold}</span><span class="verdict ${verdict[0]}">${verdict[1]}</span>
+    <span>potion <b>${s.potionPrice}g</b>, can buy <b>${p.potions}</b></span>
+    <span>${p.toFull ? `missing <b>${s.maxHealth - s.health} HP</b>, full heal <b class="${left < 0 ? "bad" : ""}">${heal}g</b>` : "full health"}</span>
+    <span>${s.beast ? "market closed during a fight" : p.deal ? `cheapest upgrade <b>${esc(p.deal.name)}</b> <b class="${p.deal.price > s.gold ? "bad" : ""}">${p.deal.price}g</b>, ${esc(p.deal.why)}` : "nothing better on the market"}</span>`;
+}
+
+function renderTicker() {
+  const [now, before] = [scene.lines?.at(-1), scene.lines?.at(-2)];
+  $("lines").innerHTML = now ? `<div class="now ${tone(now)}">${esc(now)}</div>${before ? `<div>${esc(before)}</div>` : ""}` : "";
 }
 
 function schedule() {
   if (!dirty) { dirty = true; requestAnimationFrame(renderStage); }
 }
 
-const stampQueue = [];
-let stampBusy = false;
 function stamp(text, sub = "") {
-  if (fallenShown) return;
-  stampQueue.length = 0;
-  stampQueue.push({ text, sub });
-  if (!stampBusy) nextStamp();
-}
-function nextStamp() {
-  const m = stampQueue.shift();
-  const el = $("stamp");
-  if (!m || fallenShown) {
-    stampBusy = false;
-    if (!fallenShown) el.className = "stamp";
-    return;
-  }
-  stampBusy = true;
-  el.className = "stamp";
-  el.innerHTML = `${esc(m.text)}${m.sub ? `<small>${esc(m.sub)}</small>` : ""}`;
+  const el = $("banner");
+  if (scene.state?.over || quiet.matches) return;
+  el.className = "banner";
+  el.innerHTML = `${esc(text)}${sub ? `<small>${esc(sub)}</small>` : ""}`;
   void el.offsetWidth;
-  el.className = `stamp ${quiet.matches ? "hold" : "show"}`;
-  setTimeout(nextStamp, 1100);
-}
-
-function parseThought(t) {
-  const parts = String(t ?? "").split(" · ");
-  const picks = parts.map((p) => p.match(/^(.{1,40}?)\s+(\d{1,3})%$/));
-  return picks.every(Boolean) ? picks.map((m) => ({ label: m[1], p: Number(m[2]) })) : null;
-}
-
-function thoughtHtml(t) {
-  const picks = parseThought(t);
-  if (!picks) return `<span class="said">${esc(t)}</span>`;
-  return picks.map((k) => `<span class="pick">${esc(k.label)} <meter min="0" max="100" value="${k.p}" title="${k.p}% sure"></meter><em>${k.p}%</em></span>`).join("");
+  el.className = "banner show";
 }
 
 function actionHtml(a) {
@@ -450,59 +589,51 @@ function actionHtml(a) {
     case "buy": return `<span class="act">${icon(a.item)}buy ${name(a.item)}${a.equip ? ", equip" : ""}</span>`;
     case "equip": return `<span class="act">${icon(a.item)}equip ${name(a.item)}</span>`;
     case "drop": return `<span class="act">drop ${name(a.item)}</span>`;
-    case "potions": return `<span class="act">drink ${a.qty} potion${a.qty > 1 ? "s" : ""}</span>`;
+    case "potions": return `<span class="act">drink ${plural(a.qty, "potion")}</span>`;
     default: return `<span class="act">${esc(a.type)}</span>`;
   }
 }
 
+const said = (e) => (MOVE[e.thought] ? "" : `<span class="said">${esc(e.thought || e.note)}</span>`);
+const chips = (e) => `<span class="did">${e.actions.filter((a) => a.type !== "upgrade" || !e.thought.includes(`+${a.amount} ${a.stat.slice(0, 3).toUpperCase()}`)).map(actionHtml).join("")}${e.reserve ? `<span class="act">keep ${e.reserve} gold</span>` : ""}</span>`;
+
 let called;
 function renderCall(s) {
   const d = scene.decision;
-  const key = s?.beast && d?.phase !== "battle" ? `size:${s.beast.name}` : d ?? `none:${view.id}:${view.loading}`;
+  const key = s?.beast && d?.phase !== "battle" ? `size:${s.beast.name}` : d ?? `none:${view.id}:${view.loading}:${isLive()}`;
   if (key === called) return;
   called = key;
   if (typeof key === "string") {
-    $("odds").hidden = true;
-    $("caption").innerHTML = !view.game
-      ? `<span class="said">${view.loading ? "Loading" : view.id ? `Game ${view.id} was not found` : "No game yet. Run the benchmark to start one."}</span>`
-      : `<span class="name">Agent</span><span class="said${isLive() ? " thinking" : ""}">${s?.beast ? `sizing up the ${esc(s.beast.name)}` : view.events.length ? "getting ready" : "nothing was recorded for this game"}</span>`;
+    $("odds").innerHTML = "";
+    $("call").innerHTML = !view.game
+      ? `<span class="wait">${view.loading ? "Loading" : view.id ? `Game ${view.id} was not found` : "No game yet. Run practice to start one."}</span>`
+      : `<span class="by">Agent</span><span class="wait">${s?.beast ? `sizing up the ${esc(s.beast.name)}` : view.events.length ? "getting ready" : "nothing was recorded for this game"}</span>`;
     return;
   }
-  $("caption").innerHTML = `<span class="name">Agent</span>${thoughtHtml(d.thought || d.note)}${chips(d, "span")}`;
+  $("call").innerHTML = `<span class="by">Agent</span>${said(d)}${chips(d)}`;
   renderOdds(d);
 }
 
 function renderOdds(e) {
-  const box = $("odds");
-  const s = e.before;
   const chosen = e.actions?.at(-1)?.type;
-  box.hidden = false;
   if (!e.options?.length) {
-    box.innerHTML = `<div class="note">Level up: spending stat points and shopping before the next move</div>`;
+    $("odds").innerHTML = `<span class="chip">Spending stat points, no odds simulated</span>`;
     return;
   }
-  const max = s?.maxHealth ?? Math.max(1, ...e.options.map((o) => o.hp?.[2] ?? 0));
-  const pos = (v) => `${Math.max(0, Math.min(100, (100 * v) / max))}%`;
-  box.innerHTML = `<span class="head">Move</span><span class="head">Death risk</span><span class="head">HP after, worst to best</span><span class="head">Likely HP</span><span class="head">XP</span><span class="head">Gold</span>` + e.options.map((o) => {
-    const cls = o.move === chosen ? "move chosen" : "move";
-    if (o.error) return `<span class="${cls}">${MOVE[o.move] ?? esc(o.move)}</span><span class="note" style="grid-column:2/-1" title="${esc(o.error)}">${/^RPC|starknet|fetch|timeout/i.test(o.error) ? "odds unavailable, the simulation did not answer" : esc(o.error.slice(0, 90))}</span>`;
+  const risk = (o) => {
     const d = Math.round(100 * o.death);
-    return `<span class="${cls}">${MOVE[o.move] ?? esc(o.move)}</span>
-      <span class="risk ${d === 0 ? "safe" : d >= 50 ? "dead" : ""}"><span class="bar"><div style="width:${d}%"></div></span><b>${d}%</b></span>
-      <span class="track" title="HP after: worst ${o.hp[0]}, median ${o.hp[1]}, best ${o.hp[2]}"><span class="band" style="left:${pos(o.hp[0])};right:calc(100% - ${pos(o.hp[2])})"></span><span class="mid" style="left:${pos(o.hp[1])}"></span>${s ? `<span class="now" style="left:${pos(s.health)}"></span>` : ""}</span>
-      <span class="gain"><b>${o.hp[1]}</b> HP</span><span class="gain">+${o.xp} xp</span><span class="gain">${o.gold >= 0 ? "+" : ""}${o.gold} gold</span>`;
-  }).join("");
+    return `<b class="${d === 0 ? "good" : d >= 50 ? "bad" : ""}">death ${d}%</b>`;
+  };
+  const pick = e.options.find((o) => o.move === chosen && !o.error);
+  $("odds").innerHTML = e.options.map((o) => `<span class="chip${o.move === chosen ? " pick" : ""}" title="${esc(o.error ?? `HP after: worst ${o.hp[0]}, median ${o.hp[1]}, best ${o.hp[2]}`)}">${MOVE[o.move] ?? esc(o.move)}: ${o.error ? "no odds" : risk(o)}</span>`).join("")
+    + (pick && chosen === "explore" ? `<span class="chip">meets a beast ${Math.round(100 * pick.ongoing)}%</span>` : "")
+    + (pick ? `<span class="chip">likely ${pick.hp[1]} HP after, +${pick.xp} xp</span>` : "");
 }
 
 const log = $("log");
-let pinned = true;
-log.addEventListener("scroll", () => {
-  pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-  $("chat").classList.toggle("scrolled", !pinned);
-});
-$("jump").onclick = () => { log.scrollTop = log.scrollHeight; };
 let streak = null;
 function say(html, cls = "") {
+  const pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   const div = document.createElement("div");
   if (cls) div.className = cls;
   div.innerHTML = html;
@@ -511,46 +642,43 @@ function say(html, cls = "") {
   return div;
 }
 
-function chips(e, tag = "div") {
-  const shown = parseThought(e.thought) ? e.actions.filter((a) => (!MOVE[a.type] && a.type !== "upgrade") || a.tillHealth) : e.actions;
-  const html = shown.map(actionHtml).join("") + (e.reserve ? `<span class="act">keep ${e.reserve} gold</span>` : "");
-  return html ? `<${tag} class="acts">${html}</${tag}>` : "";
-}
-
-function chatDecision(e) {
-  const plain = e.actions.length === 1 && e.actions[0].type === "explore" && /^explore$/.test(e.thought ?? "");
+function logDecision(e) {
+  const plain = e.actions.length === 1 && e.actions[0].type === "explore";
   if (plain && streak?.isConnected && log.lastElementChild === streak) {
     streak.count++;
-    streak.querySelector(".times").textContent = `explores, ${streak.count} steps in a row`;
-    if (pinned) log.scrollTop = log.scrollHeight;
+    streak.querySelector(".sys").textContent = `explores, ${streak.count} steps in a row`;
     return;
   }
-  const div = say(plain
-    ? `<span class="by">Agent</span><span class="times">explores</span>`
-    : `<span class="by">Agent</span>${esc(e.thought || e.note)}${chips(e)}${e.note && e.thought ? `<div class="sys">${esc(e.note)}</div>` : ""}`);
+  const div = say(plain ? `<span class="by">Agent</span><span class="sys">explores</span>` : `<span class="by">Agent</span>${said(e)} ${chips(e)}`);
   streak = plain ? div : null;
   if (plain) div.count = 1;
 }
 
-function moment(text, tone = "") {
+function moment(text) {
   streak = null;
-  say(esc(text), `moment ${tone}`);
+  scene.lines.push(text);
+  say(esc(text), tone(text));
 }
 
 function onState(s, still) {
   const prev = scene.state;
   scene.state = s;
   for (const g of [...s.equipment, ...s.bag, ...s.market]) items[g.id] = g;
-  const show = still ? () => {} : stamp;
   if (prev) {
-    if (!prev.beast && s.beast) { moment(`${s.beast.name} appears, level ${s.beast.level}`); show(s.beast.name, `level ${s.beast.level} ${s.beast.type.toLowerCase()} appears`); }
-    for (const line of s.happened ?? []) moment(line, /hits your|Failed/.test(line) ? "bad" : /Found|Dodged|Avoided/.test(line) ? "good" : "");
-    if (prev.beast && !s.beast && !s.over) {
-      if (scene.lastMove === "flee") { moment(`Escaped the ${prev.beast.name}`, "good"); show("Escaped"); }
-      else { moment(`Slew the ${prev.beast.name}, +${s.xp - prev.xp} xp, +${s.gold - prev.gold} gold`, "good"); show("Victory", `${prev.beast.name} slain`); }
+    if (!prev.beast && s.beast) moment(`${s.beast.name} blocks the path: level ${s.beast.level}, tier ${s.beast.tier} ${s.beast.type.toLowerCase()}`);
+    for (const line of s.happened) moment(line);
+    if (prev.beast && !s.beast && !s.over) moment(scene.lastMove === "flee" ? `Escaped the ${prev.beast.name}` : `Slew the ${prev.beast.name}: +${s.xp - prev.xp} xp, +${s.gold - prev.gold} gold`);
+    if (s.level > prev.level && !s.over) {
+      moment(`Reached level ${s.level}`);
+      if (!still) {
+        stamp(`Level ${s.level}`);
+        const of = scene;
+        clearTimeout(scene.flare);
+        scene.flare = setTimeout(() => { if (of === scene) { scene.flare = 0; schedule(); } }, 1800);
+      }
     }
-    if (s.level > prev.level && !s.over) { moment(`Reached level ${s.level}`, "good"); if (!stampBusy) show(`Level ${s.level}`); }
-    if (s.over && !prev.over) moment(`Slain at level ${s.level}`, "bad");
+    if (s.over && !prev.over) moment(`Slain at level ${s.level}`);
+    if (!still) blows(prev, s);
   }
   clearTimeout(scene.linger);
   if (s.beast) scene.shown = s.beast;
@@ -558,21 +686,20 @@ function onState(s, still) {
     const fled = scene.lastMove === "flee";
     const of = scene;
     scene.shown = { ...prev.beast, health: fled ? prev.beast.health : 0, gone: fled ? "escaped" : "slain" };
-    scene.linger = setTimeout(() => { if (of === scene) { scene.shown = null; schedule(); } }, 2400);
+    if (!s.over) scene.linger = setTimeout(() => { if (of === scene) { scene.shown = null; schedule(); } }, 2400);
   } else scene.shown = null;
 }
 
-function onDecision(e, still) {
+function onDecision(e) {
   scene.moves++;
   scene.lastMove = e.actions?.at(-1)?.type ?? scene.lastMove;
-  scene.decision = { ...e, before: scene.state };
-  chatDecision(e);
-  if (!still && e.phase === "battle" && MOVE[scene.lastMove]) stamp(MOVE[scene.lastMove]);
+  scene.decision = e;
+  logDecision(e);
 }
 
 function onStatus(e) {
   streak = null;
-  if (e.ending !== undefined) say(esc(`Game ${e.row} ${e.ending}`), "moment bad");
+  if (e.ending !== undefined) moment(`Game ${e.row} ${e.ending}`);
   else if (e.row) say(`Game ${e.row} ${scene.begun ? "resumes" : "begins"}`, "split");
   else say(esc(e.text), "sys");
   if (e.row) scene.begun = true;
@@ -580,9 +707,9 @@ function onStatus(e) {
 
 function apply(e, still) {
   if (e.kind === "state") onState(e.state, still);
-  else if (e.kind === "decision") onDecision(e, still);
+  else if (e.kind === "decision") onDecision(e);
   else if (e.kind === "status") onStatus(e);
-  else if (e.kind === "rejected") { streak = null; say(`The game refused that move: ${esc(e.reason)}`, "sys"); }
+  else if (e.kind === "rejected") moment(`The game refused that move: ${e.reason}`);
 }
 
 function seek(to) {
@@ -590,16 +717,14 @@ function seek(to) {
   const still = to !== view.cursor + 1;
   if (to < view.cursor || !scene.beastMax) {
     clearTimeout(scene.linger);
-    scene = { state: null, decision: null, shown: null, beastMax: {}, lastMove: null, moves: 0, begun: false, linger: 0 };
+    clearTimeout(scene.flare);
+    scene = { state: null, decision: null, shown: null, beastMax: {}, lastMove: null, moves: 0, begun: false, linger: 0, flare: 0, lines: [] };
     view.cursor = 0;
     log.replaceChildren();
-    pinned = true;
     streak = null;
-    stampQueue.length = 0;
+    $("banner").className = "banner";
   }
-  if (still && !fallenShown) { stampQueue.length = 0; $("stamp").className = "stamp"; }
   while (view.cursor < to) apply(view.events[view.cursor++], still);
-  $("moves").textContent = scene.moves ? `${scene.moves} decision${scene.moves > 1 ? "s" : ""}` : "";
   schedule();
   renderGame();
 }
@@ -610,8 +735,7 @@ function index() {
 }
 
 function renderReel() {
-  const live = isLive();
-  $("reel").hidden = live || view.events.length === 0;
+  $("reel").hidden = isLive() || view.events.length === 0;
   const at = view.stops.findLastIndex((x) => x <= view.cursor);
   const total = view.events.filter((e) => e.kind === "decision").length;
   $("seek").max = view.stops.length - 1;
@@ -620,8 +744,10 @@ function renderReel() {
   $("next").disabled = atEnd();
   $("toggle").textContent = view.playing ? "Pause" : atEnd() ? "Replay" : "Play";
   $("speed").textContent = `speed ${view.speed}x`;
-  $("where").innerHTML = `decision <b>${scene.moves}</b> of ${total}${scene.state ? ` <b>level ${scene.state.level}</b>` : ""}`;
+  $("where").textContent = `decision ${scene.moves} of ${total}`;
 }
+
+const spent = (g) => (g.gas_strk === null ? "cost not recorded" : `${round(g.gas_strk, 1)} STRK`);
 
 function renderGame() {
   const g = view.game;
@@ -633,26 +759,80 @@ function renderGame() {
   $("golive").hidden = liveRow === null || live;
   $("play").disabled = $("chain").disabled = liveRow !== null;
   $("stop").disabled = liveRow === null;
-  document.title = g ? `Game ${g.id} ${live ? "live" : "replay"}, Death Mountain` : "Death Mountain";
-  const level = live ? scene.state?.level : g?.ended_at && !/^died/.test(g.ending) ? g.level : null;
-  const fate = !g ? "" : live ? "so far" : g.ending ?? "unfinished";
-  $("game").innerHTML = g
-    ? `<span>Game <b>${g.id}</b></span><span title="Adventurer ${esc(g.game_id)}"><b>${esc(tail(g))}</b></span><span class="${g.onchain ? "chain" : ""}">${esc(g.onchain ? `on-chain ${g.mode}` : g.mode)}</span>${level ? `<span><b>level ${level}</b></span>` : ""}<span class="fate" title="${esc(fate)}">${esc(fate)}</span>`
-    : "";
+  document.title = g ? `Game ${g.id} ${live ? "live" : "replay"}, Loot Survivor agent` : "Loot Survivor agent";
+  $("title").textContent = g ? `Game ${g.id}` : "";
+  $("meta").textContent = g ? [g.onchain ? `${g.dungeon} on-chain, ${spent(g)}` : "practice", `adventurer ${tail(g)}`, `policy ${g.strategy}`].join(", ") : "";
   const blind = g && view.events.length > 0 && !view.events.some((e) => e.kind === "state");
   $("unseen").hidden = !blind;
-  if (blind) $("unseen").innerHTML = `<b>Decisions only</b>Game ${g.id} was played before the adventurer's state was recorded. The log and the odds still replay.`;
+  if (blind) $("unseen").innerHTML = `<b>Decisions only</b>Game ${g.id} was played before the adventurer's state was recorded. The agent's decisions and odds still replay.`;
 }
 
 function renderRows() {
-  const list = games.filter((g) => !onlyChain || g.onchain);
-  const top = Math.max(10, ...list.map((g) => g.level ?? 0));
-  for (const b of $("filter").children) b.setAttribute("aria-pressed", String(!!b.dataset.only === onlyChain));
-  $("rows").innerHTML = list.map((g) => {
-    const live = g.id === liveRow;
-    const end = live ? `<span class="air">live</span>` : g.ended_at ? `level ${g.level}` : "unfinished";
-    return `<button type="button" class="row${g.id === view.id ? " on" : ""}" data-id="${g.id}" style="--reach:${live || !g.ended_at ? 0 : Math.round((100 * g.level) / top)}%" title="Game ${g.id}, strategy ${esc(g.strategy)}: ${esc(live ? "playing now" : g.ending ?? "unfinished")}${g.mismatches ? ", differs from the contract" : ""}"><b>${g.id}</b><span>${esc(tail(g))}</span><span class="${g.onchain ? "chain" : ""}">${esc(g.onchain ? "on-chain" : g.mode)}${g.mismatches ? ` <span class="bad">!</span>` : ""}</span><span class="end">${end}</span></button>`;
-  }).join("") || `<p>${onlyChain ? "No on-chain game yet." : "No game yet."}</p>`;
+  const how = (g) => (g.id === liveRow ? "playing now" : (g.ending ?? "unfinished").replace(/^died at level \d+ while /, "died "));
+  const level = (g) => (g.id === liveRow ? `<span class="air">live</span>` : g.ended_at ? `<b>level ${g.level}</b>` : "");
+  const attrs = (g) => `type="button" data-id="${g.id}" title="Game ${g.id}, policy ${esc(g.strategy)}: ${esc(how(g))}${g.mismatches ? ". The local engine differed from the contract." : ""}"`;
+  const chain = games.filter((g) => g.onchain);
+  const practice = games.filter((g) => !g.onchain);
+  $("rows").innerHTML = `<h3><span>On-chain</span><span>${chain.length}</span></h3>`
+    + (chain.map((g) => `<button class="row chain${g.id === view.id ? " on" : ""}" ${attrs(g)}><b>${g.id}</b><span>${esc(g.dungeon)} ${level(g)}</span><span class="cost">${spent(g)}</span><span class="how">${esc(how(g))}${g.mismatches ? ` <span class="bad">differs from the contract</span>` : ""}</span></button>`).join("") || `<p>No on-chain game yet.</p>`)
+    + `<h3><span>Practice</span><span>${practice.length} latest</span></h3>`
+    + (practice.map((g) => `<button class="row${g.id === view.id ? " on" : ""}" ${attrs(g)}><b>${g.id}</b>${level(g) || "<span></span>"}<span class="how">${esc(how(g))}</span><span>${g.mismatches ? `<span class="bad">differs</span>` : ""}</span></button>`).join("") || `<p>No practice game yet.</p>`);
+}
+
+let funds = null;
+function renderWallet() {
+  const chain = games.filter((g) => g.onchain && g.gas_strk !== null);
+  const total = chain.reduce((n, g) => n + g.gas_strk, 0);
+  const cost = `<dt>Spent on ${plural(chain.length, "game")}</dt><dd>${chain.length ? `${round(total, 1)} STRK` : "not recorded"}</dd>`;
+  $("address").textContent = funds ? `${funds.address.slice(0, 6)}…${funds.address.slice(-4)}` : "";
+  $("address").title = funds?.address ?? "";
+  if (funds?.strk === undefined) {
+    $("wallet").innerHTML = `<p class="blank">${funds ? "Balance unavailable. The Starknet node did not answer." : "Loading"}</p><dl class="pairs">${cost}</dl>`;
+    return;
+  }
+  const above = funds.strk - funds.floor;
+  const scale = Math.max(funds.strk, 2 * funds.floor);
+  $("wallet").innerHTML = `<div class="funds">${round(funds.strk, 1)} <small>STRK</small></div>
+    <div class="floor" title="The agent stops spending under ${funds.floor} STRK"><i style="width:${(100 * funds.strk) / scale}%;background:${above > 0 ? "var(--lime)" : "var(--blood)"}"></i><b style="left:${(100 * funds.floor) / scale}%"></b></div>
+    <div class="${above > 0 ? "good" : "bad"}">${above > 0 ? `${round(above, 1)} above the ${funds.floor} STRK floor` : `Under the ${funds.floor} STRK floor, so on-chain play is blocked`}</div>
+    <dl class="pairs"><dt><img src="/assets/icons/dungeon_ticket.png" alt="">Tickets</dt><dd>${round(funds.tickets, 1)}</dd><dt><img src="/assets/icons/survivor_token.png" alt="">SURVIVOR</dt><dd>${round(funds.survivor, 1)}</dd>${cost}</dl>`;
+}
+
+const day = (seconds) => new Date(1000 * seconds).toLocaleDateString("en", { month: "short", day: "numeric" });
+const BEAST_STATE = {
+  held: () => `<em>held</em>`,
+  staked: (b) => `<em>staked</em>, ${b.queued ? "queued without a Mega place" : `Mega on ${day(b.transformsAt)}`}`,
+  mega: () => `<em class="good">Mega</em>`,
+};
+
+function beastHtml(b, note) {
+  const art = b.collection === "beast" ? `<img src="/assets/beasts/${slug(b.name.replace(/^".*" /, ""))}.png" alt="">` : "";
+  return `<div class="beast${art ? "" : " bare"}" title="${esc(b.name)}">${art}<b>${esc(b.name)}</b><span>level ${b.level}, tier ${b.tier} ${esc(b.type.toLowerCase())}</span><span>${note}</span></div>`;
+}
+
+function renderBeasts(data) {
+  const groups = Object.entries(data?.inventory ?? {}).filter(([, list]) => list.length);
+  const claims = data?.pendingClaims ?? [];
+  const name = (key) => esc(data.collections[key] ?? key);
+  $("beasts").innerHTML = !data?.inventory
+    ? `<p class="blank">${data ? "Beasts unavailable. The Starknet node or the game API did not answer." : "Loading"}</p>`
+    : !groups.length && !claims.length
+      ? `<div class="none"><img src="/assets/beasts/dragon.png" alt=""><b>No beasts yet</b><span>Beasts won in on-chain games are listed here.</span></div>`
+      : `<div class="herd">${groups.map(([key, list]) => `<h3><span>${name(key)}</span><span>${list.length}</span></h3>${list.map((b) => beastHtml(b, BEAST_STATE[b.state](b))).join("")}`).join("")}${claims.length ? `<h3><span>To claim</span><span>${claims.length}</span></h3>${claims.map((c) => beastHtml(c, `game ${esc(c.adventurerId.slice(-8))}, ${c.settled ? "settled" : "not settled yet"}`)).join("")}` : ""}</div>`;
+}
+const loadBeasts = () => get("/api/beasts").then(renderBeasts);
+
+function renderPolicy(list) {
+  const top = list.slice(0, 4);
+  $("policy").innerHTML = top.length
+    ? `<table><tr><th>Version</th><th>Games</th>${top[0].reach.map((r) => `<th>${r.level}+</th>`).join("")}<th>Best</th></tr>${top.map((v, i) => `<tr class="${i ? "" : "lead"}"><td>${esc(v.hash)}</td><td>${v.games}</td>${v.reach.map((r) => `<td>${Math.round(100 * r.share)}%</td>`).join("")}<td>${v.best}</td></tr>`).join("")}</table>`
+    : `<p class="blank">No finished practice game yet.</p>`;
+}
+
+function renderBags(list) {
+  $("bags").innerHTML = list.length
+    ? `<table><tr><th>Bag</th><th>Mean</th><th>Best</th><th>25+</th><th style="text-align:left">Weapon</th></tr>${list.slice(0, 5).map((b) => `<tr><td><b>${b.bag}</b></td><td><b>${Math.round(b.mean)}</b></td><td>${b.best}</td><td>${b.ge25}%</td><td class="txt" title="${esc(`${b.weapon}, ${b.set}, ${b.neck}, ${b.ring}`)}">${esc(b.weapon)}</td></tr>`).join("")}</table>`
+    : `<p class="blank">No bag ranking yet.</p>`;
 }
 
 let asked = 0;
@@ -666,9 +846,15 @@ async function load() {
   games = list;
   liveRow = games.find((g) => g.live)?.id ?? null;
   view.game = games.find((g) => g.id === view.id) ?? view.game;
-  $("strats").innerHTML = (strategies ?? []).slice(0, 3).map((r) => `<span title="${esc(r.text.slice(0, 600))}"><b>${esc(r.hash)}</b> median ${r.median ?? "none"}, best ${r.best ?? "none"}, ${r.games} games</span>`).join("");
+  renderPolicy(strategies ?? []);
   renderRows();
+  renderWallet();
   renderGame();
+}
+
+async function loadWallet() {
+  funds = (await get("/api/wallet")) ?? funds;
+  renderWallet();
 }
 
 function pause() {
@@ -746,15 +932,23 @@ function onLive(e) {
       seek(view.events.length);
     }
   }
-  if (e.kind === "status" && e.ending !== undefined) { liveRow = null; renderRows(); renderGame(); schedule(); }
+  if (e.kind === "status" && e.ending !== undefined) { liveRow = null; renderRows(); renderGame(); schedule(); loadWallet(); loadBeasts(); }
 }
 
+const confirming = (on) => { $("acts").hidden = on; $("ask").hidden = !on; (on ? $("cancel") : $("chain")).focus(); };
 $("rows").onclick = (e) => { const row = e.target.closest(".row"); if (row) pick(Number(row.dataset.id)); };
-$("filter").onclick = (e) => { if (e.target.dataset.only !== undefined) { onlyChain = !!e.target.dataset.only; renderRows(); } };
 $("golive").onclick = () => { history.pushState(null, "", location.pathname); route(); };
 $("play").onclick = () => post("/api/play", {});
-$("chain").onclick = () => { if (confirm("Start one on-chain game? It spends real money: about 4 STRK of gas.")) post("/api/play", { live: true }); };
+$("chain").onclick = () => {
+  const last = games.find((g) => g.onchain && g.gas_strk !== null);
+  $("askText").textContent = `This starts one on-chain game. It spends real STRK from the wallet on a ticket and on gas for every move.${last ? ` Game ${last.id} cost ${round(last.gas_strk, 1)} STRK.` : ""}`;
+  confirming(true);
+};
+$("cancel").onclick = () => confirming(false);
+$("spend").onclick = () => { confirming(false); post("/api/play", { live: true }); };
 $("stop").onclick = () => post("/api/stop");
+$("openLog").onclick = () => { $("sheet").hidden = !$("sheet").hidden; log.scrollTop = log.scrollHeight; };
+$("closeLog").onclick = () => { $("sheet").hidden = true; $("openLog").focus(); };
 $("toggle").onclick = () => { pin(); if (view.playing) { pause(); renderGame(); schedule(); } else play(); };
 $("speed").onclick = () => { view.speed = SPEEDS[(SPEEDS.indexOf(view.speed) + 1) % SPEEDS.length]; if (view.playing) play(); else schedule(); };
 const step = (by) => { pin(); pause(); seek(view.stops[Math.max(0, view.stops.findLastIndex((x) => (by > 0 ? x <= view.cursor : x < view.cursor)) + (by > 0 ? 1 : 0))] ?? view.events.length); };
@@ -763,6 +957,7 @@ $("next").onclick = () => step(1);
 $("seek").oninput = () => { pin(); pause(); seek(view.stops[Number($("seek").value)]); };
 addEventListener("popstate", route);
 addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("ask").hidden) return confirming(false);
   if ($("reel").hidden || e.target.closest("button, input")) return;
   if (e.key === "ArrowLeft") step(-1);
   else if (e.key === "ArrowRight") step(1);
@@ -783,9 +978,14 @@ Promise.all([get("/api/items"), refresh()]).then(([table]) => {
   for (const g of table ?? []) items[g.id] ??= g;
   route();
 });
+loadWallet();
+setInterval(loadWallet, WALLET_MS);
+renderBeasts();
+loadBeasts();
+get("/api/bags").then((list) => renderBags(list ?? []));
 get("/api/check").then((c) => {
   if (!c) return;
-  $("check").textContent = c.failed ? `contract check failed ${c.failed}` : "contract check ok";
+  $("check").textContent = c.failed ? `Contract check failed: ${c.failed}` : "Contract check passed";
   $("check").classList.toggle("bad", !!c.failed);
 });
 </script>

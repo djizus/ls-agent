@@ -12,7 +12,10 @@ export const TICKET_BATCH = 10;
 export const TICKET_BATCH_MAX_STRK = 2;
 export const GAME_API = "https://api-v2-next.up.railway.app";
 export const GAME_CORE = "0x03cafe867e9f5dc7ccf73471b98c1d6d6d54804744cef9626accd217b6ad1dd2";
-export type Dungeon = { name: string; address: string; minterId: number; settingsId: number; benchmark: string[] };
+export const BEAST_NFT = "0x00f739e402e52830a736335a0f47d58ec78ba067443c9c6930da182eab2ff8b0";
+export const SETTLE_MAX_PACKETS = 469;
+export const SETTLE_CHUNK = 117;
+export type Dungeon = { name: string; address: string; minterId: number; settingsId: number; claim: string; firstSpecies: number; speciesCount: number; benchmark: string[] };
 
 export const DUNGEONS: Record<string, Dungeon> = {
   beast: {
@@ -20,6 +23,9 @@ export const DUNGEONS: Record<string, Dungeon> = {
     address: "0x075ca042091b8e1418d0510b8d6519a89222ef5f7bbceb0ff760bb3c62c98174",
     minterId: 1,
     settingsId: 2,
+    claim: "claim_beast",
+    firstSpecies: 1,
+    speciesCount: 75,
     benchmark: [
       "0x000000000000000000000100000000020000000001c82b15010969dd00033441",
       "0x000000000000000000000100000000020000000001c87a76011489e0001f7381",
@@ -48,6 +54,9 @@ export const DUNGEONS: Record<string, Dungeon> = {
     address: "0x03921001b64ad6af2bae27b95c27c465fc8921d9c537f4821eb3023b5889622f",
     minterId: 4,
     settingsId: 6,
+    claim: "claim_collectable",
+    firstSpecies: 78,
+    speciesCount: 30,
     benchmark: [
       "0x0100000000001f2000000400000000060000000001c878ba01144c53000b1e41",
       "0x0100000000001eb900000400000000060000000001c878ba01144c4d00048b41",
@@ -75,4 +84,5 @@ export const DUNGEONS: Record<string, Dungeon> = {
 
 export const DUNGEON_KEY = process.env.LS_DUNGEON ?? "beast";
 export const DUNGEON = DUNGEONS[DUNGEON_KEY];
+export const SURVIVOR = "0x042dd777885ad2c116be96d4d634abc90a26a790ffb5871e037dd5ae7d2ec86b";
 export const TICKET = "0x0452810188C4Cb3AEbD63711a3b445755BC0D6C4f27B923fDd99B1A118858136";

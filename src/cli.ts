@@ -1,4 +1,5 @@
-import { collect } from "./live.ts";
+import { inventory, pendingClaims } from "./beasts.ts";
+import { collect, quote } from "./live.ts";
 import { deploy, isDeployed, keys, strkBalance } from "./wallet.ts";
 
 const commands: Record<string, () => Promise<unknown>> = {
@@ -8,6 +9,12 @@ const commands: Record<string, () => Promise<unknown>> = {
   },
   deploy,
   collect: async () => (await collect(process.argv[3])) ?? "nothing to claim",
+  quote: () => quote(process.argv[3]),
+  async beasts() {
+    const address = process.argv[3] ?? keys().address;
+    const [beasts, claims] = await Promise.all([inventory(address), pendingClaims(address)]);
+    return { address, inventory: beasts, pendingClaims: claims };
+  },
 };
 
 const run = commands[process.argv[2] ?? ""];

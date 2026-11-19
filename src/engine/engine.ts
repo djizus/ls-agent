@@ -12,7 +12,7 @@ import { PREFIX_GREATNESS, specialsSeed } from "./specials.ts";
 
 const BAG_SIZE = 15;
 const MAX_ITEM_XP = 400;
-const ARMOR_SLOTS = ["chest", "head", "waist", "foot", "hand"] as const;
+export const ARMOR_SLOTS = ["chest", "head", "waist", "foot", "hand"] as const;
 const LOOT_BY_TIER = [
   [16, 12, 26, 31, 21, 36, 41, 76, 86, 81, 96, 91, 101, 46, 61, 66, 51, 71, 56],
   [45, 60, 65, 50, 55, 70, 75, 80, 85, 95, 100, 90, 20, 25, 30, 35, 40],
