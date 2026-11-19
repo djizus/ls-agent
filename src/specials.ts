@@ -24,7 +24,7 @@ export const SUFFIXES: Record<string, Partial<Stats>> = {
 };
 
 const NAMES = Object.keys(SUFFIXES);
-const BAG_STATS: (keyof Stats)[] = ["vitality", "charisma"];
+export const BAG_STATS: (keyof Stats)[] = ["vitality", "charisma"];
 
 const SLOT_ORDER: Record<Slot, number[]> = {
   weapon: [72, 73, 74, 75, 76, 42, 43, 44, 45, 46, 9, 10, 11, 12, 13, 14, 15, 16],

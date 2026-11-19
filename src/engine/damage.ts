@@ -8,7 +8,7 @@ export type Foe = { level: number; tier: number; type: "Magic" | "Blade" | "Blud
 const STRONG: Record<string, ItemType> = { Magic: "Metal", Blade: "Cloth", Bludgeon: "Hide" };
 const WEAK: Record<string, ItemType> = { Magic: "Hide", Blade: "Metal", Bludgeon: "Cloth" };
 const ARMOR: Record<Foe["type"], ItemType> = { Magic: "Cloth", Blade: "Hide", Bludgeon: "Metal" };
-const NECK: Partial<Record<ItemType, string>> = { Cloth: "Amulet", Hide: "Pendant", Metal: "Necklace" };
+export const NECK: Partial<Record<ItemType, string>> = { Cloth: "Amulet", Hide: "Pendant", Metal: "Necklace" };
 
 const typeOf = (item: Item): ItemType | undefined => (item.id ? itemOf(item.id)!.type : undefined);
 const named = (item: Item, name: string): boolean => !!item.id && itemOf(item.id)!.name === name;

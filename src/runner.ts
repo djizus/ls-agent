@@ -4,6 +4,7 @@ import type { Action } from "./codec.ts";
 import { DUNGEON, DUNGEON_KEY } from "./config.ts";
 import { db } from "./db.ts";
 import { collect } from "./live.ts";
+import { strkBalance } from "./wallet.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
 import { plan } from "./policy.ts";
@@ -41,6 +42,8 @@ async function playGame(practiceId: string | undefined, seed: number): Promise<v
   let ending = "stopped";
   const strategy = loadStrategy();
   db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(strategy.hash, strategy.text, Date.now());
+  const funds = () => (practiceId ? null : strkBalance().then(Number, () => null));
+  const before = await funds();
   const id = await begin(practiceId, seed);
   const mode = practiceId ? "practice" : DUNGEON_KEY;
   const resumed = practiceId ? undefined : (db.prepare("SELECT id FROM games WHERE game_id = ? AND mode = ?").get(id, mode) as { id: number } | undefined);
@@ -53,6 +56,8 @@ async function playGame(practiceId: string | undefined, seed: number): Promise<v
   } finally {
     const end = snapshot();
     db.prepare("UPDATE games SET ended_at = ?, level = ?, xp = ?, moves = ?, cost_usd = ?, ending = ?, mismatches = ? WHERE id = ?").run(Date.now(), end?.level ?? 0, end?.xp ?? 0, movesMade(), cost, ending, mismatches, row);
+    const after = await funds();
+    if (before !== null && after !== null) db.prepare("UPDATE games SET gas_strk = coalesce(gas_strk, 0) + ? WHERE id = ?").run((before - after) / 1e18, row);
     emit({ kind: "status", text: `game ${row} ${ending}`, row, ending });
     row = undefined;
   }
@@ -102,10 +107,10 @@ async function playMoves(rules: (p: Phase) => string): Promise<string> {
     const choices = await options(state);
     const prompt = [render(state), describeOptions(state, choices), note && `Your note from the previous decision: ${note}`, rejected].filter(Boolean).join("\n\n");
     const decision = await decideWithRetry(state, rules(phase(state)), prompt, choices);
-    if (PACE_MS) await new Promise((r) => setTimeout(r, PACE_MS));
     cost += decision.costUsd;
     const actions = shape(state, decision.actions as Action[], decision.reserve);
     emit({ kind: "decision", phase: phase(state), options: choices, thought: decision.thought, actions, note: decision.note, reserve: decision.reserve, costUsd: decision.costUsd });
+    if (PACE_MS) await new Promise((r) => setTimeout(r, PACE_MS));
     try {
       if (!actions.length) throw new Error("spend your stat points before anything else");
       const before = state;

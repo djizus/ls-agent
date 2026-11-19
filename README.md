@@ -26,20 +26,26 @@ difference under 1 level on 200 games is noise.
 
 | Feature | How to reach it |
 |---|---|
-| Watch the live game: adventurer, beast, odds, decision log, gear, bag | `/` follows whatever is live; with nothing live it shows the top game of the list at its end |
-| Pick a game to watch | click a row in the Games list, or open `/?game=<row id>`; "On-chain" filters the list, on-chain games rank first |
+| Watch the live game on the stage: adventurer and beast sprites, health bars, damage numbers, the odds the agent saw, the last two events, its decision | `/` follows whatever is live; with nothing live it shows the top run of the list at its end |
+| Stats with the part granted by items and what each buys (flee, dodge, potion price, critical chance) | the seven tiles above the stage |
+| Gear: every slot with tier, greatness, progress, what it grants; empty and weak slots in red; bag items that still grant something | "Gear" and "Bag" under the stage |
+| Money: gold, potion price, cost of a full heal, cheapest upgrade on the market | "Purse" under the stage |
+| Every event and decision of the game in order | "Full log" beside the ticker |
+| Pick a run to watch | click a row in "Runs" (on-chain first, practice below), or open `/?game=<row id>` |
 | Replay a finished game | pick it, then Play/Pause, Back/Next (left/right arrows), the slider, and the speed button; space toggles play |
-| Return to the live game from a replay | "Watch live" in the top bar |
-| Start an on-chain game (spends STRK) | "Play on-chain" in the top bar, then confirm; `POST /api/play` with `{"live": true}` |
-| Start a benchmark pass | `POST /api/play` with `{"games": n}` |
-| Stop after the current move | `POST /api/stop` |
+| Return to the live game from a replay | "Watch live" beside the game title |
+| Wallet: STRK, margin above the spend floor, tickets, SURVIVOR, STRK spent on on-chain games | "Wallet" in the left column; `GET /api/wallet` (cached 30 seconds) |
+| Start an on-chain game (spends STRK) | "Play on-chain" in the left column, then "Spend STRK and play"; `POST /api/play` with `{"live": true}` |
+| Start a practice pass | "Run practice"; `POST /api/play` with `{"games": n}` |
+| Stop after the current move | "Stop"; `POST /api/stop` |
+| Share of practice games reaching level 26, 30 and 35, and the best level, per policy version | "Policy results" in the right column; `GET /api/strategies` |
+| Loot bags ranked by simulated level | "Loot bags for sale" in the right column; `GET /api/bags` reads `var/bag-ranking.json` |
 | Current game state | `GET /api/state` |
-| 200 games, on-chain first, each with `onchain` and `live` flags | `GET /api/games` |
+| 200 games, on-chain first, each with `onchain`, `live`, `dungeon` and `gas_strk` (STRK balance spent during the game, null when not recorded) | `GET /api/games` |
 | One game with its stored events, states included | `GET /api/games/<row id>` |
-| Results per strategy version | `GET /api/strategies` |
 | Live event stream | `GET /events` |
 | Item table | `GET /api/items` |
-| Daily contract check result | `GET /api/check`, written by `scripts/check.sh` |
+| Daily contract check result | foot of the left column; `GET /api/check`, written by `scripts/check.sh` |
 | Wallet address, deployment and balance | `node src/cli.ts wallet` |
 | Deploy the wallet account (spends STRK) | `node src/cli.ts deploy` |
 | Settle a finished on-chain game and claim its collectable beasts (spends STRK; runs by itself after each on-chain game) | `node src/cli.ts collect <game id>` |
@@ -52,7 +58,7 @@ difference under 1 level on 200 games is noise.
 |---|---|---|
 | `LS_DECIDER` | `rules` | `rules`, `jev` or `model` |
 | `LS_DUNGEON` | `beast` | key in `DUNGEONS` in `src/config.ts` |
-| `LS_PACE_MS` | 0 | pause between moves, for watching |
+| `LS_PACE_MS` | 0 | pause between a decision and its move, for watching |
 | `LS_RPC_URL` | public node | Starknet RPC |
 | `LS_HOST`, `LS_PORT` | 127.0.0.1, 4100 | where the page is served |
 
@@ -69,3 +75,4 @@ daily check timer and the Traefik route.
 | Rule policy | `src/policy.ts` |
 | Strategy choices for model deciders | `strategy/candidate.md` |
 | Dungeons and benchmark adventurers | `src/config.ts` |
+| What the page shows about a state (luck, chances, what gear grants, purse) | `enrich` in `src/play.ts` |

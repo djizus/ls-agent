@@ -75,4 +75,5 @@ export const DUNGEONS: Record<string, Dungeon> = {
 
 export const DUNGEON_KEY = process.env.LS_DUNGEON ?? "beast";
 export const DUNGEON = DUNGEONS[DUNGEON_KEY];
+export const SURVIVOR = "0x042dd777885ad2c116be96d4d634abc90a26a790ffb5871e037dd5ae7d2ec86b";
 export const TICKET = "0x0452810188C4Cb3AEbD63711a3b445755BC0D6C4f27B923fDd99B1A118858136";
