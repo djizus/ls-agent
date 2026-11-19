@@ -2,7 +2,7 @@ import type { Action } from "./codec.ts";
 import { potionPrice } from "./items.ts";
 import { shape, type State } from "./play.ts";
 
-export const RULES = { potionPrice: 1, dexPerLevel: 0.9, weaponCatchUp: 5, jewelryLevel: 8, jewelryReserve: 2, armorReserve: 0.5, fightRisk: 0.35, swapGain: 0.05 };
+export const RULES = { potionPrice: 1, dexPerLevel: 0.9, weaponCatchUp: 5, jewelryLevel: 8, jewelryReserve: 2, armorReserve: 0.5, fightRisk: 0.35, swapGain: 0.05, weaponReserve: 3 };
 
 const RINGS = ["Titanium Ring", "Silver Ring", "Gold Ring", "Platinum Ring", "Bronze Ring"];
 
@@ -13,6 +13,8 @@ const MAX_STAT = 31;
 const MAX_ROUNDS = 30;
 const MAX_ACTIONS = 15;
 const KEPT = 9;
+const STRONG: Record<string, string> = { Magic: "Metal", Blade: "Cloth", Bludgeon: "Hide" };
+const WEAK: Record<string, string> = { Magic: "Hide", Blade: "Metal", Bludgeon: "Cloth" };
 const SURE = 0.999999;
 const BAG_SIZE = 15;
 const FALLBACK = ["vitality", "strength", "dexterity", "charisma", "intelligence", "wisdom"] as const;
@@ -83,11 +85,23 @@ export function plan(s: State): Plan {
         .filter((x) => x.hit.normal < s.hits!.theirs[i].normal)
         .sort((a, b) => a.hit.normal - b.hit.normal)[0];
     const better = ARMOR.map(spare);
-    if (win < SURE && better.some(Boolean)) {
-      const dressed = odds(mine, blows(ARMOR.map((_, i) => better[i]?.hit ?? s.hits!.theirs[i])), flee);
-      const after = dressed.strikes.reduce((sum, x) => sum + (x.damage < s.health ? x.chance * Math.max(dressed.win(s.health - x.damage, s.beast!.health) + RULES.fightRisk, dressed.escape(s.health - x.damage)) : 0), 0);
-      const swaps = better.flatMap((x) => (x ? [x.g] : []));
-      if (after > Math.max(win + RULES.fightRisk, escape) + RULES.swapGain) return { actions: swaps.map((g) => ({ type: "equip" as const, item: g.id })), why: `${pct(win)} to win as dressed, better in ${swaps.map((g) => g.name).join(", ")}` };
+    const arms = s.bag
+      .filter((g) => g.slot === "weapon" && g.tier === 1)
+      .map((g) => ({ g, hit: s.hits!.arms.find((x) => x.id === g.id)!.hit }))
+      .filter((x) => x.hit.normal > s.hits!.yours.normal);
+    if (win < SURE && (better.some(Boolean) || arms.length)) {
+      const armor = better.flatMap((x) => (x ? [x.g] : []));
+      const sets = [{ gear: [] as Gear[], hits: theirs }, ...(armor.length ? [{ gear: armor, hits: blows(ARMOR.map((_, i) => better[i]?.hit ?? s.hits!.theirs[i])) }] : [])];
+      const blades = [{ gear: [] as Gear[], hits: mine }, ...arms.map((x) => ({ gear: [x.g], hits: [{ damage: x.hit.normal, chance: 1 - lucky }, { damage: x.hit.crit, chance: lucky }] }))];
+      const options = blades
+        .flatMap((blade) => sets.map((set) => ({ gear: [...blade.gear, ...set.gear], blade: blade.hits, set: set.hits })))
+        .filter((o) => o.gear.length)
+        .map((o) => {
+          const after = odds(o.blade, o.set, flee);
+          return { gear: o.gear, value: after.strikes.reduce((sum, x) => sum + (x.damage < s.health ? x.chance * Math.max(after.win(s.health - x.damage, s.beast!.health) + RULES.fightRisk, after.escape(s.health - x.damage)) : 0), 0) };
+        })
+        .sort((a, b) => b.value - a.value);
+      if (options[0].value > Math.max(win + RULES.fightRisk, escape) + RULES.swapGain) return { actions: options[0].gear.map((g) => ({ type: "equip" as const, item: g.id })), why: `${pct(win)} to win as equipped, better with ${options[0].gear.map((g) => g.name).join(", ")}` };
     }
     const attack: Action = win > SURE ? { type: "attack" } : { type: "attack", tillHealth: s.health - 1 };
     return { actions: [fight ? attack : { type: "flee" }], why: `${pct(win)} to win the fight, ${pct(escape)} to escape: ${fight ? "fight" : "flee"}` };
@@ -128,7 +142,7 @@ export function plan(s: State): Plan {
     const top = done.filter((g) => g.tier === cap);
     return mine.filter((g) => g.tier < cap).sort((a, b) => b.greatness - a.greatness)[0] ?? top.find((g) => g === worn(slot)) ?? top[0];
   };
-  const use = (g: Gear) => (JEWELRY.includes(g.slot) ? 2 : g === real(g.slot) ? KEPT : maxed(g) || g.tier < (real(g.slot)?.tier ?? 6) ? 1 : 0);
+  const use = (g: Gear) => (g.slot === "weapon" && g.tier === 1 ? KEPT : JEWELRY.includes(g.slot) ? 2 : g === real(g.slot) ? KEPT : maxed(g) || g.tier < (real(g.slot)?.tier ?? 6) ? 1 : 0);
   const makeRoom = () => {
     if (room > 0) return true;
     const stash = (g: Gear) => (g.bonus?.vitality ?? 0) + (g.bonus?.charisma ?? 0);
@@ -159,8 +173,26 @@ export function plan(s: State): Plan {
   const next = (slot: string, tier: number, reserve = 0): Gear | Offer | undefined => [...stowed(slot), ...offers(slot, reserve)].filter((c) => c.tier < tier).sort((a, b) => a.tier - b.tier)[0];
 
   const weapon = worn("weapon");
-  const blade = next("weapon", Math.min(2, weapon?.tier ?? 6));
-  if (blade && (!weapon || maxed(weapon) || weapon.greatness * (6 - weapon.tier) <= RULES.weaponCatchUp * (6 - blade.tier))) take(blade, "T1 weapon");
+  const finest = [...s.equipment, ...s.bag].filter((g) => g.slot === "weapon" && g.tier === 1);
+  const first = finest.find(maxed);
+  if (first) {
+    const learning = finest.filter((g) => !maxed(g)).sort((a, b) => b.greatness - a.greatness)[0];
+    const counter = Object.keys(STRONG).find((type) => STRONG[type] === WEAK[first.type]);
+    const fresh = offers("weapon", RULES.weaponReserve * fullHeal)
+      .filter((m) => m.tier === 1 && !finest.some((g) => g.type === m.type))
+      .sort((a, b) => Number(b.type === counter) - Number(a.type === counter))[0];
+    if (learning && learning !== weapon && bag.includes(learning)) take(learning, "weapon to level");
+    else if (!learning && fresh && makeRoom()) {
+      room--;
+      buys.push({ type: "buy", item: fresh.id, equip: false });
+      owned.add(fresh.id);
+      gold -= price(fresh);
+      why.push(`${fresh.name} (another weapon type to level)`);
+    }
+  } else {
+    const blade = next("weapon", Math.min(2, weapon?.tier ?? 6));
+    if (blade && (!weapon || maxed(weapon) || weapon.greatness * (6 - weapon.tier) <= RULES.weaponCatchUp * (6 - blade.tier))) take(blade, "T1 weapon");
+  }
   for (const slot of ARMOR) {
     const now = real(slot);
     const pick = now ? (maxed(now) ? next(slot, now.tier, RULES.armorReserve * fullHeal) : undefined) : offers(slot).sort((a, b) => price(a) - price(b))[0];
