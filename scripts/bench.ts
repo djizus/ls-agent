@@ -11,6 +11,7 @@ import { act, newPracticeGame, syntheticGame } from "../src/practice.ts";
 const { values } = parseArgs({
   options: {
     starts: { type: "string", default: "10000" },
+    from: { type: "string", default: "0" },
     seeds: { type: "string" },
     procs: { type: "string", default: String(Math.max(1, Math.min(14, availableParallelism() - 2))) },
     rules: { type: "string", multiple: true, default: ["{}"] },
@@ -24,7 +25,7 @@ const { values } = parseArgs({
 const rolled = DUNGEON.rolledStart && !values.ids;
 const [from, to] = (values.seeds ?? (rolled ? "0-1" : "0-500")).split("-").map(Number);
 const ids: (string | number)[] = rolled
-  ? Array.from({ length: Number(values.starts) }, (_, i) => i)
+  ? Array.from({ length: Number(values.starts) }, (_, i) => Number(values.from) + i)
   : values.ids
     ? JSON.parse(readFileSync(values.ids, "utf8")).map((x: string | { game: string }) => (typeof x === "string" ? x : x.game))
     : DUNGEON.benchmark;
@@ -32,6 +33,7 @@ const games = ids.flatMap((id) => Array.from({ length: to - from }, (_, i) => [i
 const procs = Number(values.procs);
 const MEAN_SLACK = 0.25;
 const SHARE_SLACK = 1;
+const DEEP = [30, 35, 40];
 const defaults = { ...RULES };
 
 async function play(share: number): Promise<number[][]> {
@@ -57,7 +59,7 @@ const summary = (levels: number[]) => {
   const mean = levels.reduce((a, b) => a + b, 0) / levels.length;
   const se = Math.sqrt(levels.reduce((a, b) => a + (b - mean) ** 2, 0) / (levels.length - 1) / levels.length);
   const share = (n: number) => +((100 * levels.filter((l) => l >= n).length) / levels.length).toFixed(1);
-  return { games: levels.length, mean: +mean.toFixed(2), se: +se.toFixed(2), median: sorted[sorted.length >> 1], "26+": share(26), "30+": share(30), "35+": share(35), best: sorted.at(-1) };
+  return { games: levels.length, mean: +mean.toFixed(2), se: +se.toFixed(2), median: sorted[sorted.length >> 1], "26+": share(26), "30+": share(30), "35+": share(35), "40+": share(40), best: sorted.at(-1) };
 };
 
 if (process.send) {
@@ -78,7 +80,11 @@ if (process.send) {
     if (v > 0) {
       const base = order.map(([share, at]) => shares[share][0][at]);
       const d = summary(levels.map((l, i) => l - base[i]));
-      console.log(`  against the first: ${d.mean > 0 ? "+" : ""}${d.mean} ± ${d.se} levels`);
+      const moved = DEEP.map((n) => {
+        const s = summary(levels.map((l, i) => 100 * (Number(l >= n) - Number(base[i] >= n))));
+        return `${n}+ ${s.mean > 0 ? "+" : ""}${s.mean} ± ${s.se}`;
+      });
+      console.log(`  against the first: ${d.mean > 0 ? "+" : ""}${d.mean} ± ${d.se} levels; share in points: ${moved.join(", ")}`);
     }
     if (values["by-id"]) ids.forEach((id, n) => console.log(" ", String(id).slice(-8), JSON.stringify(summary(levels.slice(n * (to - from), (n + 1) * (to - from))))));
   });
