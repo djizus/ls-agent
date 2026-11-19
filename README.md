@@ -15,15 +15,19 @@ the database, service log, event stream and game list in `var/evidence/<timestam
 ## Measure a policy
 
 ```
-node scripts/bench.ts --seeds 0-80
-node scripts/bench.ts --seeds 0-500 --rules '{}' --rules '{"jewelryLevel":99}'
+node scripts/bench.ts
+node scripts/bench.ts --rules '{}' --rules '{"jewelryLevel":99}'
+node scripts/bench.ts --gate
+LS_DUNGEON=lootBag node scripts/bench.ts --ids bags.json --by-id
 ```
 
-Plays the rule policy on every benchmark adventurer for each seed, in parallel, and prints mean, spread and the share of games
-reaching level 26, 30 and 35. 1,600 games take about 5 seconds, 20,000 about 20. Each extra `--rules` overrides fields of `RULES`
-in `src/policy.ts` and is compared with the first on the same games. `LS_DUNGEON=lootBag` switches dungeon, `--ids file.json`
-takes a list of game ids, `--by-id` adds a line per game id. Games use a fast hash for luck; `--exact` uses the contract's hash
-(8 times slower, same distribution). A difference under two standard errors is noise.
+Beast Mode: plays the rule policy from 10,000 generated starts (the same every run: each has its own rolled stats, market and
+luck) in about 15 seconds, and prints mean, spread and the share of games reaching level 26, 30 and 35. Loot Dungeon starts are
+fixed by the bag, so there it plays each game id for 500 luck seeds (`--seeds 0-500`); `--ids file.json` takes a list of game
+ids and `--by-id` adds a line per id. Each extra `--rules` overrides fields of `RULES` in `src/policy.ts` and is compared with
+the first on the same games. `--gate` fails when the mean drops 0.25 levels or the 30+ share drops 1 point below
+`scripts/baseline.json`; `--save` writes the baseline after a change that is meant to move it. Luck uses a fast hash; `--exact`
+uses the contract's hash (same distribution, 30 times slower). A difference under two standard errors is noise.
 
 ## Feature map
 
