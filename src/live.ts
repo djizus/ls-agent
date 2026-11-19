@@ -1,13 +1,14 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hash, type Call } from "starknet";
-import { DUNGEON, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, STRK, STRK_FLOOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, VAR_DIR } from "./config.ts";
+import { DUNGEON, EKUBO_QUOTER, GAME_API, EKUBO_ROUTER, GAME_CORE, STRK, STRK_FLOOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, VAR_DIR } from "./config.ts";
 import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
-import { randomHash, replay, type Game, type Snapshot } from "./practice.ts";
+import { randomHash, replay, type Chain, type Game, type Snapshot } from "./practice.ts";
 import { account, balanceOf, keys, provider, strkBalance } from "./wallet.ts";
 
 const ONE = 10n ** 18n;
 const TRANSFER = BigInt(hash.getSelectorFromName("Transfer"));
+const COMMITTED = hash.getSelectorFromName("ActionCommitted");
 const file = `${VAR_DIR}live.json`;
 const hex = (n: bigint) => "0x" + n.toString(16);
 const u256 = (n: bigint) => [hex(n & ((1n << 128n) - 1n)), hex(n >> 128n)];
@@ -65,11 +66,25 @@ async function enter(): Promise<string> {
   return "0x" + (BigInt(mint.keys[3]) + (BigInt(mint.keys[4]) << 128n)).toString(16).padStart(64, "0");
 }
 
-type Saved = { id: string; packets: string[]; blocks: string[]; hashes: string[] };
+const view = (entrypoint: string, id: string) => provider.callContract({ contractAddress: GAME_CORE, entrypoint, calldata: [id] });
 
-function save(game: Game): void {
-  const saved: Saved = { id: game.id, packets: game.packets.map(String), blocks: game.chain!.blocks.map(String), hashes: game.chain!.hashes };
-  writeFileSync(file, JSON.stringify(saved));
+export async function transcript(id: string): Promise<{ packets: bigint[]; chain: Chain }> {
+  const from = Number((await view("minted_at_block_number", id))[0]);
+  const packets: bigint[] = [];
+  const chain: Chain = { blocks: [], hashes: [], rolling: 0n };
+  for (let token: string | undefined, first = true; first || token; first = false) {
+    const page = await provider.getEvents({ address: GAME_CORE, keys: [[COMMITTED], [id]], from_block: { block_number: from }, to_block: "latest", chunk_size: 500, continuation_token: token });
+    for (const e of page.events) {
+      for (const packet of e.data.slice(1, 1 + Number(e.data[0]))) {
+        packets.push(BigInt(packet));
+        chain.blocks.push(BigInt(e.block_number!));
+        chain.hashes.push(e.block_hash!);
+      }
+      chain.rolling = BigInt(e.data.at(-1)!);
+    }
+    token = page.continuation_token;
+  }
+  return { packets, chain };
 }
 
 async function start(id: string): Promise<Snapshot> {
@@ -84,16 +99,41 @@ async function start(id: string): Promise<Snapshot> {
 }
 
 export async function liveGame(): Promise<Game> {
-  const saved: Saved = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : { id: await enter(), packets: [], blocks: [], hashes: [] };
-  const packets = saved.packets.map(BigInt);
-  const blocks = saved.blocks.map(BigInt);
-  const rolling = packets.reduce((c, p, i) => BigInt(hash.computePoseidonHashOnElements([c, p, blocks[i]])), BigInt(hash.computePoseidonHashOnElements([BigInt(saved.id)])));
-  const stored = BigInt((await provider.callContract({ contractAddress: GAME_CORE, entrypoint: "get_commitment", calldata: [saved.id] }))[0]);
-  if (packets.length && stored !== rolling) throw new Error(`saved moves for ${saved.id} do not match the chain; ${file} needs repair`);
-  const begin = await start(saved.id);
-  const game: Game = { id: saved.id, seed: 0, packets, start: begin, local: fromSnapshot(replayLocal(begin, saved.id, packets, saved.hashes)), chain: { blocks, hashes: saved.hashes, rolling } };
-  save(game);
-  return game;
+  const id: string = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).id : await enter();
+  writeFileSync(file, JSON.stringify({ id }));
+  const { packets, chain } = await transcript(id);
+  const begin = await start(id);
+  return { id, seed: 0, packets, start: begin, local: fromSnapshot(replayLocal(begin, id, packets, chain.hashes)), chain };
+}
+
+export async function settle(id: string, claims: number[]): Promise<string> {
+  const { packets, chain } = await transcript(id);
+  const verified = BigInt((await view("is_verified", id))[0]) === 1n;
+  const receipt = await send([
+    ...(verified ? [] : [{ contractAddress: GAME_CORE, entrypoint: "verify_game", calldata: [id, hex(BigInt(packets.length)), ...packets.map(hex), hex(BigInt(packets.length)), ...chain.blocks.map(hex)] }]),
+    ...claims.map((xp) => ({ contractAddress: DUNGEON.address, entrypoint: "claim_beast", calldata: [id, hex(BigInt(xp))] })),
+  ]);
+  return receipt.transaction_hash;
+}
+
+type GameEvent = { event: { type: string; beast?: { isCollectable: boolean }; encounter_xp?: number } };
+
+export async function claimable(id: string): Promise<number[]> {
+  const res = await fetch(`${GAME_API}/adventurer/${id}/events?game_core=${GAME_CORE}&minter_id=${DUNGEON.minterId}`);
+  if (!res.ok) throw new Error(`game events ${res.status}`);
+  const { events } = (await res.json()) as { events: GameEvent[] };
+  let collectable = false;
+  const claims: number[] = [];
+  for (const { event } of events) {
+    if (event.type === "beast") collectable = event.beast!.isCollectable;
+    if (event.type === "defeated_beast" && collectable) claims.push(event.encounter_xp!);
+  }
+  return claims;
+}
+
+export async function collect(id: string): Promise<string | undefined> {
+  const claims = await claimable(id);
+  return claims.length ? settle(id, claims) : undefined;
 }
 
 export async function actLive(game: Game, actions: Action[]): Promise<Snapshot> {
@@ -102,11 +142,10 @@ export async function actLive(game: Game, actions: Action[]): Promise<Snapshot> 
   const chain = game.chain!;
   const receipt = await send([{ contractAddress: GAME_CORE, entrypoint: "commit_actions", calldata: [game.id, hex(game.packets.length ? chain.rolling : 0n), "0x1", hex(packet)] }]);
   const block = BigInt(receipt.block_number);
+  chain.rolling = BigInt(hash.computePoseidonHashOnElements([game.packets.length ? chain.rolling : BigInt(hash.computePoseidonHashOnElements([BigInt(game.id)])), packet, block]));
   game.packets.push(packet);
   chain.blocks.push(block);
   chain.hashes.push(receipt.block_hash);
-  chain.rolling = BigInt(hash.computePoseidonHashOnElements([chain.rolling, packet, block]));
-  save(game);
   game.local = step(game.local, game.id, packet, receipt.block_hash);
   const snap = toSnapshot(game.local);
   if (snap.over) rmSync(file);

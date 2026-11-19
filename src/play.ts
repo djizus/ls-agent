@@ -21,6 +21,7 @@ export type State = {
   beast: Beast | null;
   statUpgradesAvailable: number;
   stats: Snapshot["adventurer"]["stats"];
+  baseStats: Snapshot["adventurer"]["stats"];
   equipment: Gear[];
   bag: Gear[];
   market: (LootItem & { price: number })[];
@@ -46,6 +47,7 @@ export function describe(s: Snapshot, id: string): State {
     beast: beastOf(a, BigInt(id)),
     statUpgradesAvailable: a.stat_upgrades_available,
     stats: a.stats,
+    baseStats: s.adventurer.stats,
     equipment: Object.values(a.equipment).filter((i) => i.id).map(gear),
     bag: s.bag.map(gear),
     potionPrice: potionPrice(levelOf(a.xp), a.stats.charisma),
@@ -163,7 +165,7 @@ export async function options(s: State): Promise<Option[]> {
 }
 
 export function describeOptions(s: State, list: Option[]): string {
-  if (s.statUpgradesAvailable > 0) return "Stat points are pending: this decision applies your upgrades and purchases only; you choose what to do next with the odds in front of you.";
+  if (!list.length) return "";
   return [`Simulated outcomes (${SAMPLES} samples each):`, ...list.map((o) => `- ${o.label}: ${"error" in o ? `rejected: ${o.error}` : describeOdds(o)}`)].join("\n");
 }
 
@@ -176,7 +178,6 @@ export function auditGame(): Promise<string | undefined> {
 }
 
 export function shape(s: State, actions: Action[], reserve = 0): Action[] {
-  if (s.statUpgradesAvailable > 0) return actions.filter((a) => !RANDOM.has(a.type));
   if (s.beast) return actions;
   const ups = (stat: string) => actions.reduce((n, a) => n + (a.type === "upgrade" && a.stat === stat ? a.amount : 0), 0);
   const charisma = s.stats.charisma + ups("charisma");

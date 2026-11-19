@@ -1,3 +1,4 @@
+import { collect } from "./live.ts";
 import { deploy, isDeployed, keys, strkBalance } from "./wallet.ts";
 
 const commands: Record<string, () => Promise<unknown>> = {
@@ -6,6 +7,7 @@ const commands: Record<string, () => Promise<unknown>> = {
     return { address, deployed: await isDeployed(), strk: Number(await strkBalance()) / 1e18 };
   },
   deploy,
+  collect: async () => (await collect(process.argv[3])) ?? "nothing to claim",
 };
 
 const run = commands[process.argv[2] ?? ""];

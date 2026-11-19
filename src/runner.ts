@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
 import { DUNGEON, DUNGEON_KEY } from "./config.ts";
 import { db } from "./db.ts";
+import { collect } from "./live.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
 import { plan } from "./policy.ts";
@@ -14,6 +15,7 @@ const DECIDER_SOURCE = ["policy.ts", "jev.ts"].map((f) => readFileSync(new URL(f
 const promptFile = process.env.LS_STRATEGY ?? new URL("../strategy/prompt.md", import.meta.url).pathname;
 const MAX_REJECTIONS = 3;
 const LIVE_CHECK_MOVES = 100;
+const CLAIM_DELAY_MS = 60_000;
 const PACE_MS = Number(process.env.LS_PACE_MS ?? 0);
 
 let row: number | undefined;
@@ -54,6 +56,10 @@ async function playGame(practiceId: string | undefined, seed: number): Promise<v
     emit({ kind: "status", text: `game ${row} ${ending}`, row, ending });
     row = undefined;
   }
+  if (practiceId || !snapshot()?.over) return;
+  await new Promise((r) => setTimeout(r, CLAIM_DELAY_MS));
+  const claimed = await collect(id);
+  emit({ kind: "status", text: claimed ? `claimed beasts from ${id.slice(-8)} in ${claimed}` : `no beast to claim from ${id.slice(-8)}` });
 }
 
 

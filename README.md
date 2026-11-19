@@ -42,6 +42,7 @@ difference under 1 level on 200 games is noise.
 | Daily contract check result | `GET /api/check`, written by `scripts/check.sh` |
 | Wallet address, deployment and balance | `node src/cli.ts wallet` |
 | Deploy the wallet account (spends STRK) | `node src/cli.ts deploy` |
+| Settle a finished on-chain game and claim its collectable beasts (spends STRK; runs by itself after each on-chain game) | `node src/cli.ts collect <game id>` |
 | Import human games for study | `node scripts/import.ts <dir>...` |
 | Explain how a game died | `node scripts/autopsy.ts <file> <game>...` |
 

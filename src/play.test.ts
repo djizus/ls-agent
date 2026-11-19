@@ -32,15 +32,13 @@ test("attack and flee without a threshold run until the fight ends; tillHealth s
   assert.ok((preview(game, [{ type: "attack", tillHealth: floor }], 8)).every((o) => o.adventurer.health > 0 && (o.adventurer.beast_health === 0 || o.adventurer.health <= floor)));
 });
 
-test("potion price formula matches the contract; explores are healed first and pending points hold the explore", { timeout: 300_000 }, async () => {
+test("potion price formula matches the contract; explores are healed first", { timeout: 300_000 }, async () => {
   const hurtWithGold = async (id: string): Promise<State | undefined> => {
     await begin(id);
     let state = current();
     while (state.beast || state.statUpgradesAvailable > 0 || state.health > state.maxHealth - 20 || state.gold < 2) {
       if (state.statUpgradesAvailable > 0) {
-        const pending = shape(state, [{ type: "upgrade", stat: "charisma", amount: state.statUpgradesAvailable }, { type: "explore" }]);
-        assert.deepEqual(pending.map((a) => a.type), ["upgrade"]);
-        state = await commit(pending);
+        state = await commit(shape(state, [{ type: "upgrade", stat: "charisma", amount: state.statUpgradesAvailable }, { type: "explore" }]));
         continue;
       }
       state = await commit(state.beast ? [{ type: "attack" }] : [{ type: "explore" }]);

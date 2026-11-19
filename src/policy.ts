@@ -5,6 +5,10 @@ import { shape, type State } from "./play.ts";
 
 export const RULES = { potionPrice: 1, dexPerLevel: 1, weaponTier: 2 };
 
+const MAX_GREATNESS = 20;
+const MAX_STAT = 31;
+const MAX_DROPS = 3;
+const FALLBACK = ["vitality", "strength", "dexterity", "charisma", "intelligence", "wisdom"] as const;
 const ARMOR = ["chest", "head", "waist", "foot", "hand"];
 
 export type Plan = { actions: Action[]; why: string };
@@ -18,13 +22,20 @@ export function plan(s: State): Plan {
     const fight = toKill < toDie || s.stats.dexterity === 0;
     return { actions: [{ type: fight ? "attack" : "flee" }], why: `${toKill} blows to kill it, ${toDie} to die: ${fight ? "fight" : "flee"}` };
   }
-  const actions: Action[] = [];
-  const why: string[] = [];
+  const useless = s.bag.filter((g) => !g.bonus?.vitality && !g.bonus?.charisma).slice(0, MAX_DROPS);
+  const actions: Action[] = useless.map((g) => ({ type: "drop", item: g.id }));
+  const why: string[] = useless.map((g) => `drop ${g.name}`);
   const stats = { ...s.stats };
+  const base = { ...s.baseStats };
   for (let i = 0; i < s.statUpgradesAvailable; i++) {
-    const stat =
-      potionPrice(s.level, stats.charisma) > RULES.potionPrice ? "charisma" : stats.dexterity < RULES.dexPerLevel * s.level ? "dexterity" : "vitality";
+    const wanted = [
+      ...(potionPrice(s.level, stats.charisma) > RULES.potionPrice ? ["charisma" as const] : []),
+      ...(stats.dexterity < RULES.dexPerLevel * s.level ? ["dexterity" as const] : []),
+      ...FALLBACK,
+    ];
+    const stat = wanted.find((w) => base[w] < MAX_STAT)!;
     stats[stat]++;
+    base[stat]++;
     const same = actions.find((a) => a.type === "upgrade" && a.stat === stat);
     if (same && same.type === "upgrade") same.amount++;
     else actions.push({ type: "upgrade", stat, amount: 1 });
@@ -42,9 +53,10 @@ export function plan(s: State): Plan {
   const weapon = offers("weapon").filter((m) => m.tier <= RULES.weaponTier && m.tier < (worn("weapon")?.tier ?? 6)).sort((a, b) => a.tier - b.tier)[0];
   if (weapon) buy(weapon, `T${weapon.tier} weapon`);
   for (const slot of ARMOR) {
-    if (worn(slot)) continue;
-    const cheapest = offers(slot).sort((a, b) => price(a) - price(b))[0];
-    if (cheapest) buy(cheapest, `empty ${slot}`);
+    const now = worn(slot);
+    if (now && (now.greatness < MAX_GREATNESS || now.tier === 1)) continue;
+    const pick = offers(slot).filter((m) => !now || m.tier < now.tier).sort((a, b) => (now ? a.tier - b.tier : 0) || price(a) - price(b))[0];
+    if (pick) buy(pick, now ? `${slot} maxed, T${pick.tier} next` : `empty ${slot}`);
   }
   return { actions: shape(s, [...actions, { type: "explore" }]), why: why.join(", ") || "explore" };
 }
