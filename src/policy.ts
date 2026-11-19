@@ -62,7 +62,8 @@ export function plan(s: State): Plan {
   const use = (g: Gear) => (JEWELRY.includes(g.slot) ? 2 : g.tier < (worn(g.slot)?.tier ?? 6) ? 1 : 0);
   const makeRoom = () => {
     if (room > 0) return true;
-    const out = bag.filter((g) => !g.bonus?.vitality && !g.bonus?.charisma).sort((a, b) => use(a) - use(b) || b.tier - a.tier || a.greatness - b.greatness)[0];
+    const stash = (g: Gear) => (g.bonus?.vitality ?? 0) + (g.bonus?.charisma ?? 0);
+    const out = bag.filter((g) => stash(g) <= 1).sort((a, b) => use(a) + stash(a) - use(b) - stash(b) || b.tier - a.tier || a.greatness - b.greatness)[0];
     if (!out) return false;
     bag.splice(bag.indexOf(out), 1);
     drops.push({ type: "drop", item: out.id });
