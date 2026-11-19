@@ -1,13 +1,13 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
-import { DUNGEON, DUNGEONS, HOST, PORT, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
+import { BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
 import { halt, play } from "./runner.ts";
 import { enrich, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
-import { inventory, pendingClaims, sellPrices, worth, type Prices } from "./beasts.ts";
+import { inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
 import { liveRow, subscribe } from "./events.ts";
 import { handleMcp } from "./mcp.ts";
 import { summary } from "./summary.ts";
@@ -70,24 +70,55 @@ const wallet = cached(30_000, () => {
   );
 });
 
-const prices = cached(600_000, () => sellPrices().catch((): Prices => ({})));
+function background<T>(ttlMs: number, load: () => Promise<T>, idle: () => boolean = () => true): () => T | undefined | null {
+  let held: T | undefined | null;
+  let at = 0;
+  let busy = false;
+  return () => {
+    if (!busy && Date.now() - at > ttlMs && idle()) {
+      busy = true;
+      at = Date.now();
+      Promise.resolve()
+        .then(load)
+        .then((value) => (held = value), () => ((held ??= null), (at += RETRY_MS - ttlMs)))
+        .finally(() => (busy = false));
+    }
+    return held;
+  };
+}
 
-const beasts = cached(60_000, () => {
-  const address = process.env.LS_BEASTS_ADDRESS ?? keys().address;
-  const collections = Object.fromEntries(Object.entries(DUNGEONS).map(([key, d]) => [key, d.name]));
-  return Promise.all([inventory(address), pendingClaims(address), prices() as Promise<Prices>]).then(
-    ([held, claims, sell]) => ({
-      address,
-      groups: Object.entries(collections).map(([key, name]) => {
-        const own = (held[key] ?? []).map((b) => ({ ...b, strk: worth(sell, b) }));
-        const open = claims.filter((c) => c.collection === key).map((c) => ({ ...c, state: "claim", strk: worth(sell, c) }));
-        const all = [...own, ...open].sort((a, b) => Number(a.state === "claim") - Number(b.state === "claim") || a.tier - b.tier || b.level - a.level);
-        return { key, name, held: own.length, claims: open.length, strk: all.some((b) => b.strk !== null) ? all.reduce((n, b) => n + (b.strk ?? 0), 0) : null, beasts: all };
-      }),
+const BEASTS_MS = 600_000;
+const RETRY_MS = 60_000;
+const quiet = () => liveRow() === null;
+const prices = background(BEASTS_MS, sellPrices, quiet);
+const claimable = background(BEASTS_MS, () => pendingClaims(keys().address), quiet);
+const collection = background(BEASTS_MS, () => inventory(BEASTS_TO ?? keys().address));
+
+function beasts() {
+  const [held, claims, sell] = [collection(), claimable() ?? [], prices() ?? {}];
+  const address = BEASTS_TO ?? keys().address;
+  if (!held) return { address, failed: held === null };
+  return {
+    address,
+    groups: Object.entries(DUNGEONS).map(([key, d]) => {
+      const open = claims.filter((c) => c.collection === key).map((c) => ({ ...c, minted: 0, state: "claim" }));
+      const all = [...open, ...(held[key] ?? []).sort((a, b) => b.minted - a.minted || a.tier - b.tier || b.level - a.level)].map((b) => ({ kind: b.kind, name: b.name, tier: b.tier, type: b.type, level: b.level, state: b.state, strk: worth(sell, b) }));
+      const own = all.slice(open.length);
+      const count = (state: string) => own.filter((b) => b.state === state).length;
+      return {
+        key,
+        name: d.name,
+        held: own.length,
+        claims: open.length,
+        tiers: [1, 2, 3, 4, 5].map((tier) => own.filter((b) => b.tier === tier).length),
+        mega: count("mega"),
+        staked: count("staked"),
+        strk: all.some((b) => b.strk !== null) ? all.reduce((n, b) => n + (b.strk ?? 0), 0) : null,
+        beasts: all,
+      };
     }),
-    () => ({ address }),
-  );
-});
+  };
+}
 
 const OWN = new Set(Object.values(networkInterfaces()).flatMap((list) => (list ?? []).map((i) => i.address)));
 
@@ -142,4 +173,5 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
 
 export function serve(): void {
   createServer((req, res) => void route(req, res).catch(() => res.writeHead(500).end())).listen(PORT, HOST, () => console.log(`ls-agent on http://${HOST}:${PORT}`));
+  beasts();
 }
