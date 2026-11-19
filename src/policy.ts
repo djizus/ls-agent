@@ -3,7 +3,7 @@ import { beastHit, yourHit } from "./combat.ts";
 import { potionPrice } from "./items.ts";
 import { shape, type State } from "./play.ts";
 
-export const RULES = { potionPrice: 1, dexPerLevel: 1, weaponTier: 2, weaponCatchUp: 10, jewelryLevel: 12, jewelryReserve: 2 };
+export const RULES = { potionPrice: 1, dexPerLevel: 1, weaponCatchUp: 5, jewelryLevel: 12, jewelryReserve: 2 };
 
 const RINGS = ["Titanium Ring", "Silver Ring", "Gold Ring", "Platinum Ring", "Bronze Ring"];
 
@@ -49,8 +49,9 @@ export function plan(s: State): Plan {
     else upgrades.push({ type: "upgrade", stat, amount: 1 });
   }
   for (const a of upgrades) if (a.type === "upgrade") why.push(`+${a.amount} ${a.stat.slice(0, 3).toUpperCase()}`);
-  const fullHeal = potionPrice(s.level, stats.charisma) * Math.ceil((s.maxHealth + 15 * (stats.vitality - s.stats.vitality)) / 10);
-  let gold = s.gold;
+  const potion = potionPrice(s.level, stats.charisma);
+  const fullHeal = potion * Math.ceil((s.maxHealth + 15 * (stats.vitality - s.stats.vitality)) / 10);
+  let gold = s.gold - potion * Math.ceil((s.maxHealth - s.health) / 10);
   const price = (m: Offer) => Math.max(1, m.price - (stats.charisma - s.stats.charisma));
   const bag = [...s.bag];
   let room = BAG_SIZE - bag.length;
@@ -87,8 +88,8 @@ export function plan(s: State): Plan {
   const next = (slot: string, tier: number): Gear | Offer | undefined => [...stowed(slot), ...offers(slot)].filter((c) => c.tier < tier).sort((a, b) => a.tier - b.tier)[0];
 
   const weapon = worn("weapon");
-  const blade = next("weapon", Math.min(RULES.weaponTier + 1, weapon?.tier ?? 6));
-  if (blade && (!weapon || maxed(weapon) || weapon.greatness * (6 - weapon.tier) <= RULES.weaponCatchUp * (6 - blade.tier))) take(blade, `T${blade.tier} weapon`);
+  const blade = next("weapon", Math.min(2, weapon?.tier ?? 6));
+  if (blade && (!weapon || maxed(weapon) || weapon.greatness * (6 - weapon.tier) <= RULES.weaponCatchUp * (6 - blade.tier))) take(blade, "T1 weapon");
   for (const slot of ARMOR) {
     const now = worn(slot);
     const pick = now ? maxed(now) && next(slot, now.tier) : offers(slot).sort((a, b) => price(a) - price(b))[0];
