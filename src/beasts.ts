@@ -1,27 +1,34 @@
-import { NAMES, PREFIXES, SUFFIXES } from "./beast.ts";
-import { BEAST_NFT, DUNGEONS, GAME_API } from "./config.ts";
+import { LOOT_NAMES, NAMES, PREFIXES, SUFFIXES } from "./beast.ts";
+import { BEAST_NFT, COLLECTION_API, DUNGEONS, EKUBO_QUOTER, ETH, GAME_API, STRK } from "./config.ts";
+import { readQuote } from "./live.ts";
 import { transcript } from "./transcript.ts";
 import { provider } from "./wallet.ts";
 
 const TYPES = ["Magic", "Blade", "Bludgeon"];
+const KINDS: Record<string, string[]> = { beast: NAMES, lootBag: LOOT_NAMES };
+const PROBE = 10n ** 15n;
 const BATCH = 8;
+const PAGE = 100;
 const hex = (n: bigint) => "0x" + n.toString(16);
 const u256 = (n: bigint) => [hex(n & ((1n << 128n) - 1n)), hex(n >> 128n)];
 
-export type Species = { collection: string; species: number; name: string; prefix: number; suffix: number; tier: number; type: string };
-export type Beast = Species & { tokenId: string; level: number; health: number; state: "held" | "staked" | "mega"; transformsAt: number | null; queued: boolean };
+export type Species = { collection: string; species: number; kind: string | null; name: string; prefix: number; suffix: number; tier: number; type: string };
+export type Beast = Species & { tokenId: string; level: number; health: number; minted: number; state: "held" | "staked" | "mega"; transformsAt: number | null; queued: boolean };
 export type Claim = Species & { adventurerId: string; encounterXp: number; level: number; health: number; settled: boolean; takenFrom: string | null };
 type Kill = { adventurerId: string; encounterXp: number; actionIndex: number; beastId: number; prefix: number; suffix: number; level: number; health: number; gameOver: boolean; settled: boolean; claimed: boolean };
-type Staked = { tokenId: string; mega: boolean; staked: boolean; transformsAt: number | null; unsafeStake: boolean };
+type Listed = { tokenId: string; beastId: number; prefix: number; suffix: number; level: number; health: number; mega: boolean; mintedAtBlock: number };
+type Staked = { tokenId: string; speciesId: number; prefix: number; suffix: number; level: number; health: number; mega: boolean; staked: boolean; transformsAt: number | null; unsafeStake: boolean };
 
 export function describe(species: number, prefix: number, suffix: number): Species {
   const [collection, d] = Object.entries(DUNGEONS).find(([, d]) => species >= d.firstSpecies && species < d.firstSpecies + d.speciesCount) ?? ["other", undefined];
   const index = d ? species - d.firstSpecies : 0;
   const perType = d ? d.speciesCount / TYPES.length : 1;
-  const base = collection === "beast" ? NAMES[index] : `${d?.name ?? "Beast"} #${d ? index + 1 : species}`;
+  const kind = KINDS[collection]?.[index] ?? null;
+  const base = kind ?? `Beast #${species}`;
   return {
     collection,
     species,
+    kind,
     name: prefix && suffix ? `"${PREFIXES[prefix - 1]} ${SUFFIXES[suffix - 1]}" ${base}` : base,
     prefix,
     suffix,
@@ -30,14 +37,14 @@ export function describe(species: number, prefix: number, suffix: number): Speci
   };
 }
 
-export function decodeBeast(tokenId: string, felts: string[], stake?: Staked): Beast {
-  const [species, prefix, suffix, level, health] = felts.map(Number);
+export function decodeBeast(b: Listed, stake?: Pick<Staked, "mega" | "staked" | "transformsAt" | "unsafeStake">): Beast {
   return {
-    ...describe(species, prefix, suffix),
-    tokenId: hex(BigInt(tokenId)),
-    level,
-    health,
-    state: stake?.mega ? "mega" : stake?.staked ? "staked" : "held",
+    ...describe(b.beastId, b.prefix, b.suffix),
+    tokenId: hex(BigInt(b.tokenId)),
+    level: b.level,
+    health: b.health,
+    minted: b.mintedAtBlock,
+    state: b.mega || stake?.mega ? "mega" : stake?.staked ? "staked" : "held",
     transformsAt: stake?.staked ? stake.transformsAt : null,
     queued: stake?.unsafeStake ?? false,
   };
@@ -96,13 +103,33 @@ export async function pendingClaims(owner: string): Promise<Claim[]> {
 }
 
 export async function inventory(owner: string): Promise<Record<string, Beast[]>> {
-  const balance = Number((await nft("balance_of", [owner]))[0]);
-  const held = await batched([...Array(balance).keys()], async (i) => (await nft("token_of_owner_by_index", [owner, hex(BigInt(i)), "0x0"]))[0]);
+  const held: Listed[] = [];
+  for (let cursor: string | null = ""; cursor !== null; ) {
+    const res = await fetch(`${COLLECTION_API}/collections/beasts/owners/${owner}?limit=${PAGE}${cursor && `&cursor=${cursor}`}`);
+    if (!res.ok) throw new Error(`beasts of ${owner.slice(0, 8)} ${res.status}`);
+    const page = (await res.json()) as { items: Listed[]; nextCursor: string | null };
+    held.push(...page.items);
+    cursor = page.nextCursor ?? null;
+  }
   const listed = (await Promise.all(Object.values(DUNGEONS).map((d) => api<{ beasts: Staked[] }>(`/loot/beasts?owner=${owner}&dungeon=${d.address}`)))).flatMap((r) => r.beasts);
   const stakes = new Map(listed.map((s) => [BigInt(s.tokenId), s]));
-  const ids = [...new Set([...held.map(BigInt), ...listed.filter((s) => s.staked).map((s) => BigInt(s.tokenId))])];
-  const beasts = await batched(ids, async (id) => decodeBeast(hex(id), await nft("get_beast", [hex(id)]), stakes.get(id)));
+  const mine = new Set(held.map((b) => BigInt(b.tokenId)));
+  const away = listed.filter((s) => s.staked && !mine.has(BigInt(s.tokenId))).map((s) => decodeBeast({ ...s, beastId: s.speciesId, mintedAtBlock: 0 }, s));
   const out: Record<string, Beast[]> = Object.fromEntries(Object.keys(DUNGEONS).map((key) => [key, []]));
-  for (const b of beasts) (out[b.collection] ??= []).push(b);
+  for (const b of [...held.map((h) => decodeBeast(h, stakes.get(BigInt(h.tokenId)))), ...away]) (out[b.collection] ??= []).push(b);
   return out;
 }
+
+export type Prices = Record<string, { normal: number[]; mega: number[] }>;
+
+export async function sellPrices(): Promise<Prices> {
+  const res = await fetch(`${EKUBO_QUOTER}/${PROBE}/${ETH}/${STRK}`);
+  if (!res.ok) throw new Error(`ETH quote ${res.status}`);
+  const rate = Number(BigInt(((await res.json()) as { total_calculated: string }).total_calculated)) / Number(PROBE);
+  const quote = async (pool: string) => (Number(readQuote(await provider.callContract({ contractAddress: pool, entrypoint: "get_sell_nft_quote", calldata: ["0x0", "0x0", "0x1", "0x0"] })).price) / 1e18) * rate;
+  const out: Prices = {};
+  for (const [key, d] of Object.entries(DUNGEONS)) if (d.sell) out[key] = { normal: await batched(d.sell.normal, quote), mega: await batched(d.sell.mega, quote) };
+  return out;
+}
+
+export const worth = (prices: Prices, b: { collection: string; tier: number; state?: string }): number | null => prices[b.collection]?.[b.state === "mega" ? "mega" : "normal"][b.tier - 1] ?? null;

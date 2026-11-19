@@ -1,18 +1,20 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
-import { DUNGEON, DUNGEONS, HOST, PORT, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
+import { networkInterfaces } from "node:os";
+import { BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
 import { halt, play } from "./runner.ts";
 import { enrich, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
-import { inventory, pendingClaims } from "./beasts.ts";
+import { inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
 import { liveRow, subscribe } from "./events.ts";
 import { handleMcp } from "./mcp.ts";
+import { summary } from "./summary.ts";
 
 const page = readFileSync(new URL("../web/index.html", import.meta.url));
 const CHECK = `${VAR_DIR}contract-check.json`;
-const BAGS = `${VAR_DIR}bag-ranking.json`;
+const BAGS = new URL("../scripts/bag-ranking.json", import.meta.url);
 const GAMES = `SELECT *, CASE mode ${Object.entries(DUNGEONS).map(([k, d]) => `WHEN '${k}' THEN '${d.name}'`).join(" ")} END AS dungeon, mode IN (${Object.keys(DUNGEONS).map((k) => `'${k}'`)}) AS onchain, id IS ? AS live FROM games`;
 
 async function json(req: IncomingMessage): Promise<unknown> {
@@ -26,17 +28,28 @@ function reply(res: ServerResponse, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-const REACH = [26, 30, 35];
+const PRACTICE = "practice";
 
-function strategies() {
-  const rows = db.prepare("SELECT strategy, level FROM games WHERE ended_at IS NOT NULL AND mode = 'practice'").all() as { strategy: string; level: number }[];
-  const versions = db.prepare("SELECT hash, created_at FROM strategies ORDER BY created_at DESC").all() as { hash: string; created_at: number }[];
-  return versions
-    .map((v) => {
-      const levels = rows.filter((r) => r.strategy === v.hash).map((r) => r.level);
-      return { ...v, games: levels.length, best: Math.max(0, ...levels), reach: REACH.map((level) => ({ level, share: levels.filter((l) => l >= level).length / levels.length })) };
-    })
-    .filter((s) => s.games > 0);
+function figures() {
+  const ended = db.prepare("SELECT mode, strategy, level, beasts, gas_strk FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; strategy: string; level: number; beasts: number | null; gas_strk: number | null }[];
+  const strategy = ended.find((g) => g.mode === PRACTICE)?.strategy ?? null;
+  const groups = [...Object.entries(DUNGEONS).map(([mode, d]) => ({ mode, name: d.name, strategy: null as string | null })), { mode: PRACTICE, name: "Practice", strategy }];
+  const mean = (values: number[]) => (values.length ? summary(values).mean : null);
+  return groups.map((group) => {
+    const games = ended.filter((g) => g.mode === group.mode && (!group.strategy || g.strategy === group.strategy));
+    if (!games.length) return { ...group, games: 0 };
+    const { median, best, "30+": reach30 } = summary(games.map((g) => g.level));
+    return {
+      ...group,
+      games: games.length,
+      median,
+      mean: mean(games.map((g) => g.level)),
+      best,
+      reach30,
+      slain: mean(games.flatMap((g) => (g.beasts === null ? [] : [g.beasts]))),
+      strk: mean(games.flatMap((g) => (g.gas_strk === null ? [] : [g.gas_strk]))),
+    };
+  });
 }
 
 const tokens = (n: bigint) => Number(n) / 1e18;
@@ -57,20 +70,62 @@ const wallet = cached(30_000, () => {
   );
 });
 
-const beasts = cached(60_000, () => {
-  const address = process.env.LS_BEASTS_ADDRESS ?? keys().address;
-  const collections = Object.fromEntries(Object.entries(DUNGEONS).map(([key, d]) => [key, d.name]));
-  return Promise.all([inventory(address), pendingClaims(address)]).then(
-    ([held, claims]) => ({ address, collections, inventory: held, pendingClaims: claims }),
-    () => ({ address, collections }),
-  );
-});
+function background<T>(ttlMs: number, load: () => Promise<T>, idle: () => boolean = () => true): () => T | undefined | null {
+  let held: T | undefined | null;
+  let at = 0;
+  let busy = false;
+  return () => {
+    if (!busy && Date.now() - at > ttlMs && idle()) {
+      busy = true;
+      at = Date.now();
+      Promise.resolve()
+        .then(load)
+        .then((value) => (held = value), () => ((held ??= null), (at += RETRY_MS - ttlMs)))
+        .finally(() => (busy = false));
+    }
+    return held;
+  };
+}
+
+const BEASTS_MS = 600_000;
+const RETRY_MS = 60_000;
+const quiet = () => liveRow() === null;
+const prices = background(BEASTS_MS, sellPrices, quiet);
+const claimable = background(BEASTS_MS, () => pendingClaims(keys().address), quiet);
+const collection = background(BEASTS_MS, () => inventory(BEASTS_TO ?? keys().address));
+
+function beasts() {
+  const [held, claims, sell] = [collection(), claimable() ?? [], prices() ?? {}];
+  const address = BEASTS_TO ?? keys().address;
+  if (!held) return { address, failed: held === null };
+  return {
+    address,
+    groups: Object.entries(DUNGEONS).map(([key, d]) => {
+      const open = claims.filter((c) => c.collection === key).map((c) => ({ ...c, minted: 0, state: "claim" }));
+      const all = [...open, ...(held[key] ?? []).sort((a, b) => b.minted - a.minted || a.tier - b.tier || b.level - a.level)].map((b) => ({ kind: b.kind, name: b.name, tier: b.tier, type: b.type, level: b.level, state: b.state, strk: worth(sell, b) }));
+      const own = all.slice(open.length);
+      const count = (state: string) => own.filter((b) => b.state === state).length;
+      return {
+        key,
+        name: d.name,
+        held: own.length,
+        claims: open.length,
+        tiers: [1, 2, 3, 4, 5].map((tier) => own.filter((b) => b.tier === tier).length),
+        mega: count("mega"),
+        staked: count("staked"),
+        strk: all.some((b) => b.strk !== null) ? all.reduce((n, b) => n + (b.strk ?? 0), 0) : null,
+        beasts: all,
+      };
+    }),
+  };
+}
+
+const OWN = new Set(Object.values(networkInterfaces()).flatMap((list) => (list ?? []).map((i) => i.address)));
 
 async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown> {
   const url = new URL(req.url ?? "/", "http://x");
-  const own = [HOST, "127.0.0.1", "::1"].includes((req.socket.remoteAddress ?? "").replace("::ffff:", ""));
+  const own = OWN.has((req.socket.remoteAddress ?? "").replace("::ffff:", ""));
   if (!own && (req.method !== "GET" || url.pathname === "/mcp")) return res.writeHead(403).end();
-  if (url.pathname === "/api/me") return reply(res, { control: own });
   if (url.pathname === "/mcp") return handleMcp(req, res, req.method === "POST" ? await json(req) : undefined);
   if (url.pathname === "/events") {
     res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
@@ -80,8 +135,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     return;
   }
   if (url.pathname === "/api/play" && req.method === "POST") {
-    const body = (await json(req)) as { games?: number; live?: boolean } | undefined;
-    play(Number(body?.games) || (body?.live ? 1 : DUNGEON.benchmark.length), body?.live === true);
+    const body = (await json(req)) as { games?: number; live?: boolean; bag?: number; maxSurvivor?: number } | undefined;
+    play(Number(body?.games) || (body?.live ? 1 : DUNGEON.benchmark.length), body?.live === true, body?.bag ? { bag: Number(body.bag), maxSurvivor: Number(body.maxSurvivor) } : undefined);
     return res.end("ok");
   }
   if (url.pathname === "/api/stop" && req.method === "POST") {
@@ -97,7 +152,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     const events = (db.prepare("SELECT body FROM events WHERE game = ? ORDER BY rowid").all(id) as { body: string }[]).map((r) => JSON.parse(r.body));
     return reply(res, { game, events: events.map((e) => (e.kind === "state" ? { ...e, state: enrich(e.state) } : e)) });
   }
-  if (url.pathname === "/api/strategies") return reply(res, strategies());
+  if (url.pathname === "/api/summary") return reply(res, figures());
   if (url.pathname === "/api/wallet") return reply(res, await wallet());
   if (url.pathname === "/api/beasts") return reply(res, await beasts());
   if (url.pathname === "/api/bags") return reply(res, existsSync(BAGS) ? JSON.parse(readFileSync(BAGS, "utf8")) : []);
@@ -118,4 +173,5 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
 
 export function serve(): void {
   createServer((req, res) => void route(req, res).catch(() => res.writeHead(500).end())).listen(PORT, HOST, () => console.log(`ls-agent on http://${HOST}:${PORT}`));
+  beasts();
 }

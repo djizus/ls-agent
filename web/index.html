@@ -43,6 +43,9 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 
 #logo { width: 11rem; image-rendering: auto; margin: -0.2rem auto 0; }
 #games { flex: 1; }
+.rows li.more { display: block; padding: 0; }
+.more button { width: 100%; padding: 0.3rem; color: var(--dim); border: 2px solid var(--edge); border-radius: 4px; }
+.more button:hover { color: var(--gold); border-color: var(--gold); }
 .rows li.none { display: block; text-align: center; padding: 2rem 0; color: var(--dim); font-size: 1.6rem; }
 #podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; align-items: end; }
 #podium li { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; padding: 0.5rem 0.2rem 0.6rem; }
@@ -50,13 +53,17 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 #podium li:nth-child(2) { order: 1; } #podium li:nth-child(3) { order: 3; }
 #podium img { width: 3.6rem; height: 3.6rem; object-fit: contain; filter: drop-shadow(0 3px 0 rgb(0 0 0 / 0.7)); }
 #podium b { font: 400 2.6rem/0.9 var(--num); color: var(--gold); }
-#games li { cursor: pointer; }
-#games li:hover { background: #1e2619; }
+#games li[data-id] { cursor: pointer; }
+#board li { grid-template-columns: auto 1fr auto 2.4rem; }
+#board b { text-align: right; }
+.slain { display: flex; align-items: center; gap: 0.2rem; font-size: 1.4rem; line-height: 1; }
+#games .slain img { width: 1.2rem; height: 1.2rem; filter: none; }
+#games li[data-id]:hover { background: #1e2619; }
 #games li.on { border-color: var(--gold); box-shadow: var(--bevel), 0 0 0 2px var(--gold), 0 3px 0 rgb(0 0 0 / 0.6); }
-#results { flex: none; }
-#reach { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+#reach { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
 #reach div { text-align: center; padding: 0.4rem 0 0.5rem; }
-#reach b { display: block; font: 400 2rem/1 var(--num); color: var(--lime); }
+#reach b { display: block; font: 400 2rem/1 var(--num); color: var(--gold); }
+#reach b.good { color: var(--lime); } #reach b.bad { color: var(--blood); }
 
 #mid { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; min-height: 0; }
 #stage { position: relative; flex: 1; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--drop); background: #000; overflow: hidden; display: grid; place-content: center; text-align: center; }
@@ -77,17 +84,21 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .chip.out img { filter: grayscale(1) brightness(0.6); }
 #golive { color: #000; background: var(--lime); border-radius: 3px; padding: 0.2rem 0.6rem; white-space: nowrap; }
 
-#run { flex: none; height: 3.6rem; font: 400 2.1rem/1 var(--num); letter-spacing: 0.08em; color: #000; background: linear-gradient(#b6ff5c 0 12%, var(--lime) 12% 80%, #4fa800 80%); border: 2px solid #000; border-radius: 4px; box-shadow: 0 0 0 2px #2f5c00, var(--drop); }
-#run.stop { background: linear-gradient(#ff9a8c 0 12%, var(--blood) 12% 80%, #a32a1c 80%); box-shadow: 0 0 0 2px #5c1a12, var(--drop); }
-#run:active { transform: translateY(2px); }
 .big { font: 400 3.2rem/0.9 var(--num); }
 .big small { font-size: 1.3rem; color: var(--dim); }
 .row { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: center; }
 .row > span { display: inline-flex; align-items: center; gap: 0.35rem; }
-#zoo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; max-height: 11rem; }
-#zoo div { position: relative; aspect-ratio: 1; padding: 0.15rem; }
-#zoo img { width: 100%; height: 100%; object-fit: contain; }
-#zoo b { position: absolute; right: 0.2rem; bottom: 0; font: 400 1.2rem/1 var(--num); text-shadow: 0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000; }
+#zoo { display: flex; flex-direction: column; gap: 0.4rem; max-height: 17rem; }
+#zoo .head span { display: inline-flex; gap: 0.6rem; align-items: baseline; }
+.tally { gap: 0.2rem 0.7rem; }
+.cells { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; }
+.cells div { position: relative; aspect-ratio: 1; padding: 0.15rem; }
+.cells img { width: 100%; height: 100%; object-fit: contain; }
+.cells b { position: absolute; right: 0.2rem; bottom: 0; font: 400 1.2rem/1 var(--num); text-shadow: 0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000; }
+.cells i { position: absolute; left: 0.2rem; top: 0.1rem; font-style: normal; line-height: 1; color: var(--gold); text-shadow: 0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000; }
+.cells .claim { border-style: dashed; border-color: var(--dim); background: none; box-shadow: none; }
+.cells .claim img { opacity: 0.35; filter: grayscale(1); }
+.cells .mega { border-color: var(--gold); }
 #bags { flex: 1; }
 #sacks .arts { display: flex; gap: 0.15rem; }
 #sacks img { width: 2rem; height: 2rem; }
@@ -97,14 +108,6 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .seg button { padding: 0 0.5rem; border: 2px solid var(--edge); border-radius: 3px; color: var(--dim); }
 .seg button[aria-pressed="true"] { color: #000; background: var(--gold); border-color: var(--gold); }
 
-dialog { margin: auto; width: min(34rem, calc(100vw - 2rem)); color: var(--bone); background: linear-gradient(#141a10, #0a0d08); border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--bevel), 0 0 0 2px #000, 0 20px 60px #000; padding: 1.4rem; }
-dialog::backdrop { background: rgb(0 0 0 / 0.78); }
-dialog h2 { text-align: center; margin-bottom: 1rem; font-size: 2.4rem; color: var(--blood); }
-.cost { justify-content: center; margin-bottom: 1.1rem; }
-.pick { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
-.pick button { padding: 1.1rem 0.5rem; font: 400 2rem/1 var(--num); }
-.pick button:hover { border-color: var(--gold); }
-.pick button.spend { color: var(--blood); border-color: #7a2a20; }
 
 @media (max-width: 900px) {
   body { height: auto; overflow: auto; padding: 0.5rem; }
@@ -121,8 +124,7 @@ dialog h2 { text-align: center; margin-bottom: 1rem; font-size: 2.4rem; color: v
 <div class="win">
   <aside class="panel">
     <img id="logo" src="/assets/logo.png" alt="Loot Survivor">
-    <section id="games"><div class="head" id="modes"></div><ol id="podium"></ol><ol id="board" class="rows scroll"></ol></section>
-    <section id="results"></section>
+    <section id="games"><div class="head" id="modes"></div><div id="sum"></div><ol id="podium"></ol><ol id="board" class="rows scroll"></ol></section>
   </aside>
   <main id="mid">
     <div id="stage"></div>
@@ -137,7 +139,6 @@ dialog h2 { text-align: center; margin-bottom: 1rem; font-size: 2.4rem; color: v
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const post = (url, body) => fetch(url, { method: "POST", body: body && JSON.stringify(body) });
 const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 const round = (n, digits = 0) => Number(n).toLocaleString("en", { maximumFractionDigits: digits });
 const put = (el, html) => { if (el.html !== html) el.innerHTML = el.html = html; };
@@ -145,25 +146,31 @@ const title = (word) => word[0].toUpperCase() + word.slice(1);
 const stat = (name) => `<i class="ic" style="--i:url(/assets/icons/${title(name)}.svg)" title="${title(name)}"></i>`;
 const pic = (name, label) => `<img class="pic" src="/assets/icons/${name}.png" alt="${label}" title="${label}">`;
 const art = (name) => `<img class="pic" src="/assets/loot/${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.png" alt="${esc(name)}" title="${esc(name)}">`;
+const slain = (g) => (g.beasts == null ? `<span></span>` : `<span class="slain" title="Named beasts slain"><img src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`);
+const MARK = { lootBag: "/assets/bag.png" };
 const face = (name) => (/^[A-Za-z]+$/.test(name ?? "") ? `/assets/beasts/${name.toLowerCase()}.png` : "/assets/skull.png");
+const portrait = (g) => (killer(g) ? face(killer(g)[1]) : (MARK[g.mode] ?? "/assets/skull.png"));
 const killer = (g) => (g.ending ?? "").match(/against (?:".*" )?(\w+) level (\d+)$/);
 
 const WATCH = "https://www.lootsurvivor.io/watch?id=";
 const MOVES = { attack: "Fight", flee: "Flee", explore: "Explore" };
 const SLOW_MS = 60_000;
 const BAGS = 25;
+const LATEST = 20;
+const STRIP = 5;
+let zooAll = false;
+let every = false;
 const SORTS = { mean: "Level", kills: "Beasts" };
 const keep = (key, value) => { try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch { return null; } };
 let bagSort = keep("bagSort") in SORTS ? keep("bagSort") : "mean";
 
 const items = {};
 const byName = {};
-const data = { games: [], wallet: null, beasts: null, results: null, bags: null, check: null };
-let shown = null;
+const data = { games: [], wallet: null, beasts: null, summary: null, bags: null, check: null };
+let shown;
 let move = null;
 let market = [];
 
-const liveGame = () => data.games.find((g) => g.live);
 const liveReal = () => data.games.find((g) => g.live && g.onchain);
 const realGames = () => data.games.filter((g) => g.onchain);
 const picked = () => Number(new URLSearchParams(location.search).get("game")) || null;
@@ -190,13 +197,12 @@ function planHtml(e) {
 
 function endHtml(g) {
   const k = killer(g);
-  return `<span class="chip">Level ${g.level}</span>${k ? `<span class="chip"><img class="pic" src="${face(k[1])}" alt="">${k[1]} ${k[2]}</span>` : ""}${g.gas_strk === null ? "" : `<span class="chip">${round(g.gas_strk, 1)}<small>STRK</small></span>`}<span class="dim">Click the game, then press the right arrow to replay it</span>`;
+  return `${g.level === null ? "" : `<span class="chip">Level ${g.level}</span>`}${k ? `<span class="chip"><img class="pic" src="${face(k[1])}" alt="">${k[1]} ${k[2]}</span>` : ""}${g.gas_strk === null ? "" : `<span class="chip">${round(g.gas_strk, 1)}<small>STRK</small></span>`}<span class="dim">Click the game, then press the right arrow to replay it</span>`;
 }
 
 function render() {
   const g = target();
-  const live = liveGame();
-  if (g?.id !== shown?.id) {
+  if (shown === undefined || g?.id !== shown?.id) {
     shown = g;
     move = null;
     market = [];
@@ -208,56 +214,48 @@ function render() {
   $("which").textContent = g ? `Game ${g.id}` : "";
   put($("plan"), !g ? "" : g.live ? (move ? planHtml(move) : "") : endHtml(g));
   $("golive").hidden = !liveReal() || g?.live;
-  if ($("run")) { $("run").textContent = live ? "Stop" : "Play"; $("run").className = live ? "stop" : ""; }
 
-  const modes = data.beasts?.collections ?? {};
-  const mode = keep("dungeon") in modes ? keep("dungeon") : (liveReal() ?? realGames()[0])?.mode;
-  const inMode = realGames().filter((x) => x.mode === mode);
-  const liveHere = inMode.find((x) => x.live);
-  put($("modes"), `<h2>Games</h2><span class="seg">${Object.entries(modes).map(([k, name]) => `<button type="button" data-mode="${k}" aria-pressed="${k === mode}">${name.split(" ")[0]}</button>`).join("")}</span>`);
-  const ranked = inMode.filter((x) => !x.live).sort((a, b) => b.level - a.level || b.id - a.id);
-  const cls = (x) => `card${x.id === g?.id ? " on" : ""}`;
-  put($("podium"), ranked.slice(0, 3).map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0" title="Game ${x.id}"><img src="${face(killer(x)?.[1])}" alt=""><b>${x.level}</b><span class="dim">${x.id}</span></li>`).join(""));
-  put($("board"), !inMode.length ? `<li class="none">No games</li>` : [...(liveHere ? [liveHere] : []), ...ranked.slice(3).sort((a, b) => b.started_at - a.started_at)].map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0"><img src="${x.live ? "/assets/favicon.png" : face(killer(x)?.[1])}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span><b>${x.live ? "" : x.level}</b></li>`).join(""));
-
-  const l = data.results?.[0];
+  const sums = data.summary ?? [];
+  const sum = sums.find((x) => x.mode === keep("dungeon")) ?? sums.find((x) => x.mode === (liveReal() ?? realGames()[0])?.mode) ?? sums[0];
+  const mode = sum?.mode;
+  const inMode = data.games.filter((x) => x.mode === mode && (!sum.strategy || x.strategy === sum.strategy));
   const c = data.check;
-  put($("results"), `<div class="head"><h2>Practice</h2>${c ? (c.failed ? `<span class="bad" title="${esc(c.failed)}">Check failed</span>` : `<span class="good" title="The local game matches the one on Starknet">Checked</span>`) : ""}</div>
-    ${l ? `<div id="reach">${l.reach.map((r) => `<div class="card" title="Share of ${l.games} practice games that reached level ${r.level}"><b>${Math.round(100 * r.share)}%</b><span class="dim">Level ${r.level}</span></div>`).join("")}</div>` : ""}`);
+  const tile = (value, label, tone = "") => `<div class="card"><b class="${tone}">${value}</b><span class="dim">${label}</span></div>`;
+  const figure = (n, digits) => (n == null ? "-" : round(n, digits));
+  put($("sum"), !sum?.games ? "" : `<div id="reach">${tile(round(sum.games), "Games")}${tile(sum.median, "Median")}${tile(figure(sum.mean, 1), "Average")}${tile(figure(sum.slain, 1), "Slain each")}${tile(sum.best, "Best")}${sum.strategy ? tile(`${Math.round(sum.reach30)}%`, "Level 30") : tile(figure(sum.strk, 1), "STRK each")}</div>${sum.strategy && c ? `<div class="head"><span></span>${c.failed ? `<span class="bad" title="${esc(c.failed)}">Check failed</span>` : `<span class="good" title="The local game matches the one on Starknet">Checked</span>`}</div>` : ""}`);
+  const liveNow = data.games.find((x) => x.live);
+  put($("modes"), `<h2>Games</h2><span class="seg">${sums.map((x) => `<button type="button" data-mode="${x.mode}" aria-pressed="${x.mode === mode}">${x.name.split(" ")[0]}</button>`).join("")}</span>`);
+  const ranked = inMode.filter((x) => x.ended_at).sort((a, b) => b.level - a.level || b.id - a.id);
+  const cls = (x) => (x.onchain ? `class="card${x.id === g?.id ? " on" : ""}" data-id="${x.id}" tabindex="0"` : `class="card"`);
+  put($("podium"), ranked.slice(0, 3).map((x) => `<li ${cls(x)} title="Game ${x.id}"><img src="${portrait(x)}" alt=""><b>${x.level}</b>${slain(x)}<span class="dim">${x.id}</span></li>`).join(""));
+  put($("board"), !liveNow && !ranked.length ? `<li class="none">No games</li>` : [...(liveNow ? [liveNow] : []), ...ranked.slice().sort((a, b) => b.started_at - a.started_at).slice(0, every ? undefined : LATEST)].map((x) => `<li ${cls(x)}><img src="${x.live ? (MARK[x.mode] ?? "/assets/favicon.png") : portrait(x)}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.live ? "" : x.level}</b></li>`).join("") + (!every && ranked.length > LATEST ? `<li class="more"><button type="button" data-more>More</button></li>` : ""));
 
   const w = data.wallet;
-  const paid = realGames().filter((x) => x.gas_strk !== null);
-  const each = paid.length ? paid.reduce((n, x) => n + x.gas_strk, 0) / paid.length : null;
   put($("wallet"), `<h2>Wallet</h2>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
-    <div class="row"><span>${pic("dungeon_ticket", "Tickets")}<span class="n">${round(w.tickets, 1)}</span></span><span>${pic("survivor_token", "SURVIVOR tokens")}<span class="n">${round(w.survivor, 1)}</span></span>${each === null ? "" : `<span class="dim" title="Average cost of a real game"><span class="n">${round(each, 1)}</span>a game</span>`}</div>`}`);
+    <div class="row"><span>${pic("dungeon_ticket", "Tickets")}<span class="n">${round(w.tickets, 1)}</span></span><span>${pic("survivor_token", "SURVIVOR tokens")}<span class="n">${round(w.survivor, 1)}</span></span></div>`}`);
 
   const b = data.beasts;
-  const held = Object.values(b?.inventory ?? {}).flat();
-  const claims = b?.pendingClaims ?? [];
-  const cell = (x) => `<div class="card" title="${esc(`${x.name}, level ${x.level}`)}"><img src="${face(x.name.split(" ").at(-1))}" alt="${esc(x.name)}"><b>${x.level}</b></div>`;
-  put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.inventory ? held.length : ""}</span></div>${b && !b.inventory ? `<span class="bad">No answer</span>` : ""}${claims.length ? `<span class="gold">${claims.length} to claim</span>` : ""}${held.length + claims.length ? `<div id="zoo" class="scroll">${[...held, ...claims].map(cell).join("")}</div>` : ""}`);
+  const STATE = { held: "", staked: ", staked", mega: ", Mega", claim: ", to claim" };
+  const cell = (x) => `<div class="card ${x.state}" title="${esc(`${x.name}: tier ${x.tier} ${x.type}, level ${x.level}${STATE[x.state]}${x.strk === null ? "" : `, sells for ${round(x.strk, 1)} STRK`}`)}"><img src="${face(x.kind)}" alt="${esc(x.name)}"><i>T${x.tier}</i><b>${x.level}</b></div>`;
+  const tiers = (x) => x.tiers.map((n, i) => (n ? `<span><span class="gold">T${i + 1}</span> <span class="n">${round(n)}</span></span>` : "")).join("");
+  const group = (x) => `<div class="head"><span><span class="dim">${x.name}</span><span class="n">${round(x.held)}</span>${x.claims ? `<span class="gold">${x.claims} to claim</span>` : ""}</span>${x.strk === null ? "" : `<span title="What the pools pay for them now, one at a time"><span class="n">${round(x.strk)}</span> <span class="dim">STRK</span></span>`}</div>${x.held ? `<div class="row tally">${tiers(x)}${x.mega ? `<span><span class="n">${x.mega}</span> Mega</span>` : ""}${x.staked ? `<span><span class="n">${x.staked}</span> staked</span>` : ""}</div>` : ""}${x.beasts.length ? `<div class="cells">${x.beasts.slice(0, zooAll ? undefined : STRIP).map(cell).join("")}</div>` : ""}`;
+  const more = !zooAll && b?.groups?.some((x) => x.beasts.length > STRIP);
+  put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.groups ? round(b.groups.reduce((n, x) => n + x.held, 0)) : ""}</span></div>${b?.failed ? `<span class="bad">No answer</span>` : ""}${b?.groups ? `<div id="zoo" class="scroll">${b.groups.map(group).join("")}${more ? `<div class="more"><button type="button" data-more>More</button></div>` : ""}</div>` : ""}`);
 
   const first = (text) => text.replace(/ (T\d|G\d).*$/, "");
   const sacks = [...(data.bags ?? [])].sort((a, b) => (b[bagSort] ?? -1) - (a[bagSort] ?? -1)).slice(0, BAGS);
   put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><ol id="sacks" class="rows scroll">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>x${x.n}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>`);
 }
 
-function askHtml() {
-  const paid = realGames().find((g) => g.gas_strk !== null);
-  const w = data.wallet;
-  return `<h2>This spends real money</h2>
-    <div class="row cost">${paid ? `<span>Last game <span class="n bad">${round(paid.gas_strk, 1)} STRK</span></span>` : ""}${w?.strk !== undefined ? `<span>Wallet <span class="n ${w.strk > w.floor ? "good" : "bad"}">${round(w.strk, 1)} STRK</span></span>` : ""}</div>
-    <div class="pick"><button class="card spend" type="button" data-do="spend">Spend STRK</button><button class="card" type="button" data-close autofocus>Cancel</button></div>`;
-}
-
 async function load() {
-  data.games = (await get("/api/games")) ?? data.games;
+  const [games, summary] = await Promise.all([get("/api/games"), get("/api/summary")]);
+  Object.assign(data, { games: games ?? data.games, summary: summary ?? data.summary });
   render();
 }
 
 async function loadSide() {
-  const [w, b, l, c, bags] = await Promise.all(["wallet", "beasts", "strategies", "check", "bags"].map((p) => get(`/api/${p}`)));
-  Object.assign(data, { wallet: w ?? data.wallet, beasts: b ?? data.beasts, results: l ?? data.results, check: c, bags: bags ?? data.bags });
+  const [w, b, c, bags] = await Promise.all(["wallet", "beasts", "check", "bags"].map((p) => get(`/api/${p}`)));
+  Object.assign(data, { wallet: w ?? data.wallet, beasts: b ?? data.beasts, check: c, bags: bags ?? data.bags });
   render();
 }
 
@@ -271,26 +269,12 @@ function go(search) {
   render();
 }
 
-const pick = (e) => { const m = e.target.closest("[data-mode]"); if (m) { keep("dungeon", m.dataset.mode); return render(); } const row = e.target.closest("li[data-id]"); if (row) go(Number(row.dataset.id) === liveReal()?.id ? "" : `?game=${row.dataset.id}`); };
+const pick = (e) => { const m = e.target.closest("[data-mode]"); if (m) { keep("dungeon", m.dataset.mode); every = false; return render(); } if (e.target.closest("[data-more]")) { every = true; return render(); } const row = e.target.closest("li[data-id]"); if (row) go(Number(row.dataset.id) === liveReal()?.id ? "" : `?game=${row.dataset.id}`); };
 $("games").onclick = pick;
 $("games").onkeydown = (e) => { if (e.key === "Enter") pick(e); };
+$("beasts").onclick = (e) => { if (e.target.closest("[data-more]")) { zooAll = true; render(); } };
 $("bags").onclick = (e) => { const b = e.target.closest("[data-sort]"); if (b) { bagSort = b.dataset.sort; keep("bagSort", bagSort); render(); } };
 $("golive").onclick = () => go("");
-function control() {
-  $("wallet").insertAdjacentHTML("beforebegin", `<button type="button" id="run"></button>`);
-  document.body.insertAdjacentHTML("beforeend", `<dialog id="ask"></dialog>`);
-  $("run").onclick = () => {
-    if (liveGame()) return post("/api/stop");
-    $("ask").innerHTML = askHtml();
-    $("ask").showModal();
-  };
-  $("ask").onclick = (e) => {
-    const spend = e.target.closest("[data-do]");
-    if (spend) post("/api/play", { live: true });
-    if (spend || e.target.closest("[data-close]") || e.target === $("ask")) { $("ask").close(); if (spend) go(""); }
-  };
-  render();
-}
 addEventListener("popstate", render);
 
 const source = new EventSource("/events");
@@ -305,7 +289,6 @@ Promise.all([get("/api/items"), load()]).then(([table]) => {
   loadSide();
 });
 setInterval(loadSide, SLOW_MS);
-get("/api/me").then((me) => { if (me?.control) control(); });
 </script>
 </body>
 </html>

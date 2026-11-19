@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hash, type Call } from "starknet";
 import { claims as pending } from "./beasts.ts";
-import { DUNGEON, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, VAR_DIR, type Dungeon } from "./config.ts";
+import { BEAST_NFT, DUNGEON, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, SURVIVOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, VAR_DIR, type Dungeon } from "./config.ts";
 import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
 import { randomHash, startOf, type Chain, type Game, type Snapshot } from "./practice.ts";
@@ -55,8 +55,57 @@ export async function ticketCalls(): Promise<{ calls: Call[]; maxStrk: number }>
   };
 }
 
-async function enter(): Promise<string> {
+export type Entry = { bag: number; maxSurvivor: number };
+export type BagQuote = { price: bigint; protocolFee: bigint; royalty: bigint };
+
+const gameId = (n: bigint) => "0x" + n.toString(16).padStart(64, "0");
+const bagOf = (id: bigint) => Number((id >> 192n) & ((1n << 56n) - 1n));
+const pair = (list: string[], at: number) => BigInt(list[at]) + (BigInt(list[at + 1]) << 128n);
+export const units = (n: bigint) => `${n / ONE}.${(n % ONE).toString().padStart(18, "0")}`.replace(/\.?0+$/, "");
+
+export function heldGames(ids: string[], bag: number): string[] {
+  return Array.from({ length: Number(ids[0]) }, (_, i) => pair(ids, 1 + 2 * i)).filter((id) => bagOf(id) === bag).map(gameId);
+}
+
+export function readQuote(out: string[]): BagQuote {
+  if (BigInt(out[0]) !== 0n) throw new Error(`the pool cannot price a bag (curve error ${Number(out[0])})`);
+  return { price: pair(out, 3), protocolFee: pair(out, 5), royalty: pair(out, 7) };
+}
+
+export function bagCalls(pool: string, id: string, max: bigint, recipient: string): Call[] {
+  return [
+    { contractAddress: SURVIVOR, entrypoint: "approve", calldata: [pool, ...u256(max)] },
+    { contractAddress: pool, entrypoint: "swap_token_for_specific_nfts", calldata: ["0x1", ...u256(BigInt(id)), ...u256(max), recipient, "0x0", "0x0"] },
+    { contractAddress: SURVIVOR, entrypoint: "approve", calldata: [pool, "0x0", "0x0"] },
+  ];
+}
+
+export function bagPurchase(pool: string, held: string[], quote: BagQuote, entry: Entry, recipient: string, survivor: bigint): { id: string; calls: Call[] } {
+  const max = entry.maxSurvivor > 0 ? BigInt(Math.round(entry.maxSurvivor * 1e6)) * (ONE / 1_000_000n) : 0n;
+  if (!held.length) throw new Error(`the pool holds no game of bag ${entry.bag}`);
+  if (max === 0n) throw new Error("give the most SURVIVOR to pay for the bag as maxSurvivor");
+  if (quote.price > max) throw new Error(`bag ${entry.bag} costs ${units(quote.price)} SURVIVOR, over the ${entry.maxSurvivor} limit`);
+  if (survivor < quote.price) throw new Error(`bag ${entry.bag} costs ${units(quote.price)} SURVIVOR and the wallet holds ${units(survivor)}`);
+  return { id: held[0], calls: bagCalls(pool, held[0], max, recipient) };
+}
+
+export async function bagMarket(pool: string, bag: number): Promise<{ held: string[]; quote: BagQuote }> {
+  const held = heldGames(await provider.callContract({ contractAddress: pool, entrypoint: "get_all_ids", calldata: [] }), bag);
+  const quote = readQuote(await provider.callContract({ contractAddress: pool, entrypoint: "get_buy_nft_quote", calldata: [...u256(BigInt(held[0] ?? 0)), "0x1", "0x0"] }));
+  return { held, quote };
+}
+
+async function buyBag(pool: string, entry: Entry | undefined, me: string): Promise<string> {
+  if (!entry) throw new Error(`${DUNGEON.name} starts from a bought bag: give bag and maxSurvivor`);
+  const [{ held, quote }, survivor] = await Promise.all([bagMarket(pool, entry.bag), balanceOf(SURVIVOR)]);
+  const { id, calls } = bagPurchase(pool, held, quote, entry, me, survivor);
+  await send(calls);
+  return id;
+}
+
+async function enter(entry?: Entry): Promise<string> {
   const me = keys().address;
+  if (DUNGEON.pool) return buyBag(DUNGEON.pool, entry, me);
   const buy = (await balanceOf(TICKET)) < ONE ? (await ticketCalls()).calls : [];
   const receipt = await send([
     ...buy,
@@ -81,8 +130,8 @@ async function start(id: string): Promise<Snapshot> {
   }
 }
 
-export async function liveGame(): Promise<Game> {
-  const id: string = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).id : await enter();
+export async function liveGame(entry?: Entry): Promise<Game> {
+  const id: string = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).id : await enter(entry);
   writeFileSync(file, JSON.stringify({ id }));
   const { packets, chain } = await transcript(id);
   const begin = await start(id);
@@ -135,6 +184,20 @@ export async function collect(id: string): Promise<string | undefined> {
 
 type Simulated = { calls: string[]; strk: number; revert: string | null };
 
+export async function sendBeasts(to: string): Promise<{ beasts: number; transaction: string | null }> {
+  const owner = keys().address;
+  await provider.getClassHashAt(to);
+  const nft = (entrypoint: string, calldata: string[]) => provider.callContract({ contractAddress: BEAST_NFT, entrypoint, calldata });
+  const count = Number((await nft("balance_of", [owner]))[0]);
+  const ids: string[] = [];
+  for (let i = 0; i < count; i++) ids.push((await nft("token_of_owner_by_index", [owner, hex(BigInt(i)), "0x0"]))[0]);
+  const calls = ids.map((id) => ({ contractAddress: BEAST_NFT, entrypoint: "transfer_from", calldata: [owner, to, ...u256(BigInt(id))] }));
+  if (!calls.length) return { beasts: 0, transaction: null };
+  const [checked] = await simulate(owner, [calls]);
+  if (checked.revert) throw new Error(`transfer would revert: ${checked.revert}`);
+  return { beasts: calls.length, transaction: (await send(calls)).transaction_hash };
+}
+
 export async function simulate(sender: string, txs: Call[][]): Promise<Simulated[]> {
   const nonce = BigInt(await provider.getNonceForAddress(sender));
   const none = { max_amount: "0x0", max_price_per_unit: "0x0" };
@@ -172,6 +235,22 @@ export async function simulate(sender: string, txs: Call[][]): Promise<Simulated
     strk: Number(BigInt(r.fee_estimation.overall_fee)) / 1e18,
     revert: r.transaction_trace.execute_invocation.revert_reason?.replace(/\s+/g, " ").slice(-200) ?? null,
   }));
+}
+
+export async function bagReport(bag: number, address: string) {
+  const pool = DUNGEONS.lootBag.pool!;
+  const [{ held, quote }, survivor, strk] = await Promise.all([bagMarket(pool, bag), balanceOf(SURVIVOR, address), balanceOf(STRK, address)]);
+  const enough = survivor >= quote.price;
+  const [purchase] = held.length ? await simulate(address, [bagCalls(pool, held[0], quote.price, address)]) : [null];
+  return {
+    bag,
+    held: held.length,
+    games: held,
+    survivor: { price: units(quote.price), protocolFee: units(quote.protocolFee), royalty: units(quote.royalty) },
+    wallet: { address, survivor: units(survivor), strk: units(strk), enough },
+    purchase: purchase && { strk: purchase.strk, revert: purchase.revert },
+    note: !held.length ? "the pool does not hold this bag: nothing to simulate" : enough ? "simulated only, nothing was sent" : "the wallet holds too little SURVIVOR, so the simulated purchase reverts and its fee is a lower bound",
+  };
 }
 
 export async function quote(id: string): Promise<{ owner: string; claims: number[]; strk: number; transactions: Simulated[] }> {

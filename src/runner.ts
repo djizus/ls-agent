@@ -1,15 +1,15 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
-import { DUNGEON, DUNGEON_KEY } from "./config.ts";
+import { BEASTS_TO, DUNGEON, DUNGEON_KEY } from "./config.ts";
 import { db } from "./db.ts";
-import { collect } from "./live.ts";
+import { collect, sendBeasts, type Entry } from "./live.ts";
 import { strkBalance } from "./wallet.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
 import { plan } from "./policy.ts";
 import { emit, subscribe } from "./events.ts";
-import { type Option, type State, auditGame, begin, commit, current, currentGame, describeOptions, movesMade, options, phase, render, shape, snapshot, type Phase } from "./play.ts";
+import { type Option, type State, auditGame, begin, namedSlain, commit, current, currentGame, describeOptions, movesMade, options, phase, render, shape, snapshot, type Phase } from "./play.ts";
 
 export const DECIDER = process.env.LS_DECIDER ?? "rules";
 const DECIDER_SOURCE = ["policy.ts", "jev.ts"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("");
@@ -29,6 +29,14 @@ subscribe((e) => {
   if (row !== undefined) db.prepare("INSERT INTO events (game, at, body) VALUES (?, ?, ?)").run(row, e.at, JSON.stringify(e));
 });
 
+const slain = (game: number): number =>
+  namedSlain((db.prepare("SELECT body FROM events WHERE game = ? ORDER BY rowid").all(game) as { body: string }[]).map((e) => JSON.parse(e.body)));
+
+const RECORDED = `EXISTS (SELECT 1 FROM events WHERE game = games.id AND body LIKE '{"kind":"state"%')`;
+db.exec(`UPDATE games SET beasts = NULL WHERE beasts = 0 AND NOT ${RECORDED}`);
+for (const { id } of db.prepare(`SELECT id FROM games WHERE ended_at IS NOT NULL AND beasts IS NULL AND ${RECORDED}`).all() as { id: number }[])
+  db.prepare("UPDATE games SET beasts = ? WHERE id = ?").run(slain(id), id);
+
 export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
   const full = `${DECIDER === "rules" ? "rules" : DECIDER === "jev" ? JEV_MODEL : `${MODEL} effort ${EFFORT}`}\n\n${PREAMBLE}\n\n${text}`;
   const hash = createHash("sha256").update(full).update(DECIDER === "model" ? "" : DECIDER_SOURCE).digest("hex").slice(0, 8);
@@ -38,13 +46,13 @@ export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
   return { hash, text: full, rules: (p: Phase) => [common.trim(), sections[p] ?? ""].filter(Boolean).join("\n\n") };
 }
 
-async function playGame(practiceId: string | undefined, seed: number): Promise<void> {
+async function playGame(practiceId: string | undefined, seed: number, entry?: Entry): Promise<void> {
   let ending = "stopped";
   const strategy = loadStrategy();
   db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(strategy.hash, strategy.text, Date.now());
   const funds = () => (practiceId ? null : strkBalance().then(Number, () => null));
   const before = await funds();
-  const id = await begin(practiceId, seed);
+  const id = await begin(practiceId, seed, entry);
   const mode = practiceId ? "practice" : DUNGEON_KEY;
   const resumed = practiceId ? undefined : (db.prepare("SELECT id FROM games WHERE game_id = ? AND mode = ?").get(id, mode) as { id: number } | undefined);
   row = resumed?.id ?? Number(db.prepare("INSERT INTO games (mode, game_id, seed, strategy, started_at) VALUES (?, ?, ?, ?, ?)").run(mode, id, seed, strategy.hash, Date.now()).lastInsertRowid);
@@ -55,7 +63,7 @@ async function playGame(practiceId: string | undefined, seed: number): Promise<v
     ending = `failed: ${(err as Error).message.slice(0, 200)}`;
   } finally {
     const end = snapshot();
-    db.prepare("UPDATE games SET ended_at = ?, level = ?, xp = ?, moves = ?, cost_usd = ?, ending = ?, mismatches = ? WHERE id = ?").run(Date.now(), end?.level ?? 0, end?.xp ?? 0, movesMade(), cost, ending, mismatches, row);
+    db.prepare("UPDATE games SET ended_at = ?, level = ?, xp = ?, moves = ?, cost_usd = ?, ending = ?, mismatches = ?, beasts = ? WHERE id = ?").run(Date.now(), end?.level ?? 0, end?.xp ?? 0, movesMade(), cost, ending, mismatches, slain(row!), row);
     const after = await funds();
     if (before !== null && after !== null) db.prepare("UPDATE games SET gas_strk = coalesce(gas_strk, 0) + ? WHERE id = ?").run((before - after) / 1e18, row);
     emit({ kind: "status", text: `game ${row} ${ending}`, row, ending });
@@ -65,6 +73,9 @@ async function playGame(practiceId: string | undefined, seed: number): Promise<v
   await new Promise((r) => setTimeout(r, CLAIM_DELAY_MS));
   const claimed = await collect(id);
   emit({ kind: "status", text: claimed ? `claimed beasts from ${id.slice(-8)} in ${claimed}` : `no beast to claim from ${id.slice(-8)}` });
+  if (!claimed || !BEASTS_TO) return;
+  const sent = await sendBeasts(BEASTS_TO);
+  emit({ kind: "status", text: `sent ${sent.beasts} beasts to ${BEASTS_TO.slice(0, 8)} in ${sent.transaction}` });
 }
 
 
@@ -139,7 +150,7 @@ async function playMoves(rules: (p: Phase) => string): Promise<string> {
   return ending;
 }
 
-export async function play(count: number, live: boolean): Promise<void> {
+export async function play(count: number, live: boolean, entry?: Entry): Promise<void> {
   if (busy) return;
   busy = true;
   stopping = false;
@@ -147,7 +158,7 @@ export async function play(count: number, live: boolean): Promise<void> {
     const seed = nextSeed();
     for (const id of live ? Array<undefined>(count).fill(undefined) : DUNGEON.benchmark.slice(0, count)) {
       if (stopping) break;
-      await playGame(id, seed).catch((err) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` }));
+      await playGame(id, seed, entry).catch((err) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` }));
     }
   } finally {
     busy = false;
