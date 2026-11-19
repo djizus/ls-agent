@@ -7,7 +7,7 @@ import { marketOf } from "./market.ts";
 import { MARKET } from "./settings.ts";
 import { BAG_STATS, SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
 import { NECK, beastHit, yourHit } from "./engine/damage.ts";
-import { actLive, liveGame } from "./live.ts";
+import { actLive, liveGame, type Entry } from "./live.ts";
 import { ARMOR_SLOTS, foeOf, toSnapshot } from "./engine/engine.ts";
 import { act, audit, newPracticeGame, preview, revertReason, type Game, type Snapshot } from "./practice.ts";
 
@@ -193,8 +193,8 @@ export function phase(s: State): Phase {
   return s.beast ? "battle" : "explore";
 }
 
-export async function begin(id: string | undefined, seed = 0): Promise<string> {
-  game = id ? await newPracticeGame(id, seed) : await liveGame();
+export async function begin(id: string | undefined, seed = 0, entry?: Entry): Promise<string> {
+  game = id ? await newPracticeGame(id, seed) : await liveGame(entry);
   last = toSnapshot(game.local);
   return game.id;
 }

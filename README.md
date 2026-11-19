@@ -53,6 +53,7 @@ Real games send transactions on Starknet mainnet and spend STRK from the bot's o
 | Wallet key | `var/wallet.json` holds the private key in plain text, readable only by your user. Whoever reads the file owns the funds. If you delete `var/`, the funds are lost. Back the file up. |
 | Spend floor | 100 STRK, `STRK_FLOOR` in `src/config.ts`. Under it the bot sends nothing. It is the only spending limit: above the floor the bot keeps paying for as many games as you start. |
 | Tickets | A game uses one dungeon ticket. With less than one ticket left, the bot buys 10 on Ekubo and refuses if they cost more than 2 STRK. |
+| Loot Bag games | With `LS_DUNGEON=lootBag` a game starts by buying one bag from the game's pool with SURVIVOR, so the wallet needs SURVIVOR as well as STRK. Name the bag and the most you will pay: `curl -X POST 127.0.0.1:4100/api/play -d '{"live":true,"bag":7806,"maxSurvivor":90}'`. The bot refuses when the price is above `maxSurvivor`, when the pool no longer holds that bag, or when the wallet is short. The price rises a little with each bag sold: 84 SURVIVOR at the time of writing, fee and royalty included. `node src/cli.ts bag <bag number>` prints the price now, whether the pool holds the bag, and a simulated purchase, without sending anything. If a purchase fails with an unclear error, check the wallet before you retry: a retry buys another copy. |
 | A game | Each move is one transaction. 8 recorded Beast Mode games cost 0.8 to 3.9 STRK each, 2.5 at the median, about 0.04 STRK per move. Fees change with the network. |
 | Settlement | When a finished game killed a beast that can be collected, the bot settles the game on chain a minute later and claims the beast. Simulated cost: 0.5 STRK for a 13-move game, 3.1 STRK for a 115-move game. `node src/cli.ts quote <game id>` simulates it for one game without sending anything. |
 | Stopping | `curl -X POST 127.0.0.1:4100/api/stop` ends play after the current move. An unfinished game is kept in `var/live.json` and resumes on the next start. The bot stops by itself if its local state differs from the contract. |
@@ -114,6 +115,7 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 | Deploy the wallet account (spends STRK) | `node src/cli.ts deploy` |
 | Settle a finished real game and claim its beasts (spends STRK, runs by itself after each real game) | `node src/cli.ts collect <game id>` |
 | What settling a finished game would cost (read-only) | `node src/cli.ts quote <game id>` |
+| A loot bag's price now, whether the pool holds it, and a simulated purchase (read-only) | `node src/cli.ts bag <bag number> [address]` |
 | Beasts an address holds or has staked, and its unclaimed kills (read-only) | `node src/cli.ts beasts [address]` |
 | Import human games for study | `node scripts/import.ts <dir>...` |
 | Explain how a game died | `node scripts/autopsy.ts <file> <game>...` |
