@@ -12,7 +12,7 @@ import { handleMcp } from "./mcp.ts";
 
 const page = readFileSync(new URL("../web/index.html", import.meta.url));
 const CHECK = `${VAR_DIR}contract-check.json`;
-const BAGS = `${VAR_DIR}bag-ranking.json`;
+const BAGS = new URL("../scripts/bag-ranking.json", import.meta.url);
 const GAMES = `SELECT *, CASE mode ${Object.entries(DUNGEONS).map(([k, d]) => `WHEN '${k}' THEN '${d.name}'`).join(" ")} END AS dungeon, mode IN (${Object.keys(DUNGEONS).map((k) => `'${k}'`)}) AS onchain, id IS ? AS live FROM games`;
 
 async function json(req: IncomingMessage): Promise<unknown> {

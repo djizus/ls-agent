@@ -44,14 +44,14 @@ Starts the real service on port 4199, plays 2 practice games through the HTTP AP
 Real games send transactions on Starknet mainnet and spend STRK from the bot's own wallet. Read this section before you fund it.
 
 1. `node src/cli.ts wallet` prints the wallet address, creating the key if needed.
-2. Send STRK to that address. The bot refuses to send a transaction while the balance is under 80 STRK, so fund more than that.
+2. Send STRK to that address. The bot refuses to send a transaction while the balance is under 100 STRK, so fund more than that.
 3. `node src/cli.ts deploy` deploys the account (one small fee).
 4. Open the page on the same machine and press "Play", then "Spend STRK". This plays one game. `curl -X POST 127.0.0.1:4100/api/play -d '{"live":true,"games":3}'` plays three.
 
 | What | Cost or risk |
 |---|---|
 | Wallet key | `var/wallet.json` holds the private key in plain text, readable only by your user. Whoever reads the file owns the funds. If you delete `var/`, the funds are lost. Back the file up. |
-| Spend floor | 80 STRK, `STRK_FLOOR` in `src/config.ts`. Under it the bot sends nothing. It is the only spending limit: above the floor the bot keeps paying for as many games as you start. |
+| Spend floor | 100 STRK, `STRK_FLOOR` in `src/config.ts`. Under it the bot sends nothing. It is the only spending limit: above the floor the bot keeps paying for as many games as you start. |
 | Tickets | A game uses one dungeon ticket. With less than one ticket left, the bot buys 10 on Ekubo and refuses if they cost more than 2 STRK. |
 | A game | Each move is one transaction. 8 recorded Beast Mode games cost 0.8 to 3.9 STRK each, 2.5 at the median, about 0.04 STRK per move. Fees change with the network. |
 | Settlement | When a finished game killed a beast that can be collected, the bot settles the game on chain a minute later and claims the beast. Simulated cost: 0.5 STRK for a 13-move game, 3.1 STRK for a 115-move game. `node src/cli.ts quote <game id>` simulates it for one game without sending anything. |
@@ -90,7 +90,7 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 | `npm run bench -- --late var/level30.json --seeds 0-10` | Plays those saved games forward on 10 luck seeds each, to measure late-game rules |
 | `npm run bench -- --exact` | Uses the contract's hash for luck in place of the fast one: same distribution, 30 times slower |
 | `LS_DUNGEON=lootBag npm run bench -- --ids bags.json --by-id` | Loot bag starts are fixed, so each game id in the file is played on 500 luck seeds, with one line per id |
-| `LS_DUNGEON=lootBag npm run bench -- --rank var/bag-ranking.json` | Replays every bag in the list the page shows and rewrites its figures. The list itself is not in the repository, so "Loot bags" is empty on a fresh clone. |
+| `LS_DUNGEON=lootBag npm run bench -- --rank scripts/bag-ranking.json` | Replays every bag in the list the page shows and rewrites its figures (about 8 minutes on 14 cores). |
 | `node scripts/search.ts --grid '{"fightRisk":[0.15,0.25,0.35]}' --level 35` | Moves one `RULES` field at a time to the value that raises the share reaching that level, then confirms on other starts |
 
 ## Feature map
@@ -104,7 +104,7 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 | Practice results and the contract check | "Practice" on the left. `GET /api/strategies`, `GET /api/check`. "Checked" appears after `scripts/check.sh` has run the tests and written `var/contract-check.json`. |
 | Wallet: STRK (red under the spend floor), tickets, SURVIVOR, average STRK per real game | "Wallet" on the right. `GET /api/wallet` (cached 30 seconds). |
 | Beasts held or won and not yet claimed | "Beasts" on the right. `GET /api/beasts` (cached 60 seconds). |
-| Loot bags, best 25, with the copies the pool holds | "Loot bags" on the right, ranked by mean level or by named beasts killed. `GET /api/bags` reads `var/bag-ranking.json`. |
+| Loot bags, best 25, with the copies the pool holds | "Loot bags" on the right, ranked by mean level or by named beasts killed. `GET /api/bags` reads `scripts/bag-ranking.json`. |
 | Start a real game (spends STRK) | On the machine itself: "Play", then "Spend STRK". `POST /api/play` with `{"live": true}`. |
 | Start a practice pass | `POST /api/play` with `{"games": n}`. Not on the page. |
 | Stop after the current move | On the machine itself: "Stop" replaces "Play" while a game is live. `POST /api/stop`. |
@@ -133,4 +133,8 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 
 ## The author's deployment
 
-`deploy/` is how the author runs the bot on one server: systemd user units, a daily run of `scripts/check.sh` and a Traefik route for the author's own domain. The paths and the host name are theirs. You do not need it to run locally. Use it as an example if you want a service of your own.
+`deploy/` is an example of running the bot as a service: systemd user units, a daily run of `scripts/check.sh` and a Traefik route. `deploy/install.sh` reads `LS_DOMAIN` and `LS_HOST` from `~/.config/ls-agent/env`. The paths in the units are one machine's; adjust them. You do not need it to run locally.
+
+## Licence
+
+MIT, see `LICENSE`.

@@ -2,6 +2,7 @@
   "name": "ls-agent",
   "description": "Plays Loot Survivor 2 on Starknet with a rule policy, with a local port of the game for practice and benchmarks",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22.18"
