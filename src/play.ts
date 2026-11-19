@@ -35,6 +35,25 @@ export type State = {
   buys: { attack: number; flee: number; trap: number; ambush: number; crit: number };
   purse: { potions: number; toFull: number; deal: (Offer & { why: string }) | null };
 };
+export const slewNamed = (before: Pick<State, "beast">, after: Pick<State, "beast" | "over">, move: string): boolean =>
+  before.beast?.specialPrefix != null && !after.beast && !after.over && move === "attack";
+
+type Recorded = { kind: string; state?: Pick<State, "beast" | "over">; actions?: { type: string }[] };
+
+export function namedSlain(events: Recorded[]): number {
+  let count = 0;
+  let before: Recorded["state"];
+  let move: string | undefined;
+  for (const e of events) {
+    if (e.kind === "decision") move = e.actions?.[0]?.type;
+    if (e.kind !== "state" || !e.state) continue;
+    if (before && move && slewNamed(before, e.state, move)) count++;
+    before = e.state;
+    move = undefined;
+  }
+  return count;
+}
+
 type Stored = Pick<State, "over" | "level" | "health" | "maxHealth" | "xp" | "gold" | "beast" | "statUpgradesAvailable" | "stats" | "market"> &
   Partial<Pick<State, "baseStats" | "potionPrice" | "happened" | "hits">> & { equipment: Legacy[] | Record<string, Legacy>; bag: Legacy[] };
 type Legacy = Omit<Worn, "greatness" | "xp"> & { greatness?: number; xp?: number; level?: number };

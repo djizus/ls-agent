@@ -51,6 +51,10 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 #podium img { width: 3.6rem; height: 3.6rem; object-fit: contain; filter: drop-shadow(0 3px 0 rgb(0 0 0 / 0.7)); }
 #podium b { font: 400 2.6rem/0.9 var(--num); color: var(--gold); }
 #games li { cursor: pointer; }
+#board li { grid-template-columns: auto 1fr auto 2.4rem; }
+#board b { text-align: right; }
+.slain { display: flex; align-items: center; gap: 0.2rem; font-size: 1.4rem; line-height: 1; }
+#games .slain img { width: 1.2rem; height: 1.2rem; filter: none; }
 #games li:hover { background: #1e2619; }
 #games li.on { border-color: var(--gold); box-shadow: var(--bevel), 0 0 0 2px var(--gold), 0 3px 0 rgb(0 0 0 / 0.6); }
 #results { flex: none; }
@@ -77,9 +81,6 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .chip.out img { filter: grayscale(1) brightness(0.6); }
 #golive { color: #000; background: var(--lime); border-radius: 3px; padding: 0.2rem 0.6rem; white-space: nowrap; }
 
-#run { flex: none; height: 3.6rem; font: 400 2.1rem/1 var(--num); letter-spacing: 0.08em; color: #000; background: linear-gradient(#b6ff5c 0 12%, var(--lime) 12% 80%, #4fa800 80%); border: 2px solid #000; border-radius: 4px; box-shadow: 0 0 0 2px #2f5c00, var(--drop); }
-#run.stop { background: linear-gradient(#ff9a8c 0 12%, var(--blood) 12% 80%, #a32a1c 80%); box-shadow: 0 0 0 2px #5c1a12, var(--drop); }
-#run:active { transform: translateY(2px); }
 .big { font: 400 3.2rem/0.9 var(--num); }
 .big small { font-size: 1.3rem; color: var(--dim); }
 .row { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: center; }
@@ -97,14 +98,6 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .seg button { padding: 0 0.5rem; border: 2px solid var(--edge); border-radius: 3px; color: var(--dim); }
 .seg button[aria-pressed="true"] { color: #000; background: var(--gold); border-color: var(--gold); }
 
-dialog { margin: auto; width: min(34rem, calc(100vw - 2rem)); color: var(--bone); background: linear-gradient(#141a10, #0a0d08); border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--bevel), 0 0 0 2px #000, 0 20px 60px #000; padding: 1.4rem; }
-dialog::backdrop { background: rgb(0 0 0 / 0.78); }
-dialog h2 { text-align: center; margin-bottom: 1rem; font-size: 2.4rem; color: var(--blood); }
-.cost { justify-content: center; margin-bottom: 1.1rem; }
-.pick { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
-.pick button { padding: 1.1rem 0.5rem; font: 400 2rem/1 var(--num); }
-.pick button:hover { border-color: var(--gold); }
-.pick button.spend { color: var(--blood); border-color: #7a2a20; }
 
 @media (max-width: 900px) {
   body { height: auto; overflow: auto; padding: 0.5rem; }
@@ -137,7 +130,6 @@ dialog h2 { text-align: center; margin-bottom: 1rem; font-size: 2.4rem; color: v
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const post = (url, body) => fetch(url, { method: "POST", body: body && JSON.stringify(body) });
 const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 const round = (n, digits = 0) => Number(n).toLocaleString("en", { maximumFractionDigits: digits });
 const put = (el, html) => { if (el.html !== html) el.innerHTML = el.html = html; };
@@ -145,6 +137,7 @@ const title = (word) => word[0].toUpperCase() + word.slice(1);
 const stat = (name) => `<i class="ic" style="--i:url(/assets/icons/${title(name)}.svg)" title="${title(name)}"></i>`;
 const pic = (name, label) => `<img class="pic" src="/assets/icons/${name}.png" alt="${label}" title="${label}">`;
 const art = (name) => `<img class="pic" src="/assets/loot/${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.png" alt="${esc(name)}" title="${esc(name)}">`;
+const slain = (g) => (g.beasts == null ? `<span></span>` : `<span class="slain" title="Named beasts slain"><img src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`);
 const face = (name) => (/^[A-Za-z]+$/.test(name ?? "") ? `/assets/beasts/${name.toLowerCase()}.png` : "/assets/skull.png");
 const killer = (g) => (g.ending ?? "").match(/against (?:".*" )?(\w+) level (\d+)$/);
 
@@ -163,7 +156,6 @@ let shown;
 let move = null;
 let market = [];
 
-const liveGame = () => data.games.find((g) => g.live);
 const liveReal = () => data.games.find((g) => g.live && g.onchain);
 const realGames = () => data.games.filter((g) => g.onchain);
 const picked = () => Number(new URLSearchParams(location.search).get("game")) || null;
@@ -195,7 +187,6 @@ function endHtml(g) {
 
 function render() {
   const g = target();
-  const live = liveGame();
   if (shown === undefined || g?.id !== shown?.id) {
     shown = g;
     move = null;
@@ -208,7 +199,6 @@ function render() {
   $("which").textContent = g ? `Game ${g.id}` : "";
   put($("plan"), !g ? "" : g.live ? (move ? planHtml(move) : "") : endHtml(g));
   $("golive").hidden = !liveReal() || g?.live;
-  if ($("run")) { $("run").textContent = live ? "Stop" : "Play"; $("run").className = live ? "stop" : ""; }
 
   const modes = data.beasts?.collections ?? {};
   const mode = keep("dungeon") in modes ? keep("dungeon") : (liveReal() ?? realGames()[0])?.mode;
@@ -217,8 +207,8 @@ function render() {
   put($("modes"), `<h2>Games</h2><span class="seg">${Object.entries(modes).map(([k, name]) => `<button type="button" data-mode="${k}" aria-pressed="${k === mode}">${name.split(" ")[0]}</button>`).join("")}</span>`);
   const ranked = inMode.filter((x) => !x.live).sort((a, b) => b.level - a.level || b.id - a.id);
   const cls = (x) => `card${x.id === g?.id ? " on" : ""}`;
-  put($("podium"), ranked.slice(0, 3).map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0" title="Game ${x.id}"><img src="${face(killer(x)?.[1])}" alt=""><b>${x.level}</b><span class="dim">${x.id}</span></li>`).join(""));
-  put($("board"), !inMode.length ? `<li class="none">No games</li>` : [...(liveHere ? [liveHere] : []), ...ranked.slice(3).sort((a, b) => b.started_at - a.started_at)].map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0"><img src="${x.live ? "/assets/favicon.png" : face(killer(x)?.[1])}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span><b>${x.live ? "" : x.level}</b></li>`).join(""));
+  put($("podium"), ranked.slice(0, 3).map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0" title="Game ${x.id}"><img src="${face(killer(x)?.[1])}" alt=""><b>${x.level}</b>${slain(x)}<span class="dim">${x.id}</span></li>`).join(""));
+  put($("board"), !inMode.length ? `<li class="none">No games</li>` : [...(liveHere ? [liveHere] : []), ...ranked.slice().sort((a, b) => b.started_at - a.started_at)].map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0"><img src="${x.live ? "/assets/favicon.png" : face(killer(x)?.[1])}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.live ? "" : x.level}</b></li>`).join(""));
 
   const l = data.results?.[0];
   const c = data.check;
@@ -240,14 +230,6 @@ function render() {
   const first = (text) => text.replace(/ (T\d|G\d).*$/, "");
   const sacks = [...(data.bags ?? [])].sort((a, b) => (b[bagSort] ?? -1) - (a[bagSort] ?? -1)).slice(0, BAGS);
   put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><ol id="sacks" class="rows scroll">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>x${x.n}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>`);
-}
-
-function askHtml() {
-  const paid = realGames().find((g) => g.gas_strk !== null);
-  const w = data.wallet;
-  return `<h2>This spends real money</h2>
-    <div class="row cost">${paid ? `<span>Last game <span class="n bad">${round(paid.gas_strk, 1)} STRK</span></span>` : ""}${w?.strk !== undefined ? `<span>Wallet <span class="n ${w.strk > w.floor ? "good" : "bad"}">${round(w.strk, 1)} STRK</span></span>` : ""}</div>
-    <div class="pick"><button class="card spend" type="button" data-do="spend">Spend STRK</button><button class="card" type="button" data-close autofocus>Cancel</button></div>`;
 }
 
 async function load() {
@@ -276,21 +258,6 @@ $("games").onclick = pick;
 $("games").onkeydown = (e) => { if (e.key === "Enter") pick(e); };
 $("bags").onclick = (e) => { const b = e.target.closest("[data-sort]"); if (b) { bagSort = b.dataset.sort; keep("bagSort", bagSort); render(); } };
 $("golive").onclick = () => go("");
-function control() {
-  $("wallet").insertAdjacentHTML("beforebegin", `<button type="button" id="run"></button>`);
-  document.body.insertAdjacentHTML("beforeend", `<dialog id="ask"></dialog>`);
-  $("run").onclick = () => {
-    if (liveGame()) return post("/api/stop");
-    $("ask").innerHTML = askHtml();
-    $("ask").showModal();
-  };
-  $("ask").onclick = (e) => {
-    const spend = e.target.closest("[data-do]");
-    if (spend) post("/api/play", { live: true });
-    if (spend || e.target.closest("[data-close]") || e.target === $("ask")) { $("ask").close(); if (spend) go(""); }
-  };
-  render();
-}
 addEventListener("popstate", render);
 
 const source = new EventSource("/events");
@@ -305,7 +272,6 @@ Promise.all([get("/api/items"), load()]).then(([table]) => {
   loadSide();
 });
 setInterval(loadSide, SLOW_MS);
-get("/api/me").then((me) => { if (me?.control) control(); });
 </script>
 </body>
 </html>

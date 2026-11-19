@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DUNGEON } from "./config.ts";
-import { begin, commit, current, enrich, render, shape, type State } from "./play.ts";
+import { begin, commit, current, enrich, namedSlain, render, shape, type State } from "./play.ts";
 import { act, newPracticeGame, preview, replay, type Snapshot } from "./practice.ts";
 
 test("market and potions are open between fights, not only at level-up", { timeout: 120_000 }, async () => {
@@ -87,4 +87,29 @@ test("a stored state gains luck, chances, grants and purse, whatever its age", (
   assert.deepEqual(state.bag.map((g) => g.grants), [["+3 luck"], ["+2 vitality"]]);
   assert.deepEqual(state.purse, { potions: 15, toFull: 15, deal: { ...state.market[1], why: "empty head" } });
   assert.deepEqual(enrich(state), state);
+});
+
+test("a recorded game counts the named beasts it killed by attacking, not plain beasts, escapes or the one that killed it", () => {
+  const beast = (specialPrefix: string | null) => ({ beast: { specialPrefix } as State["beast"], over: false });
+  const clear = { beast: null, over: false };
+  const decision = (type: string) => ({ kind: "decision", actions: [{ type }] });
+  const state = (s: { beast: State["beast"]; over: boolean }) => ({ kind: "state", state: s });
+  const recorded = [
+    { kind: "status" },
+    state(clear),
+    decision("explore"), state(beast("Horror")),
+    decision("attack"), state(beast("Horror")),
+    decision("attack"), state(clear),
+    decision("explore"), state(beast(null)),
+    decision("attack"), state(clear),
+    decision("explore"), state(beast("Brood")),
+    decision("flee"), state(clear),
+    decision("explore"), state(beast("Golem")),
+    decision("equip"), state(beast("Golem")),
+    decision("attack"), { kind: "rejected" }, decision("attack"), state(clear),
+    decision("explore"), state(beast("Victory")),
+    decision("attack"), state({ beast: null, over: true }),
+  ];
+  assert.equal(namedSlain(recorded), 2);
+  assert.equal(namedSlain([]), 0);
 });

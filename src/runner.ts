@@ -9,7 +9,7 @@ import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide
 import { JEV_MODEL, jevDecide } from "./jev.ts";
 import { plan } from "./policy.ts";
 import { emit, subscribe } from "./events.ts";
-import { type Option, type State, auditGame, begin, commit, current, currentGame, describeOptions, movesMade, options, phase, render, shape, snapshot, type Phase } from "./play.ts";
+import { type Option, type State, auditGame, begin, namedSlain, commit, current, currentGame, describeOptions, movesMade, options, phase, render, shape, snapshot, type Phase } from "./play.ts";
 
 export const DECIDER = process.env.LS_DECIDER ?? "rules";
 const DECIDER_SOURCE = ["policy.ts", "jev.ts"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("");
@@ -28,6 +28,12 @@ let mismatches = 0;
 subscribe((e) => {
   if (row !== undefined) db.prepare("INSERT INTO events (game, at, body) VALUES (?, ?, ?)").run(row, e.at, JSON.stringify(e));
 });
+
+const slain = (game: number): number =>
+  namedSlain((db.prepare("SELECT body FROM events WHERE game = ? ORDER BY rowid").all(game) as { body: string }[]).map((e) => JSON.parse(e.body)));
+
+for (const { id } of db.prepare("SELECT id FROM games WHERE ended_at IS NOT NULL AND beasts IS NULL").all() as { id: number }[])
+  db.prepare("UPDATE games SET beasts = ? WHERE id = ?").run(slain(id), id);
 
 export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
   const full = `${DECIDER === "rules" ? "rules" : DECIDER === "jev" ? JEV_MODEL : `${MODEL} effort ${EFFORT}`}\n\n${PREAMBLE}\n\n${text}`;
@@ -55,7 +61,7 @@ async function playGame(practiceId: string | undefined, seed: number): Promise<v
     ending = `failed: ${(err as Error).message.slice(0, 200)}`;
   } finally {
     const end = snapshot();
-    db.prepare("UPDATE games SET ended_at = ?, level = ?, xp = ?, moves = ?, cost_usd = ?, ending = ?, mismatches = ? WHERE id = ?").run(Date.now(), end?.level ?? 0, end?.xp ?? 0, movesMade(), cost, ending, mismatches, row);
+    db.prepare("UPDATE games SET ended_at = ?, level = ?, xp = ?, moves = ?, cost_usd = ?, ending = ?, mismatches = ?, beasts = ? WHERE id = ?").run(Date.now(), end?.level ?? 0, end?.xp ?? 0, movesMade(), cost, ending, mismatches, slain(row!), row);
     const after = await funds();
     if (before !== null && after !== null) db.prepare("UPDATE games SET gas_strk = coalesce(gas_strk, 0) + ? WHERE id = ?").run((before - after) / 1e18, row);
     emit({ kind: "status", text: `game ${row} ${ending}`, row, ending });
