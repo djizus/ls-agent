@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
 import { DUNGEON, DUNGEON_KEY } from "./config.ts";
 import { db } from "./db.ts";
-import { collect, type Entry } from "./live.ts";
+import { collect, sendBeasts, type Entry } from "./live.ts";
 import { strkBalance } from "./wallet.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
@@ -73,6 +73,10 @@ async function playGame(practiceId: string | undefined, seed: number, entry?: En
   await new Promise((r) => setTimeout(r, CLAIM_DELAY_MS));
   const claimed = await collect(id);
   emit({ kind: "status", text: claimed ? `claimed beasts from ${id.slice(-8)} in ${claimed}` : `no beast to claim from ${id.slice(-8)}` });
+  const to = process.env.LS_BEASTS_TO;
+  if (!claimed || !to) return;
+  const sent = await sendBeasts(to);
+  emit({ kind: "status", text: `sent ${sent.beasts} beasts to ${to.slice(0, 8)} in ${sent.transaction}` });
 }
 
 

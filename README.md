@@ -75,6 +75,7 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 | `LS_HOST`, `LS_PORT` | 127.0.0.1, 4100 | Where the page is served |
 | `LS_VAR_DIR` | `var/` | Where the wallet, database and caches are stored. End it with a slash. |
 | `LS_BEASTS_ADDRESS` | the wallet | Address whose beasts the page lists |
+| `LS_BEASTS_TO` | unset | Account that receives every beast right after it is claimed |
 | `TYPESAFE_API_KEY`, `LS_JEV_MODEL` | none, `jev-latest` | For `LS_DECIDER=jev`: your key for `api.typesafe.ai` and the model name |
 | `LS_MODEL`, `LS_EFFORT`, `LS_STRATEGY` | `a model`, `medium`, `strategy/prompt.md` | For `LS_DECIDER=model`: it runs the `model` command, which must be installed and logged in on your account |
 
