@@ -15,7 +15,7 @@ npm start
 
 `npm test` compares the local port of the game with the contract, through a public Starknet node. `npm start` serves the page on http://127.0.0.1:4100.
 
-In a second terminal, play 20 practice games (about a minute):
+In a second terminal, play 20 practice games (about three minutes):
 
 ```
 curl -X POST 127.0.0.1:4100/api/play -d '{"games":20}'
