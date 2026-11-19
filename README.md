@@ -35,6 +35,7 @@ difference under 1 level on 200 games is noise.
 | Replay a finished game | pick it, then Play/Pause, Back/Next (left/right arrows), the slider, and the speed button; space toggles play |
 | Return to the live game from a replay | "Watch live" beside the game title |
 | Wallet: STRK, margin above the spend floor, tickets, SURVIVOR, STRK spent on on-chain games | "Wallet" in the left column; `GET /api/wallet` (cached 30 seconds) |
+| Beasts held, staked and Mega per collection, and kills still to claim | "Beasts" in the left column; `GET /api/beasts` (cached 60 seconds) |
 | Start an on-chain game (spends STRK) | "Play on-chain" in the left column, then "Spend STRK and play"; `POST /api/play` with `{"live": true}` |
 | Start a practice pass | "Run practice"; `POST /api/play` with `{"games": n}` |
 | Stop after the current move | "Stop"; `POST /api/stop` |
@@ -62,6 +63,7 @@ difference under 1 level on 200 games is noise.
 | `LS_DUNGEON` | `beast` | key in `DUNGEONS` in `src/config.ts` |
 | `LS_PACE_MS` | 0 | pause between a decision and its move, for watching |
 | `LS_RPC_URL` | public node | Starknet RPC |
+| `LS_BEASTS_ADDRESS` | the wallet | address whose beasts the page lists |
 | `LS_HOST`, `LS_PORT` | 127.0.0.1, 4100 | where the page is served |
 
 Secrets live in `~/.config/ls-agent/env`. `deploy/install.sh` installs the user service, the

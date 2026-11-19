@@ -6,6 +6,7 @@ import { ITEMS } from "./items.ts";
 import { halt, play } from "./runner.ts";
 import { enrich, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
+import { inventory, pendingClaims } from "./beasts.ts";
 import { liveRow, subscribe } from "./events.ts";
 import { handleMcp } from "./mcp.ts";
 
@@ -38,21 +39,32 @@ function strategies() {
     .filter((s) => s.games > 0);
 }
 
-const WALLET_TTL_MS = 30_000;
 const tokens = (n: bigint) => Number(n) / 1e18;
-let purse: { at: number; body: Promise<object> } | undefined;
 
-function wallet(): Promise<object> {
-  if (!purse || Date.now() - purse.at > WALLET_TTL_MS) {
-    const address = keys().address;
-    const body = Promise.all([strkBalance(), balanceOf(TICKET), balanceOf(SURVIVOR)]).then(
-      ([strk, tickets, survivor]) => ({ address, floor: STRK_FLOOR, strk: tokens(strk), tickets: tokens(tickets), survivor: tokens(survivor) }),
-      () => ({ address, floor: STRK_FLOOR }),
-    );
-    purse = { at: Date.now(), body };
-  }
-  return purse.body;
+function cached(ttlMs: number, load: () => Promise<object>): () => Promise<object> {
+  let held: { at: number; body: Promise<object> } | undefined;
+  return () => {
+    if (!held || Date.now() - held.at > ttlMs) held = { at: Date.now(), body: load() };
+    return held.body;
+  };
 }
+
+const wallet = cached(30_000, () => {
+  const address = keys().address;
+  return Promise.all([strkBalance(), balanceOf(TICKET), balanceOf(SURVIVOR)]).then(
+    ([strk, tickets, survivor]) => ({ address, floor: STRK_FLOOR, strk: tokens(strk), tickets: tokens(tickets), survivor: tokens(survivor) }),
+    () => ({ address, floor: STRK_FLOOR }),
+  );
+});
+
+const beasts = cached(60_000, () => {
+  const address = process.env.LS_BEASTS_ADDRESS ?? keys().address;
+  const collections = Object.fromEntries(Object.entries(DUNGEONS).map(([key, d]) => [key, d.name]));
+  return Promise.all([inventory(address), pendingClaims(address)]).then(
+    ([held, claims]) => ({ address, collections, inventory: held, pendingClaims: claims }),
+    () => ({ address, collections }),
+  );
+});
 
 async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown> {
   const url = new URL(req.url ?? "/", "http://x");
@@ -84,6 +96,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
   }
   if (url.pathname === "/api/strategies") return reply(res, strategies());
   if (url.pathname === "/api/wallet") return reply(res, await wallet());
+  if (url.pathname === "/api/beasts") return reply(res, await beasts());
   if (url.pathname === "/api/bags") return reply(res, existsSync(BAGS) ? JSON.parse(readFileSync(BAGS, "utf8")) : []);
   if (url.pathname === "/api/items") return reply(res, ITEMS);
   if (url.pathname === "/api/check") return reply(res, existsSync(CHECK) ? JSON.parse(readFileSync(CHECK, "utf8")) : null);
