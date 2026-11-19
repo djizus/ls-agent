@@ -10,6 +10,7 @@ import { balanceOf, keys, strkBalance } from "./wallet.ts";
 import { inventory, pendingClaims } from "./beasts.ts";
 import { liveRow, subscribe } from "./events.ts";
 import { handleMcp } from "./mcp.ts";
+import { summary } from "./summary.ts";
 
 const page = readFileSync(new URL("../web/index.html", import.meta.url));
 const CHECK = `${VAR_DIR}contract-check.json`;
@@ -27,24 +28,25 @@ function reply(res: ServerResponse, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-const REACH = 30;
 const PRACTICE = "practice";
 
-function summary() {
+function figures() {
   const ended = db.prepare("SELECT mode, strategy, level, beasts, gas_strk FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; strategy: string; level: number; beasts: number | null; gas_strk: number | null }[];
   const strategy = ended.find((g) => g.mode === PRACTICE)?.strategy ?? null;
   const groups = [...Object.entries(DUNGEONS).map(([mode, d]) => ({ mode, name: d.name, strategy: null as string | null })), { mode: PRACTICE, name: "Practice", strategy }];
-  const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
+  const mean = (values: number[]) => (values.length ? summary(values).mean : null);
   return groups.map((group) => {
     const games = ended.filter((g) => g.mode === group.mode && (!group.strategy || g.strategy === group.strategy));
+    if (!games.length) return { ...group, games: 0 };
+    const { median, best, "30+": reach30 } = summary(games.map((g) => g.level));
     return {
       ...group,
       games: games.length,
-      best: Math.max(0, ...games.map((g) => g.level)),
+      median,
       mean: mean(games.map((g) => g.level)),
-      slain: games.some((g) => g.beasts !== null) ? games.reduce((n, g) => n + (g.beasts ?? 0), 0) : null,
-      slainEach: mean(games.flatMap((g) => (g.beasts === null ? [] : [g.beasts]))),
-      reach: { level: REACH, share: mean(games.map((g) => Number(g.level >= REACH))) },
+      best,
+      reach30,
+      slain: mean(games.flatMap((g) => (g.beasts === null ? [] : [g.beasts]))),
       strk: mean(games.flatMap((g) => (g.gas_strk === null ? [] : [g.gas_strk]))),
     };
   });
@@ -109,7 +111,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     const events = (db.prepare("SELECT body FROM events WHERE game = ? ORDER BY rowid").all(id) as { body: string }[]).map((r) => JSON.parse(r.body));
     return reply(res, { game, events: events.map((e) => (e.kind === "state" ? { ...e, state: enrich(e.state) } : e)) });
   }
-  if (url.pathname === "/api/summary") return reply(res, summary());
+  if (url.pathname === "/api/summary") return reply(res, figures());
   if (url.pathname === "/api/wallet") return reply(res, await wallet());
   if (url.pathname === "/api/beasts") return reply(res, await beasts());
   if (url.pathname === "/api/bags") return reply(res, existsSync(BAGS) ? JSON.parse(readFileSync(BAGS, "utf8")) : []);
