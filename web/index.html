@@ -3,735 +3,297 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#000000">
 <title>Loot Survivor agent</title>
 <link rel="icon" href="/assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jersey+20&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --void: #000; --raise: #14130f; --line: #2a2721;
-    --bone: #e8dcc4; --dim: #a89980;
-    --gold: #ffe97f; --lime: #80ff00; --blood: #ff5a47;
-    --title: Cinzel, Georgia, serif;
-    --text: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
-  }
-  * { box-sizing: border-box; }
-  [hidden] { display: none !important; }
-  html { font-size: clamp(16px, 0.55vw + 9px, 20px); }
-  body { margin: 0; min-height: 100vh; background: var(--void); color: var(--bone); font: 400 1rem/1.5 var(--text); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
-  img { display: block; }
-  p { margin: 0; }
-  a { color: inherit; }
-  button { font: 500 1rem/1.2 var(--text); color: var(--bone); background: none; border: 1px solid var(--line); border-radius: 999px; padding: .55rem 1.1rem; cursor: pointer; }
-  button:hover:not(:disabled) { border-color: var(--dim); }
-  button:disabled { opacity: .35; cursor: default; }
-  :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
-  .dim { color: var(--dim); }
-  .good { color: var(--lime); }
-  .bad { color: var(--blood); }
+:root {
+  --void: #030402; --raise: #171d13; --edge: #2c3725; --bone: #e8dcc4; --dim: #a39a82;
+  --gold: #ffe97f; --lime: #80ff00; --blood: #ff5a47;
+  --num: "Jersey 20", system-ui, sans-serif;
+  --bevel: inset 0 2px 0 rgb(255 255 255 / 0.07), inset 0 -3px 0 rgb(0 0 0 / 0.5);
+  --drop: 0 4px 0 rgb(0 0 0 / 0.7), 0 10px 22px rgb(0 0 0 / 0.55);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: clamp(14px, min(0.84vw, 1.5vh), 20px); height: 100%; }
+body { height: 100%; background: var(--void); color: var(--bone); font: 400 1.3rem/1.1 var(--num); padding: 0.8rem; overflow: hidden; }
+img { image-rendering: pixelated; display: block; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+ol { list-style: none; }
+h2 { font: 400 1.9rem/1 var(--num); color: var(--gold); letter-spacing: 0.04em; }
+.good { color: var(--lime); } .bad { color: var(--blood); } .gold { color: var(--gold); } .dim { color: var(--dim); }
+.n { font-family: var(--num); font-size: 1.5rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.ic { display: inline-block; width: 1.6rem; height: 1.6rem; flex: none; background: currentColor; -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; }
+.pic { width: 1.6rem; height: 1.6rem; flex: none; object-fit: contain; }
 
-  .page { max-width: 80rem; margin: 0 auto; padding: 0 2rem 1rem; }
-  .top { display: flex; align-items: center; gap: 2.5rem; padding: 1.25rem 0; }
-  .top img { height: 2.6rem; width: auto; image-rendering: pixelated; }
-  .top nav { display: flex; gap: 1.75rem; flex: 1; }
-  .top nav a { text-decoration: none; color: var(--dim); padding: .35rem 0; border-bottom: 2px solid transparent; white-space: nowrap; }
-  .top nav a:hover { color: var(--bone); }
-  .top nav a[aria-current] { color: var(--bone); border-bottom-color: var(--gold); }
+.win { height: 100%; display: grid; grid-template-columns: 21rem minmax(0, 1fr) 21rem; gap: 0.8rem; }
+.panel { background: linear-gradient(#11160e, #0a0d08); border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--bevel), var(--drop); padding: 1rem; display: flex; flex-direction: column; gap: 1rem; min-height: 0; }
+section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.card { background: var(--raise); border: 2px solid var(--edge); border-radius: 4px; box-shadow: var(--bevel), 0 3px 0 rgb(0 0 0 / 0.6); }
+.scroll { overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--edge) transparent; padding: 0 0.2rem 0.3rem 0; }
+.rows { display: flex; flex-direction: column; gap: 0.4rem; }
+.rows li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.6rem; padding: 0.25rem 0.7rem 0.25rem 0.4rem; }
+.rows b { font: 400 2rem/1 var(--num); color: var(--gold); }
+.rows img { width: 2.4rem; height: 2.4rem; object-fit: contain; }
+.tag { padding: 0 0.35rem; border-radius: 3px; background: var(--lime); color: #000; margin-left: 0.4rem; }
 
-  .watch { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem 4rem; align-items: start; padding-top: 1.5rem; }
-  .status { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem .75rem; color: var(--dim); min-height: 2.5rem; }
-  .status b { display: inline-flex; align-items: center; gap: .5rem; font-weight: 600; color: var(--bone); }
-  .status b::before { content: ""; width: .6rem; height: .6rem; border-radius: 50%; background: currentColor; }
-  .is-live .status b { color: var(--lime); }
-  .is-live .status b::before { animation: beat 1.6s ease-in-out infinite; }
-  .is-over .status b { color: var(--blood); }
-  .status button { padding: .35rem .9rem; }
-  h1 { margin: 1.25rem 0 0; font: 700 3.5rem/1 var(--title); color: var(--gold); letter-spacing: .01em; }
-  .is-over h1 { color: var(--blood); }
-  .doing { font-size: 1.5rem; line-height: 1.3; margin-top: .5rem; }
-  .bars { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .6rem 1rem; align-items: center; margin-top: 1.75rem; }
-  .bar { height: .6rem; border-radius: 999px; background: var(--raise); overflow: hidden; }
-  .bar i { display: block; height: 100%; border-radius: 999px; background: var(--lime); transition: width .3s; }
-  .bar.low i, .bar.foe i { background: var(--blood); }
-  .money { margin-top: .9rem; color: var(--dim); }
-  .money b { font-weight: 500; color: var(--bone); }
-  .turn { margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
-  .says { font-size: 1.25rem; line-height: 1.35; font-weight: 500; color: var(--gold); }
-  .says + .why { margin-top: .35rem; }
-  .why { color: var(--dim); }
-  .then { margin: .9rem 0 0; padding: 0; list-style: none; display: grid; gap: .2rem; font-size: 1.1rem; }
-  .wait::after { content: "..."; display: inline-block; width: 0; overflow: hidden; vertical-align: bottom; animation: dots 1.2s steps(4) infinite; }
-  .prev { margin-top: 1.5rem; color: var(--dim); }
-  .prev .then { margin-top: .35rem; font-size: 1rem; }
-  .prev .then li:not([class~="bad"], [class~="good"]) { color: var(--bone); opacity: .85; }
-  .link { border: 0; border-radius: 0; padding: 0; color: var(--bone); text-decoration: underline; text-decoration-color: var(--dim); text-underline-offset: .25em; }
-  .link:hover { text-decoration-color: var(--bone); }
-  .story .link { margin-top: 1rem; }
-  .reel { grid-column: 1 / -1; position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: .75rem; padding: 1rem 0; background: var(--void); border-top: 1px solid var(--line); }
-  .reel button { padding: .45rem 1rem; }
-  .reel #toggle { min-width: 5.5rem; background: var(--bone); border-color: var(--bone); color: var(--void); }
-  .reel input { flex: 1; min-width: 4rem; accent-color: var(--bone); }
-  .reel span { color: var(--dim); white-space: nowrap; }
+#logo { width: 11rem; image-rendering: auto; margin: -0.2rem auto 0; }
+#games { flex: none; max-height: 55%; }
+#podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; align-items: end; }
+#podium li { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; padding: 0.5rem 0.2rem 0.6rem; }
+#podium li:nth-child(1) { order: 2; padding-top: 0.9rem; padding-bottom: 1.5rem; border-color: #6d6335; }
+#podium li:nth-child(2) { order: 1; } #podium li:nth-child(3) { order: 3; }
+#podium img { width: 3.6rem; height: 3.6rem; object-fit: contain; filter: drop-shadow(0 3px 0 rgb(0 0 0 / 0.7)); }
+#podium b { font: 400 2.6rem/0.9 var(--num); color: var(--gold); }
+#games li { cursor: pointer; }
+#games li:hover { background: #1e2619; }
+#games li.on { border-color: var(--gold); box-shadow: var(--bevel), 0 0 0 2px var(--gold), 0 3px 0 rgb(0 0 0 / 0.6); }
+#results { flex: 1; }
+#reach { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+#reach div { text-align: center; padding: 0.4rem 0 0.5rem; }
+#reach b { display: block; font: 400 2rem/1 var(--num); color: var(--lime); }
+#practice li { grid-template-columns: 1fr auto; padding-left: 0.7rem; }
+#practice b { color: var(--bone); font-size: 1.6rem; }
 
-  .body { position: relative; width: 38rem; display: grid; grid-template-columns: 13rem 12rem 13rem; grid-template-rows: repeat(4, 7.25rem); align-items: center; }
-  .body::before { content: ""; position: absolute; left: 50%; top: 50%; width: 30rem; height: 30rem; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(closest-side, var(--aura, transparent), transparent); opacity: .16; pointer-events: none; transition: opacity .6s; }
-  .body.alive { --aura: var(--lime); }
-  .body.hurt { --aura: var(--blood); opacity: 1; }
-  .figure { grid-column: 2; grid-row: 1 / -1; width: 100%; height: 100%; position: relative; }
-  .figure svg { width: 100%; height: 100%; display: block; fill: #25221c; stroke: #25221c; }
-  .wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; stroke: var(--dim); stroke-width: 1; fill: var(--bone); }
-  .item { position: relative; display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: .1rem .75rem; align-items: center; z-index: 1; }
-  .item.l { grid-column: 1; }
-  .item.r { grid-column: 3; }
-  .item img, .item .gap { grid-row: 1 / 3; width: 3.5rem; height: 3.5rem; border-radius: .6rem; background: var(--raise); image-rendering: pixelated; }
-  .item .gap { border: 1px dashed var(--line); background: none; }
-  .item .nm { font-weight: 600; line-height: 1.2; align-self: end; }
-  .item .q { color: var(--dim); align-self: start; white-space: nowrap; }
-  .item.none .nm { grid-row: 1 / 3; align-self: center; font-weight: 400; color: var(--dim); }
-  .dots { letter-spacing: .1em; color: var(--bone); margin-right: .5rem; }
-  .dots s { text-decoration: none; color: var(--line); }
-  .legend { width: 38rem; margin-top: 1rem; display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1.5rem; color: var(--dim); }
-  .blank { color: var(--dim); max-width: 34rem; }
+#mid { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; min-height: 0; }
+#stage { position: relative; flex: 1; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--drop); background: #000; overflow: hidden; display: grid; place-content: center; text-align: center; }
+#stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+#stage b { font: 400 4rem/1 var(--num); color: var(--gold); }
+#dock { flex: none; flex-direction: row; align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; min-height: 4.6rem; }
+#mode { font: 400 1.7rem/1 var(--num); letter-spacing: 0.06em; white-space: nowrap; }
+#mode::before { content: ""; display: inline-block; width: 0.6rem; height: 0.6rem; margin-right: 0.4rem; background: currentColor; vertical-align: 0.12em; }
+#mode.live::before { animation: blink 1.1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0.15; } }
+#which { white-space: nowrap; }
+#plan { flex: 1; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.5rem; min-width: 0; }
+.chip { display: inline-flex; align-items: center; gap: 0.4rem; height: 3rem; padding: 0 0.8rem; font: 400 1.6rem/1 var(--num); background: var(--raise); border: 2px solid var(--edge); border-radius: 4px; box-shadow: var(--bevel), 0 3px 0 rgb(0 0 0 / 0.6); white-space: nowrap; }
+.chip .pic { width: 2.2rem; height: 2.2rem; }
+.chip small { font-size: 1.25rem; color: var(--dim); }
+.chip.on { color: var(--gold); border-color: var(--gold); }
+.chip.off { color: var(--dim); opacity: 0.7; }
+.chip.out img { filter: grayscale(1) brightness(0.6); }
+#golive { color: #000; background: var(--lime); border-radius: 3px; padding: 0.2rem 0.6rem; white-space: nowrap; }
 
-  .view { padding-top: 2.5rem; max-width: 62rem; }
-  .view h2, dialog h2 { margin: 0; font: 700 2.25rem/1.1 var(--title); color: var(--gold); }
-  .lede { margin-top: .75rem; color: var(--dim); max-width: 40rem; }
-  .lede.good { color: var(--lime); }
-  .lede.bad { color: var(--blood); }
-  .view h3, dialog h3 { margin: 2.5rem 0 .75rem; font: 600 1.15rem/1.3 var(--text); }
-  .huge { margin-top: 2rem; font: 700 4rem/1 var(--title); }
-  .huge small { font: 500 1.25rem var(--text); color: var(--dim); }
-  table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-weight: 400; color: var(--dim); padding: 0 1.5rem .6rem 0; vertical-align: bottom; }
-  td { padding: .7rem 1.5rem .7rem 0; border-top: 1px solid var(--line); vertical-align: top; }
-  th.n, td.n { text-align: right; white-space: nowrap; }
-  th:last-child, td:last-child { padding-right: 0; }
-  tr[data-id] { cursor: pointer; }
-  tr[data-id]:hover td { background: var(--raise); }
-  tr[data-id] td:first-child { white-space: nowrap; font-weight: 600; width: 8rem; }
-  tr[data-id] td:nth-child(2) { white-space: nowrap; width: 9rem; }
-  tr.on td:first-child { color: var(--gold); }
-  .facts { margin: 2rem 0 0; display: grid; grid-template-columns: minmax(0, 16rem) minmax(0, 1fr); }
-  .facts dt, .facts dd { margin: 0; padding: .7rem 0; border-top: 1px solid var(--line); }
-  .facts dt { color: var(--dim); padding-right: 1.5rem; }
-  .facts dd { overflow-wrap: anywhere; }
-  .facts dd small { display: block; font-size: 1rem; color: var(--dim); }
+#run { flex: none; height: 3.6rem; font: 400 2.1rem/1 var(--num); letter-spacing: 0.08em; color: #000; background: linear-gradient(#b6ff5c 0 12%, var(--lime) 12% 80%, #4fa800 80%); border: 2px solid #000; border-radius: 4px; box-shadow: 0 0 0 2px #2f5c00, var(--drop); }
+#run.stop { background: linear-gradient(#ff9a8c 0 12%, var(--blood) 12% 80%, #a32a1c 80%); box-shadow: 0 0 0 2px #5c1a12, var(--drop); }
+#run:active { transform: translateY(2px); }
+.big { font: 400 3.2rem/0.9 var(--num); }
+.big small { font-size: 1.3rem; color: var(--dim); }
+.row { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: center; }
+.row > span { display: inline-flex; align-items: center; gap: 0.35rem; }
+#zoo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; max-height: 11rem; }
+#zoo div { position: relative; aspect-ratio: 1; padding: 0.15rem; }
+#zoo img { width: 100%; height: 100%; object-fit: contain; }
+#zoo b { position: absolute; right: 0.2rem; bottom: 0; font: 400 1.2rem/1 var(--num); text-shadow: 0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000; }
+#bags { flex: 1; }
+#sacks .arts { display: flex; gap: 0.15rem; }
+#sacks img { width: 2rem; height: 2rem; }
+#sacks li { padding-left: 0.7rem; }
 
-  dialog { color: var(--bone); background: #0b0a08; border: 1px solid var(--line); padding: 2rem; }
-  dialog::backdrop { background: rgba(0, 0, 0, .7); }
-  dialog.sheet { margin: 0 0 0 auto; height: 100vh; max-height: none; width: min(36rem, 100vw); max-width: none; border-width: 0 0 0 1px; overflow-y: auto; }
-  dialog.ask { width: min(34rem, calc(100vw - 2rem)); border-radius: 1rem; }
-  dialog header { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
-  .choice { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line); display: grid; gap: .5rem; justify-items: start; }
-  .choice b { font-weight: 600; font-size: 1.15rem; }
-  .choice button { margin-top: .5rem; }
-  .spend { background: var(--blood); border-color: var(--blood); color: var(--void); font-weight: 600; }
-  .row { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
-  .moves { margin: 1.5rem 0 0; padding: 0; list-style: none; }
-  .moves > li { padding: .9rem 0; border-top: 1px solid var(--line); }
-  .moves .says { font-size: 1.05rem; }
-  .moves .then { font-size: 1rem; margin-top: .4rem; }
+dialog { margin: auto; width: min(34rem, calc(100vw - 2rem)); color: var(--bone); background: linear-gradient(#141a10, #0a0d08); border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--bevel), 0 0 0 2px #000, 0 20px 60px #000; padding: 1.4rem; }
+dialog::backdrop { background: rgb(0 0 0 / 0.78); }
+dialog h2 { text-align: center; margin-bottom: 1rem; font-size: 2.4rem; color: var(--blood); }
+.cost { justify-content: center; margin-bottom: 1.1rem; }
+.pick { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.pick button { padding: 1.1rem 0.5rem; font: 400 2rem/1 var(--num); }
+.pick button:hover { border-color: var(--gold); }
+.pick button.spend { color: var(--blood); border-color: #7a2a20; }
 
-  @keyframes beat { 50% { opacity: .3; } }
-  @keyframes dots { to { width: 1.2em; } }
-
-  @media (max-width: 1150px) {
-    .watch { grid-template-columns: minmax(0, 1fr); }
-    .gear { justify-self: center; }
-  }
-  @media (max-width: 700px) {
-    .page { padding: 0 1rem 2rem; }
-    .top { flex-wrap: wrap; gap: .75rem 1rem; padding: 1rem 0 .5rem; }
-    .top img { height: 2.1rem; }
-    .top > button { margin-left: auto; }
-    .top nav { order: 3; flex-basis: 100%; flex-wrap: wrap; gap: .25rem 1.1rem; }
-    h1 { font-size: 2.75rem; }
-    .doing { font-size: 1.3rem; }
-    .reel { flex-wrap: wrap; }
-    .reel input { order: 9; flex-basis: 100%; }
-    .gear { width: 100%; }
-    .body { width: 100%; grid-template-columns: minmax(0, 1fr) 7rem minmax(0, 1fr); grid-template-rows: repeat(4, 8rem); }
-    .body::before { width: 18rem; height: 18rem; }
-    .item { grid-template-columns: minmax(0, 1fr); gap: .2rem; align-content: center; }
-    .item.l { justify-items: end; text-align: right; }
-    .item img, .item .gap { grid-row: auto; width: 2.75rem; height: 2.75rem; }
-    .item.none .nm { grid-row: auto; }
-    .item .dots { display: block; margin: 0; }
-    .legend { width: 100%; }
-    .view { padding-top: 1.5rem; }
-    .view h2, dialog h2 { font-size: 1.75rem; }
-    .huge { font-size: 3rem; }
-    .facts { grid-template-columns: minmax(0, 1fr); }
-    .facts dd { border-top: 0; padding-top: 0; }
-    .wide { overflow-x: auto; }
-    .wide table { min-width: 38rem; }
-    dialog { padding: 1.25rem; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { transition: none !important; animation: none !important; }
-  }
+@media (max-width: 900px) {
+  body { height: auto; overflow: auto; padding: 0.5rem; }
+  .win { display: flex; flex-direction: column; height: auto; }
+  #mid { order: -1; }
+  #stage { flex: none; height: 78svh; }
+  #dock { flex-wrap: wrap; }
+  #games { max-height: none; }
+  #practice, #sacks { max-height: 22rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 </style>
 </head>
 <body>
-<div class="page">
-  <header class="top">
-    <img src="/assets/logo.png" alt="Loot Survivor">
-    <nav id="nav" aria-label="Views"></nav>
-    <button id="run" type="button"></button>
-  </header>
-
-  <main class="watch" id="watch">
-    <section class="story" aria-label="What is happening">
-      <p class="status"><b id="mode"></b><span id="which"></span><button id="golive" type="button" hidden>Watch the live game</button></p>
-      <h1 id="level"></h1>
-      <p class="doing" id="doing"></p>
-      <div class="bars" id="bars"></div>
-      <p class="money" id="money"></p>
-      <div class="turn" id="turn" aria-live="polite"></div>
-    </section>
-    <section class="gear" aria-label="What the adventurer wears">
-      <div class="body" id="body"></div>
-      <p class="legend" id="legend"></p>
-    </section>
-    <div class="reel" id="reel" hidden>
-      <button id="toggle" type="button" title="Space"></button>
-      <button id="back" type="button" title="Left arrow">Back</button>
-      <button id="next" type="button" title="Right arrow">Next</button>
-      <input id="seek" type="range" min="0" step="1" aria-label="Position in the game">
-      <span id="where"></span>
-      <button id="speed" type="button"></button>
-    </div>
+<div class="win">
+  <aside class="panel">
+    <img id="logo" src="/assets/logo.png" alt="Loot Survivor">
+    <section id="games"><div class="head"><h2>Games</h2><span class="dim">Level</span></div><ol id="podium"></ol><ol id="board" class="rows scroll"></ol></section>
+    <section id="results"></section>
+  </aside>
+  <main id="mid">
+    <div id="stage"></div>
+    <div class="panel" id="dock"><span id="mode"></span><span id="which"></span><div id="plan"></div><button type="button" id="golive" hidden>Live</button></div>
   </main>
-  <main class="view" id="view" hidden></main>
+  <aside class="panel">
+    <button type="button" id="run"></button>
+    <section id="wallet"></section>
+    <section id="beasts"></section>
+    <section id="bags"></section>
+  </aside>
 </div>
-
-<dialog class="sheet" id="sheet"></dialog>
-<dialog class="ask" id="ask"></dialog>
-
+<dialog id="ask"></dialog>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 const post = (url, body) => fetch(url, { method: "POST", body: body && JSON.stringify(body) });
 const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 const round = (n, digits = 0) => Number(n).toLocaleString("en", { maximumFractionDigits: digits });
-const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
-const times = (n) => (n === 1 ? "once" : `${n} times`);
-const list = (parts) => (parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts.join(""));
-const pct = (n) => `${Math.round(100 * n)}%`;
-const day = (ms) => new Date(ms).toLocaleDateString("en", { month: "short", day: "numeric" });
 const put = (el, html) => { if (el.html !== html) el.innerHTML = el.html = html; };
+const title = (word) => word[0].toUpperCase() + word.slice(1);
+const stat = (name) => `<i class="ic" style="--i:url(/assets/icons/${title(name)}.svg)" title="${title(name)}"></i>`;
+const pic = (name, label) => `<img class="pic" src="/assets/icons/${name}.png" alt="${label}" title="${label}">`;
+const art = (name) => `<img class="pic" src="/assets/loot/${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.png" alt="${esc(name)}" title="${esc(name)}">`;
+const face = (name) => (/^[A-Za-z]+$/.test(name ?? "") ? `/assets/beasts/${name.toLowerCase()}.png` : "/assets/skull.png");
+const killer = (g) => (g.ending ?? "").match(/against (?:".*" )?(\w+) level (\d+)$/);
 
-const VIEWS = { watch: "Watch", games: "Games", wallet: "Wallet", beasts: "Beasts", results: "Results", bags: "Loot bags" };
-const PLACE = {
-  head: ["l", 1, 0.5, 0.075, "No helmet"],
-  chest: ["l", 2, 0.44, 0.31, "No chest armor"],
-  weapon: ["l", 3, 0.15, 0.555, "No weapon"],
-  foot: ["l", 4, 0.4, 0.93, "No boots"],
-  neck: ["r", 1, 0.52, 0.16, "No necklace"],
-  hand: ["r", 2, 0.82, 0.45, "No gloves"],
-  ring: ["r", 3, 0.85, 0.555, "No ring"],
-  waist: ["r", 4, 0.6, 0.585, "No belt"],
-};
-const ABILITIES = [
-  ["strength", (s) => `Hits deal ${s.buys.attack}% more damage`],
-  ["dexterity", (s) => `Fleeing works ${s.buys.flee}% of the time`],
-  ["vitality", (s) => `${s.maxHealth} maximum health`],
-  ["intelligence", (s) => `Dodges ${s.buys.trap}% of traps`],
-  ["wisdom", (s) => `Avoids ${s.buys.ambush}% of ambushes`],
-  ["charisma", (s) => `Potions cost ${s.potionPrice} gold`],
-];
-const WORDS = [[/\bT([1-5])\b/g, "tier $1"], [/\bG(\d+)\b/g, "level $1"], [/\bHP\b/g, "health"], [/\bxp\b/gi, "experience"], [/(\d)g\b/g, "$1 gold"], [/\b1 blows\b/g, "1 blow"],
-  [/\bSTR\b/g, "strength"], [/\bDEX\b/g, "dexterity"], [/\bVIT\b/g, "vitality"], [/\bINT\b/g, "intelligence"], [/\bWIS\b/g, "wisdom"], [/\bCHA\b/g, "charisma"]];
-const plain = (text) => WORDS.reduce((t, [re, to]) => t.replace(re, to), String(text ?? ""));
-const SPEEDS = [1, 2, 4, 8];
-const TICK_MS = 800;
-const DEATH_HOLD_MS = 4000;
-const LOW_HEALTH = 0.3;
+const WATCH = "https://www.lootsurvivor.io/watch?id=";
+const MOVES = { attack: "Fight", flee: "Flee", explore: "Explore" };
 const SLOW_MS = 60_000;
-const narrow = matchMedia("(max-width: 700px)");
+const PRACTICE = 40;
+const BAGS = 25;
 
 const items = {};
-const data = { games: [], wallet: null, beasts: null, results: null, bags: null, check: undefined };
-let liveRow = null;
-let follow = true;
-let page = "watch";
-const view = { id: null, game: null, events: [], stops: [0], cursor: 0, loading: false, inbox: [], playing: false, speed: SPEEDS[0], timer: 0 };
-let scene = {};
-let dirty = false;
+const byName = {};
+const data = { games: [], wallet: null, beasts: null, results: null, bags: null, check: null };
+let shown = null;
+let move = null;
+let market = [];
 
-const isLive = () => view.id !== null && view.id === liveRow;
-const atEnd = () => view.cursor >= view.events.length;
-const foeName = (b) => `level ${b.level} ${b.baseName}`;
+const liveGame = () => data.games.find((g) => g.live);
+const liveReal = () => data.games.find((g) => g.live && g.onchain);
+const realGames = () => data.games.filter((g) => g.onchain);
+const picked = () => Number(new URLSearchParams(location.search).get("game")) || null;
+const target = () => realGames().find((g) => g.id === picked()) ?? liveReal() ?? realGames()[0] ?? null;
 
-function ending(g) {
-  const m = (g.ending ?? "").match(/^died at level \d+ while (\w+) from (\d+)\/(\d+) HP(?: against (?:".*" )?(.+) level (\d+))?$/);
-  if (!m) return g.ending ? plain(g.ending[0].toUpperCase() + g.ending.slice(1)) : "Not finished";
-  const from = m[2] === m[3] ? "at full health" : `with ${m[2]} of ${m[3]} health`;
-  return m[4] ? `Died ${m[1]} a level ${m[5]} ${m[4]}, ${from}`.replace("fleeing a", "fleeing from a") : `Died ${m[1]}, ${from}`;
-}
-
-function says(e) {
-  const name = (id) => items[id]?.name ?? `item ${id}`;
-  const of = (type) => e.actions.filter((a) => a.type === type);
-  const worn = of("buy").filter((a) => a.equip), kept = of("buy").filter((a) => !a.equip);
-  const parts = [
-    of("drop").length && `drops ${list(of("drop").map((a) => name(a.item)))}`,
-    of("upgrade").length && `raises ${list(of("upgrade").map((a) => `${a.stat} by ${a.amount}`))}`,
-    of("equip").length && `puts on ${list(of("equip").map((a) => name(a.item)))}`,
-    worn.length && `buys and wears ${list(worn.map((a) => name(a.item)))}`,
-    kept.length && `buys ${list(kept.map((a) => name(a.item)))}`,
-    ...of("potions").map((a) => `drinks ${plural(a.qty, "potion")}`),
-    ...e.actions.map((a) => ({
-      explore: () => "explores",
-      attack: () => (a.tillHealth ? `fights until its health drops to ${a.tillHealth}` : "fights until one of them falls"),
-      flee: () => (a.tillHealth ? `tries to flee until its health drops to ${a.tillHealth}` : "tries to flee until it gets away"),
-    })[a.type]?.()),
-  ].filter(Boolean);
-  if (e.reserve) parts.unshift(`keeps ${e.reserve} gold aside`);
-  return `The agent ${list(parts)}.`;
-}
-
-function why(e) {
-  const reason = e.thought || e.note || "";
-  const odds = (e.options ?? []).filter((o) => !o.error);
-  const move = e.actions.at(-1)?.type;
-  const step = odds.find((o) => o.move === "explore");
-  const risk = move === "explore" && step
-    ? `Chance of dying on this step: ${pct(step.death)}. Chance of meeting a beast: ${pct(step.ongoing)}.`
-    : odds.length ? `Chance of dying: ${odds.map((o) => `${pct(o.death)} if it ${o.move === "attack" ? "fights" : "flees"}`).join(", ")}.` : "";
-  const told = reason.split(/, (?![^(]*\))/).filter((part) => !/^\+\d+ [A-Z]{3}$/.test(part)).join(", ");
-  return [/^(explore|attack|flee)?$/.test(told) ? "" : `Its reason: ${plain(told).replace(/: (fight|flee)$/, "")}.`, risk].filter(Boolean);
-}
-
-function tell(prev, s, fled) {
-  const foe = (s.beast ?? prev.beast)?.baseName ?? "beast";
-  const out = [];
-  const add = (text, tone = "") => out.push({ text, tone });
-  const mine = { n: 0, sum: 0, crit: 0 }, theirs = { n: 0, sum: 0, crit: 0 };
-  const count = (t, m, n, crit) => { t.n++; t.sum += Number(m[n]); if (m[crit]) t.crit++; };
-  const crits = (t) => (t.crit ? `, ${t.crit} critical` : "");
-  let failed = 0, m;
-  if (!prev.beast && s.beast) add(`A ${foeName(s.beast)} blocks the way.`);
-  for (const line of s.happened) {
-    if ((m = line.match(/^You hit for (\d+)(, critical)?/))) count(mine, m, 1, 2);
-    else if ((m = line.match(/^Ambushed: the beast hits your (\w+) for (\d+)(, critical)?/))) add(`It strikes first and hits the ${m[1]} for ${m[2]}${m[3] ? ", a critical hit" : ""}.`, "bad");
-    else if ((m = line.match(/^The beast hits your \w+ for (\d+)(, critical)?/))) count(theirs, m, 1, 2);
-    else if (line === "Failed to flee") failed++;
-    else if ((m = line.match(/^A (\w+) trap.* hits your (\w+) for (\d+)/))) add(`A ${m[1].toLowerCase()} trap hits the ${m[2]} for ${m[3]}.`, "bad");
-    else if ((m = line.match(/^Dodged a (\w+) trap/))) add(`Dodged a ${m[1].toLowerCase()} trap.`);
-    else add(`${plain(line)}.`);
+function planHtml(e) {
+  const last = e.actions.at(-1)?.type;
+  if (e.phase === "battle") {
+    const odds = e.thought.match(/(\d+)% to win the fight, (\d+)% to escape/);
+    return ["attack", "flee"].map((m, i) => `<span class="chip ${m === last ? "on" : "off"}">${MOVES[m]}${odds ? ` ${odds[i + 1]}%` : ""}</span>`).join("");
   }
-  if (failed) add(`Failed to flee ${times(failed)}.`, "bad");
-  if (mine.n) add(`Hit the ${foe} ${times(mine.n)} for ${mine.sum} damage${crits(mine)}.`);
-  if (theirs.n) add(`The ${foe} hit back ${times(theirs.n)} for ${theirs.sum} damage${crits(theirs)}.`, "bad");
-  if (prev.beast && !s.beast && !s.over) add(fled ? `Escaped the ${foe}.` : `Killed the ${foe}: +${s.xp - prev.xp} experience, +${s.gold - prev.gold} gold.`, "good");
-  if (s.level > prev.level && !s.over) add(`Reached level ${s.level}.`, "good");
-  if (s.over && !prev.over) add(`Died at level ${s.level}.`, "bad");
-  return out;
+  const why = (name) => e.thought.match(new RegExp(`${name} \\(([^)]*)\\)`))?.[1].replace(/\bT(\d)/g, "tier $1") ?? "";
+  return e.actions.map((a) => {
+    const g = items[a.item];
+    const price = market.find((m) => m.id === a.item)?.price;
+    if (a.type === "upgrade") return `<span class="chip">${stat(a.stat)}+${a.amount}</span>`;
+    if (a.type === "potions") return `<span class="chip">${pic("potion", "Potions")}x${a.qty}</span>`;
+    if (a.type === "buy" && g) return `<span class="chip">${art(g.name)}${price ? `${pic("gold", "Gold")}${price}` : ""}<small>${esc(why(g.name))}</small></span>`;
+    if (a.type === "equip" && g) return `<span class="chip">${art(g.name)}<small>${esc(why(g.name))}</small></span>`;
+    if (a.type === "drop" && g) return `<span class="chip out">${art(g.name)}<small>Dropped</small></span>`;
+    return MOVES[a.type] ? `<span class="chip on">${MOVES[a.type]}</span>` : "";
+  }).join("");
 }
 
-const thenHtml = (lines) => (lines.length ? `<ul class="then">${lines.map((l) => `<li class="${l.tone}">${esc(l.text)}</li>`).join("")}</ul>` : "");
-const moveHtml = (m) => `<p class="says">${esc(m.says)}</p>${m.why.map((w) => `<p class="why">${esc(w)}</p>`).join("")}${thenHtml(m.lines)}`;
-
-function apply(e) {
-  if (e.kind === "decision") {
-    scene.lastMove = e.actions?.at(-1)?.type ?? scene.lastMove;
-    scene.moves.push({ says: says(e), why: why(e), lines: [] });
-  } else if (e.kind === "state") {
-    const prev = scene.state;
-    const s = (scene.state = e.state);
-    for (const g of [...s.equipment, ...s.bag, ...s.market]) items[g.id] = g;
-    if (s.beast) scene.foeMax = Math.max(prev?.beast ? scene.foeMax : 0, s.beast.health);
-    if (prev) (scene.moves.at(-1) ?? scene.moves[scene.moves.push({ says: "", why: [], lines: [] }) - 1]).lines.push(...tell(prev, s, scene.lastMove === "flee"));
-  } else if (e.kind === "rejected") scene.moves.at(-1)?.lines.push({ text: `The game refused that move: ${plain(e.reason)}.`, tone: "bad" });
-  else if (e.kind === "status" && e.row === undefined && e.text !== "batch done") scene.moves.at(-1)?.lines.push({ text: `${plain(e.text[0].toUpperCase() + e.text.slice(1))}.`, tone: "" });
-}
-
-function seek(to) {
-  to = Math.max(0, Math.min(view.events.length, to));
-  if (to < view.cursor || !scene.moves) {
-    scene = { state: null, moves: [], lastMove: null, foeMax: 0 };
-    view.cursor = 0;
-  }
-  while (view.cursor < to) apply(view.events[view.cursor++]);
-  schedule();
-}
-
-function index() {
-  const ends = view.events.flatMap((e, i) => (e.kind === "decision" ? [i + 1] : []));
-  view.stops = [...new Set([0, ...ends, view.events.length])];
-}
-
-function schedule() {
-  if (!dirty) { dirty = true; requestAnimationFrame(render); }
+function endHtml(g) {
+  const k = killer(g);
+  return `<span class="chip">Level ${g.level}</span>${k ? `<span class="chip"><img class="pic" src="${face(k[1])}" alt="">${k[1]} ${k[2]}</span>` : ""}${g.gas_strk === null ? "" : `<span class="chip">${round(g.gas_strk, 1)}<small>STRK</small></span>`}<span class="dim">Click the game, then press the right arrow to replay it</span>`;
 }
 
 function render() {
-  dirty = false;
-  const g = view.game;
-  const s = scene.state;
-  const live = isLive();
-  const replay = !live && !!g && (view.playing || !atEnd());
-  const over = !!s?.over;
-  $("watch").className = `watch${live ? " is-live" : ""}${over ? " is-over" : ""}`;
-  $("mode").textContent = live ? "Live" : replay ? "Replay" : !g ? (view.loading ? "Loading" : "Nothing to show") : over ? "Ended" : "Stopped";
-  $("which").textContent = g ? `Game ${g.id}, ${g.onchain ? `a real game on Starknet (${g.dungeon})` : "a practice game"}${follow && !live ? ". Nothing is live, so this is the latest game." : ""}` : view.id && !view.loading ? `Game ${view.id} was not found.` : "";
-  $("golive").hidden = liveRow === null || live;
-  $("run").textContent = liveRow === null ? "Start a game" : "Stop the game";
-  document.title = g ? `Game ${g.id}${live ? ", live" : ""}, Loot Survivor agent` : "Loot Survivor agent";
-  const blind = !!g && !s && !view.loading;
-  $("level").textContent = s ? (over ? `Died at level ${s.level}` : `Level ${s.level}`) : blind ? `Game ${g.id}` : "";
-  $("doing").textContent = s
-    ? over ? (atEnd() && g?.ending ? ending(g).replace(/^Died /, "It died ") + "." : "") : !live && !replay ? (g?.ending && g.ending !== "stopped" ? `${ending(g)}.` : "The game was stopped here, before the adventurer died.") : s.beast ? `Fighting a ${foeName(s.beast)}` : s.statUpgradesAvailable ? "Choosing what to improve" : "Exploring the dungeon"
-    : blind ? (view.events.length ? "This game was played before the adventurer was recorded. Only the agent's decisions remain." : "Nothing was recorded for this game.") : !g && !view.loading && !view.id ? "No game has been played yet. Start one to watch it here." : "";
-  renderVitals(s);
-  renderTurn();
-  renderBody(s);
-  renderReel(live);
-}
-
-function renderVitals(s) {
-  if (!s) return put($("bars"), ""), put($("money"), "");
-  const bar = (label, now, max, cls, text) => `<span>${esc(label)}</span><div class="bar ${cls}"><i style="width:${max ? Math.max(0, Math.min(100, (100 * now) / max)) : 0}%"></i></div><span>${text}</span>`;
-  put($("bars"), bar("Health", s.health, s.maxHealth, s.health / s.maxHealth < LOW_HEALTH ? "low" : "", `${s.health} of ${s.maxHealth}`)
-    + (s.beast && !s.over ? bar(s.beast.baseName, s.beast.health, scene.foeMax, "foe", `${s.beast.health} left`) : ""));
-  const heal = s.purse.toFull * s.potionPrice;
-  put($("money"), s.over ? "" : `<b>${s.gold} gold.</b> A healing potion costs ${s.potionPrice} gold${
-    !s.purse.toFull ? "." : heal <= s.gold ? `, so healing to full costs ${heal} gold.` : `. Healing to full would cost <span class="bad">${heal} gold, more than it has</span>.`}`);
-}
-
-function renderTurn() {
-  const moves = scene.moves ?? [];
-  const now = moves.at(-1);
-  if (!now) return put($("turn"), view.game && scene.state && !scene.state.over ? `<p class="why">${isLive() ? "The agent is choosing its first move." : "The game starts here. Press Play to watch it."}</p>` : "");
-  const before = moves.at(-2);
-  put($("turn"), `${moveHtml(now)}${now.lines.length || !isLive() ? "" : `<p class="why wait">Waiting for the result</p>`}
-    ${before ? `<div class="prev"><p>Before that, ${esc(before.says.replace(/^The agent/, "it"))}</p>${thenHtml(before.lines)}</div>` : ""}
-    <button class="link" type="button" data-open="story">Read the whole game, ${plural(moves.length, "move")} so far</button>`);
-}
-
-const dots = (tier) => `<span class="dots" title="Tier ${tier}">${"●".repeat(6 - tier)}<s>${"●".repeat(tier - 1)}</s></span>`;
-
-function renderBody(s) {
-  const el = $("body");
-  if (!s) {
-    put(el, "");
-    put($("legend"), "");
-    el.className = "body";
-    return;
+  const g = target();
+  const live = liveGame();
+  if (g?.id !== shown?.id) {
+    shown = g;
+    move = null;
+    market = [];
+    put($("stage"), g ? `<iframe src="${WATCH}${BigInt(g.game_id)}" title="Game ${g.id} in the Loot Survivor spectator" allow="autoplay"></iframe>` : `<b>No real game yet</b>`);
+    if (g?.live) get(`/api/games/${g.id}`).then((found) => { for (const e of found?.events ?? []) onEvent(e); render(); });
   }
-  const worn = Object.fromEntries(s.equipment.map((g) => [g.slot, g]));
-  el.className = `body ${s.over || s.health / s.maxHealth < LOW_HEALTH ? "hurt" : "alive"}`;
-  put(el, `<div class="figure" id="figure" aria-hidden="true"><svg viewBox="0 0 200 480" preserveAspectRatio="xMidYMid meet"><circle cx="100" cy="40" r="26" stroke="none"/><path d="M100 62 L100 86" stroke-width="18" fill="none"/><path d="M66 102 L134 102 L124 200 L128 282 L72 282 L76 200 Z" stroke-width="20" stroke-linejoin="round"/><path d="M48 106 L38 190 L30 266 M152 106 L162 190 L170 266" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M84 292 L80 446 M116 292 L120 446" stroke-width="28" stroke-linecap="round" fill="none"/></svg></div>`
-    + Object.entries(PLACE).map(([slot, [side, row, , , none]]) => {
-      const g = worn[slot];
-      return g
-        ? `<div class="item ${side}" data-slot="${slot}" style="grid-row:${row}"><img src="/assets/loot/${slug(g.name)}.png" alt=""><span class="nm">${esc(g.name)}</span><span class="q">${dots(g.tier)}level ${g.greatness}</span></div>`
-        : `<div class="item ${side} none" data-slot="${slot}" style="grid-row:${row}"><span class="gap"></span><span class="nm">${none}</span></div>`;
-    }).join("") + `<svg class="wires" id="wires" aria-hidden="true"></svg>`);
-  put($("legend"), `<span>Five dots is the best quality. Items gain levels with use.</span><button class="link" type="button" data-open="details">Abilities, bonuses and bag</button>`);
-  wire();
-}
+  $("mode").className = g?.live ? "live good" : g ? "bad" : "dim";
+  $("mode").textContent = g?.live ? "Live" : g ? "Ended" : "Idle";
+  $("which").textContent = g ? `Game ${g.id}` : "";
+  put($("plan"), !g ? "" : g.live ? (move ? planHtml(move) : "") : endHtml(g));
+  $("golive").hidden = !liveReal() || g?.live;
+  $("run").textContent = live ? "Stop" : "Play";
+  $("run").className = live ? "stop" : "";
 
-function wire() {
-  const el = $("body"), fig = $("figure");
-  if (!fig) return;
-  const box = el.getBoundingClientRect(), f = fig.getBoundingClientRect();
-  const scale = Math.min(f.width / 200, f.height / 480);
-  const ox = f.left - box.left + (f.width - 200 * scale) / 2, oy = f.top - box.top + (f.height - 480 * scale) / 2;
-  $("wires").innerHTML = [...el.querySelectorAll(".item")].map((card) => {
-    const [side, , ax, ay] = PLACE[card.dataset.slot];
-    const r = (narrow.matches ? card.firstElementChild : card).getBoundingClientRect();
-    const x1 = side === "l" ? r.right - box.left + 8 : r.left - box.left - 8, y1 = r.top - box.top + r.height / 2;
-    const x2 = ox + ax * 200 * scale, y2 = oy + ay * 480 * scale;
-    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><circle cx="${x2}" cy="${y2}" r="3.5" stroke="none"/>`;
-  }).join("");
-}
-new ResizeObserver(wire).observe($("body"));
+  const ranked = realGames().filter((x) => !x.live).sort((a, b) => b.level - a.level || b.id - a.id);
+  const cls = (x) => `card${x.id === g?.id ? " on" : ""}`;
+  put($("podium"), ranked.slice(0, 3).map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0" title="Game ${x.id}"><img src="${face(killer(x)?.[1])}" alt=""><b>${x.level}</b><span class="dim">${x.id}</span></li>`).join(""));
+  put($("board"), [...(liveReal() ? [liveReal()] : []), ...ranked.slice(3)].map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0"><img src="${x.live ? "/assets/favicon.png" : face(killer(x)?.[1])}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span><b>${x.live ? "" : x.level}</b></li>`).join(""));
 
-function renderReel(live) {
-  $("reel").hidden = live || view.events.length === 0;
-  const total = view.events.filter((e) => e.kind === "decision").length;
-  $("seek").max = view.stops.length - 1;
-  $("seek").value = view.stops.findLastIndex((x) => x <= view.cursor);
-  $("back").disabled = view.cursor === 0;
-  $("next").disabled = atEnd();
-  $("toggle").textContent = view.playing ? "Pause" : atEnd() ? "Replay" : "Play";
-  $("speed").textContent = `Speed ${view.speed}x`;
-  $("where").textContent = `Move ${scene.moves?.length ?? 0} of ${total}`;
-}
-
-function storyHtml() {
-  const g = view.game;
-  return `<header><h2>Game ${g.id}</h2><button type="button" data-close>Close</button></header>
-    <p class="lede">Every move so far, oldest first. The gold line is what the agent did. The lines under it are what followed.</p>
-    <ol class="moves">${scene.moves.map((m) => `<li>${moveHtml(m)}</li>`).join("")}</ol>`;
-}
-
-function detailsHtml() {
-  const s = scene.state;
-  const from = (k) => (s.stats[k] - s.baseStats[k] ? `, ${s.stats[k] - s.baseStats[k]} from items` : "");
-  const gear = (g, where) => `<tr><td>${esc(g.name)}${g.suffix ? ` ${esc(g.suffix)}` : ""}<br><span class="dim">${where}, tier ${g.tier} ${esc(g.type.toLowerCase())}, level ${g.greatness}${g.toNext ? `, ${g.toNext} experience to the next` : ", the maximum"}</span></td><td>${esc(g.grants.join(", ")) || `<span class="dim">no bonus</span>`}</td></tr>`;
-  const next = (s.level + 1) ** 2;
-  const deal = s.purse.deal;
-  return `<header><h2>The adventurer</h2><button type="button" data-close>Close</button></header>
-    <p class="lede">Level ${s.level} with ${s.xp} experience, ${next - s.xp} short of level ${s.level + 1}. ${s.statUpgradesAvailable ? `${plural(s.statUpgradesAvailable, "ability point")} to spend.` : ""}</p>
-    <h3>Abilities</h3>
-    <table>${ABILITIES.map(([k, means]) => `<tr><td>${k[0].toUpperCase() + k.slice(1)} ${s.stats[k]}<span class="dim">${from(k)}</span></td><td>${means(s)}</td></tr>`).join("")}
-      <tr><td>Luck ${s.luck}<span class="dim">${s.luck ? ", all from jewelry" : ""}</span></td><td>${s.buys.crit}% of its hits are critical</td></tr></table>
-    <h3>Worn</h3>
-    <table><tr><th>Item</th><th>Bonus</th></tr>${s.equipment.map((g) => gear(g, g.slot)).join("")}</table>
-    <h3>In the bag</h3>
-    ${s.bag.length ? `<table><tr><th>Item</th><th>Bonus while carried</th></tr>${s.bag.map((g) => gear(g, `spare ${g.slot}`)).join("")}</table>` : `<p class="dim">The bag is empty.</p>`}
-    <h3>Market</h3>
-    <p class="dim">${s.beast ? "The market is closed during a fight." : deal ? `Cheapest upgrade: ${esc(deal.name)} for ${deal.price} gold (${esc(deal.why)}). It has ${s.gold} gold.` : "Nothing on sale is better than what it wears."}</p>`;
-}
-
-const SHEETS = { story: storyHtml, details: detailsHtml };
-function openSheet(name) {
-  $("sheet").innerHTML = SHEETS[name]();
-  $("sheet").showModal();
-  if (name === "story") $("sheet").scrollTop = $("sheet").scrollHeight;
-}
-
-function askHtml(step) {
-  const last = data.games.find((g) => g.onchain && g.gas_strk !== null);
-  const funds = data.wallet;
-  if (step === "spend") return `<h2>This spends real money</h2>
-    <p class="lede">A real game buys one ticket and pays a network fee for every move, from the agent's wallet.${last ? ` Game ${last.id} cost ${round(last.gas_strk, 1)} STRK.` : ""}${funds?.strk !== undefined ? ` The wallet holds ${round(funds.strk, 1)} STRK${funds.strk < funds.floor ? `, under the floor of ${funds.floor}, so the agent will refuse to start` : ""}.` : ""}</p>
-    <div class="row"><button class="spend" type="button" data-do="spend">Spend STRK and start</button><button type="button" data-close autofocus>Cancel</button></div>`;
-  return `<header><h2>Start a game</h2><button type="button" data-close>Close</button></header>
-    <div class="choice"><b>Practice games</b><span class="dim">Free. A set of games played on this machine with the real rules, one after the other.</span><button type="button" data-do="practice">Start practice games</button></div>
-    <div class="choice"><b>A real game</b><span class="dim">Played on Starknet from the agent's wallet. It costs real money and can win beasts.</span><button type="button" data-do="confirm">Start a real game</button></div>`;
-}
-
-function gamesHtml() {
-  const row = (g, cost) => `<tr data-id="${g.id}" tabindex="0" class="${g.id === view.id ? "on" : ""}"><td>Game ${g.id}</td><td>${g.id === liveRow ? `<span class="good">Playing now</span>` : g.ended_at ? `Level ${g.level}` : ""}</td><td>${g.id === liveRow ? "" : esc(ending(g))}${g.mismatches ? ` <span class="bad">The local copy of the game disagreed with the real one.</span>` : ""}</td>${cost ? `<td class="n">${g.gas_strk === null ? `<span class="dim">not recorded</span>` : `${round(g.gas_strk, 1)} STRK`}</td>` : ""}<td class="n dim">${day(g.started_at)}</td></tr>`;
-  const table = (rows, cost) => `<div class="wide"><table><tr><th>Game</th><th>Reached</th><th>How it ended</th>${cost ? `<th class="n">Cost</th>` : ""}<th class="n">Played</th></tr>${rows.map((g) => row(g, cost)).join("")}</table></div>`;
-  const real = data.games.filter((g) => g.onchain), practice = data.games.filter((g) => !g.onchain);
-  return `<h2>Games</h2><p class="lede">Every game the agent has played. Pick one to replay it move by move.</p>
-    <h3>Real games on Starknet</h3>${real.length ? table(real, true) : `<p class="dim">No real game yet.</p>`}
-    <h3>Practice games</h3>${practice.length ? table(practice, false) : `<p class="dim">No practice game yet. Start one from the button at the top.</p>`}`;
-}
-
-function walletHtml() {
-  const w = data.wallet;
-  const paid = data.games.filter((g) => g.onchain && g.gas_strk !== null);
-  const total = paid.reduce((n, g) => n + g.gas_strk, 0);
-  const spent = `<dt>Spent on real games</dt><dd>${paid.length ? `${round(total, 1)} STRK over ${plural(paid.length, "game")}<small>${round(total / paid.length, 1)} STRK a game on average</small>` : "Not recorded yet"}</dd>`;
-  const head = `<h2>Wallet</h2><p class="lede">The agent pays for real games from this wallet, in STRK, the currency of Starknet.</p>`;
-  if (!w) return `${head}<p class="lede">Loading.</p>`;
-  if (w.strk === undefined) return `${head}<p class="lede bad">The balance is unavailable because the Starknet node did not answer.</p><dl class="facts">${spent}<dt>Address</dt><dd>${esc(w.address)}</dd></dl>`;
-  const above = w.strk - w.floor;
-  return `${head}<p class="huge">${round(w.strk, 1)} <small>STRK</small></p>
-    <p class="lede ${above > 0 ? "good" : "bad"}">${above > 0 ? `${round(above, 1)} STRK above the floor of ${w.floor}.` : `Under the floor of ${w.floor} STRK, so the agent will not start a real game.`}</p>
-    <p class="lede">The floor is the balance the agent never spends below.</p>
-    <dl class="facts"><dt>Tickets</dt><dd>${round(w.tickets, 1)}<small>One ticket starts one real game.</small></dd>
-    <dt>SURVIVOR tokens</dt><dd>${round(w.survivor, 1)}<small>The game's reward token.</small></dd>${spent}<dt>Address</dt><dd>${esc(w.address)}</dd></dl>`;
-}
-
-const BEAST_STATE = {
-  held: () => "In the wallet",
-  staked: (b) => `Staked, ${b.queued ? "waiting for a Mega place" : `becomes Mega on ${day(1000 * b.transformsAt)}`}`,
-  mega: () => `<span class="good">Mega</span>`,
-};
-
-function beastsHtml() {
-  const b = data.beasts;
-  const head = `<h2>Beasts</h2><p class="lede">A beast killed in a real game can be claimed as a collectible. These are the ones the agent owns.</p>`;
-  if (!b) return `${head}<p class="lede">Loading.</p>`;
-  if (!b.inventory) return `${head}<p class="lede bad">The list is unavailable because the Starknet node or the game's server did not answer.</p>`;
-  const row = (x, note) => `<tr><td>${esc(x.name)}</td><td>Level ${x.level}</td><td>Tier ${x.tier} ${esc(x.type.toLowerCase())}</td><td>${note}</td></tr>`;
-  const groups = Object.entries(b.inventory).filter(([, l]) => l.length);
-  const claims = b.pendingClaims ?? [];
-  if (!groups.length && !claims.length) return `${head}<p class="lede">None yet.</p>`;
-  return head + groups.map(([key, l]) => `<h3>${esc(b.collections[key] ?? key)}, ${l.length}</h3><div class="wide"><table>${l.map((x) => row(x, BEAST_STATE[x.state](x))).join("")}</table></div>`).join("")
-    + (claims.length ? `<h3>Won but not claimed yet, ${claims.length}</h3><div class="wide"><table>${claims.map((c) => row(c, c.settled ? "Ready to claim" : "Waiting for the game to be settled")).join("")}</table></div>` : "");
-}
-
-function resultsHtml() {
-  const l = data.results;
+  const l = data.results?.[0];
   const c = data.check;
-  const head = `<h2>Results</h2><p class="lede">How far each version of the agent's rules gets in practice games. Newest version first.</p>`;
-  if (!l) return `${head}<p class="lede">Loading.</p>`;
-  if (!l.length) return `${head}<p class="lede">No practice game has finished yet.</p>`;
-  return `${head}<h3>Share of games that reached a level</h3>
-    <div class="wide"><table><tr><th>Version</th><th class="n">Games</th>${l[0].reach.map((r) => `<th class="n">Level ${r.level}</th>`).join("")}<th class="n">Best level</th></tr>
-    ${l.map((v) => `<tr><td>${esc(v.hash)}<br><span class="dim">from ${day(v.created_at)}</span></td><td class="n">${v.games}</td>${v.reach.map((r) => `<td class="n">${pct(r.share)}</td>`).join("")}<td class="n">${v.best}</td></tr>`).join("")}</table></div>
-    ${c ? `<h3>Daily check against the real game</h3><p class="${c.failed ? "bad" : "dim"}">${c.failed ? `Failed: ${esc(c.failed)}` : "Passed. The local copy of the game plays the same as the one on Starknet."}</p>` : ""}`;
+  const practice = data.games.filter((x) => !x.onchain && x.ended_at).sort((a, b) => b.level - a.level || b.id - a.id).slice(0, PRACTICE);
+  put($("results"), `<div class="head"><h2>Practice</h2>${c ? (c.failed ? `<span class="bad" title="${esc(c.failed)}">Check failed</span>` : `<span class="good" title="The local game matches the one on Starknet">Checked</span>`) : ""}</div>
+    ${l ? `<div id="reach">${l.reach.map((r) => `<div class="card" title="Share of ${l.games} practice games that reached level ${r.level}"><b>${Math.round(100 * r.share)}%</b><span class="dim">Level ${r.level}</span></div>`).join("")}</div>` : ""}
+    <ol id="practice" class="rows scroll">${practice.map((x) => `<li class="card"><span class="dim">Game ${x.id}</span><b>${x.level}</b></li>`).join("")}</ol>`);
+
+  const w = data.wallet;
+  const paid = realGames().filter((x) => x.gas_strk !== null);
+  const each = paid.length ? paid.reduce((n, x) => n + x.gas_strk, 0) / paid.length : null;
+  put($("wallet"), `<h2>Wallet</h2>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
+    <div class="row"><span>${pic("dungeon_ticket", "Tickets")}<span class="n">${round(w.tickets, 1)}</span></span><span>${pic("survivor_token", "SURVIVOR tokens")}<span class="n">${round(w.survivor, 1)}</span></span>${each === null ? "" : `<span class="dim" title="Average cost of a real game"><span class="n">${round(each, 1)}</span>a game</span>`}</div>`}`);
+
+  const b = data.beasts;
+  const held = Object.values(b?.inventory ?? {}).flat();
+  const claims = b?.pendingClaims ?? [];
+  const cell = (x) => `<div class="card" title="${esc(`${x.name}, level ${x.level}`)}"><img src="${face(x.name.split(" ").at(-1))}" alt="${esc(x.name)}"><b>${x.level}</b></div>`;
+  put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.inventory ? held.length : ""}</span></div>${b && !b.inventory ? `<span class="bad">No answer</span>` : ""}${claims.length ? `<span class="gold">${claims.length} to claim</span>` : ""}${held.length + claims.length ? `<div id="zoo" class="scroll">${[...held, ...claims].map(cell).join("")}</div>` : ""}`);
+
+  const first = (text) => text.replace(/ (T\d|G\d).*$/, "");
+  put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="dim">Level</span></div><ol id="sacks" class="rows scroll">${(data.bags ?? []).slice(0, BAGS).map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><b>${round(x.mean, 1)}</b></li>`).join("")}</ol>`);
 }
 
-function bagsHtml() {
-  const l = data.bags;
-  const head = `<h2>Loot bags</h2><p class="lede">A loot bag is a set of starting gear on sale for the Loot Dungeon. Each one was played many times in simulation and they are ranked by the level the agent reaches on average.</p>`;
-  if (!l) return `${head}<p class="lede">Loading.</p>`;
-  if (!l.length) return `${head}<p class="lede">No ranking yet.</p>`;
-  return `${head}<h3>Best ${Math.min(l.length, 25)} of ${l.length}</h3><div class="wide"><table><tr><th>Bag</th><th class="n">Average level</th><th class="n">Best level</th><th class="n">Reached level 25</th><th>What is in it</th></tr>
-    ${l.slice(0, 25).map((b) => `<tr><td>${b.bag}</td><td class="n">${round(b.mean, 1)}</td><td class="n">${b.best}</td><td class="n">${Math.round(b.ge25)}%</td><td class="dim">${esc(plain(`${b.weapon}, ${b.set} armor, ${b.neck}, ${b.ring}`))}</td></tr>`).join("")}</table></div>`;
-}
-
-const HTML = { games: gamesHtml, wallet: walletHtml, beasts: beastsHtml, results: resultsHtml, bags: bagsHtml };
-const LOAD = {
-  wallet: () => get("/api/wallet").then((w) => { data.wallet = w ?? data.wallet; }),
-  beasts: () => get("/api/beasts").then((b) => { data.beasts = b ?? data.beasts; }),
-  results: () => Promise.all([get("/api/strategies"), get("/api/check")]).then(([l, c]) => { data.results = l ?? []; data.check = c; }),
-  bags: () => get("/api/bags").then((l) => { data.bags = l ?? []; }),
-};
-
-function renderPage() {
-  const game = follow ? "" : `game=${view.id}`;
-  $("nav").innerHTML = Object.entries(VIEWS).map(([key, label]) => `<a href="?${[game, key === "watch" ? "" : `view=${key}`].filter(Boolean).join("&")}"${key === page ? ` aria-current="page"` : ""}>${label}</a>`).join("");
-  $("watch").hidden = page !== "watch";
-  $("view").hidden = page === "watch";
-  if (page !== "watch") $("view").innerHTML = HTML[page]();
-  else wire();
+function askHtml() {
+  const paid = realGames().find((g) => g.gas_strk !== null);
+  const w = data.wallet;
+  return `<h2>This spends real money</h2>
+    <div class="row cost">${paid ? `<span>Last game <span class="n bad">${round(paid.gas_strk, 1)} STRK</span></span>` : ""}${w?.strk !== undefined ? `<span>Wallet <span class="n ${w.strk > w.floor ? "good" : "bad"}">${round(w.strk, 1)} STRK</span></span>` : ""}</div>
+    <div class="pick"><button class="card spend" type="button" data-do="spend">Spend STRK</button><button class="card" type="button" data-close autofocus>Cancel</button></div>`;
 }
 
 async function load() {
-  const games = await get("/api/games");
-  if (!games) return;
-  data.games = games;
-  liveRow = games.find((g) => g.live)?.id ?? null;
-  view.game = games.find((g) => g.id === view.id) ?? view.game;
-  renderPage();
-  schedule();
+  data.games = (await get("/api/games")) ?? data.games;
+  render();
 }
 
-function pause() {
-  clearInterval(view.timer);
-  view.playing = false;
+async function loadSide() {
+  const [w, b, l, c, bags] = await Promise.all(["wallet", "beasts", "strategies", "check", "bags"].map((p) => get(`/api/${p}`)));
+  Object.assign(data, { wallet: w ?? data.wallet, beasts: b ?? data.beasts, results: l ?? data.results, check: c, bags: bags ?? data.bags });
+  render();
 }
 
-function play() {
-  pause();
-  if (atEnd()) seek(0);
-  view.playing = true;
-  view.timer = setInterval(() => {
-    seek(view.cursor + 1);
-    if (atEnd()) { pause(); schedule(); }
-  }, TICK_MS / view.speed);
-  schedule();
-}
-
-let watching = 0;
-async function watch(id, fromStart = false) {
-  const ticket = ++watching;
-  pause();
-  Object.assign(view, { id, game: null, events: [], stops: [0], cursor: 0, loading: id !== null, inbox: [] });
-  scene = {};
-  seek(0);
-  if (id === null) return;
-  const found = await get(`/api/games/${id}`);
-  if (ticket !== watching) return;
-  view.loading = false;
-  if (found) {
-    const last = found.events.at(-1)?.at ?? 0;
-    view.game = found.game;
-    view.events = [...found.events, ...view.inbox.filter((e) => e.at > last)];
-    if (found.game.live && liveRow === null && !view.inbox.some((e) => e.ending !== undefined)) liveRow = id;
-  }
-  index();
-  if (fromStart && !isLive() && view.events.length) play();
-  else seek(view.events.length);
-}
-
-function pin() {
-  if (!follow) return;
-  follow = false;
-  history.replaceState(null, "", `?game=${view.id}`);
-  renderPage();
-}
-
-function route() {
-  const q = new URLSearchParams(location.search);
-  const id = Number(q.get("game"));
-  const to = HTML[q.get("view")] ? q.get("view") : "watch";
-  const target = id || liveRow || data.games[0]?.id || null;
-  follow = !id;
-  if (to !== "watch") pause();
-  if (target !== view.id) watch(target, !!id && to === "watch");
-  page = to;
-  renderPage();
-  LOAD[page]?.().then(() => page === to && renderPage());
-  schedule();
+function onEvent(e) {
+  if (e.kind === "decision") move = e;
+  else if (e.kind === "state") market = e.state.market;
 }
 
 function go(search) {
   history.pushState(null, "", search || location.pathname);
-  route();
+  render();
 }
 
-let handover = 0;
-function onLive(e) {
-  if (e.kind === "status") load();
-  if (e.kind === "status" && e.row && e.ending === undefined) {
-    liveRow = e.row;
-    clearTimeout(handover);
-    if (follow && view.id !== liveRow) handover = setTimeout(() => follow && liveRow && watch(liveRow), scene.state?.over && atEnd() ? DEATH_HOLD_MS : 0);
-  }
-  if (isLive()) {
-    if (view.loading) view.inbox.push(e);
-    else {
-      view.events.push(e);
-      index();
-      seek(view.events.length);
-    }
-  }
-  if (e.kind === "status" && e.ending !== undefined) { liveRow = null; schedule(); }
-}
-
-const step = (by) => { pin(); pause(); seek(view.stops[Math.max(0, view.stops.findLastIndex((x) => (by > 0 ? x <= view.cursor : x < view.cursor)) + (by > 0 ? 1 : 0))] ?? view.events.length); };
-$("nav").onclick = (e) => { const a = e.target.closest("a"); if (a) { e.preventDefault(); go(a.getAttribute("href")); } };
+const pick = (e) => { const row = e.target.closest("li[data-id]"); if (row) go(Number(row.dataset.id) === liveReal()?.id ? "" : `?game=${row.dataset.id}`); };
+$("games").onclick = pick;
+$("games").onkeydown = (e) => { if (e.key === "Enter") pick(e); };
 $("golive").onclick = () => go("");
 $("run").onclick = () => {
-  if (liveRow !== null) return post("/api/stop");
-  LOAD.wallet();
+  if (liveGame()) return post("/api/stop");
   $("ask").innerHTML = askHtml();
   $("ask").showModal();
 };
 $("ask").onclick = (e) => {
-  const act = e.target.closest("[data-do]")?.dataset.do;
-  if (act === "confirm") return void ($("ask").innerHTML = askHtml("spend"));
-  if (act === "practice") post("/api/play", {});
-  if (act === "spend") post("/api/play", { live: true });
-  if (act || e.target.closest("[data-close]")) { $("ask").close(); if (act) go(""); }
+  const spend = e.target.closest("[data-do]");
+  if (spend) post("/api/play", { live: true });
+  if (spend || e.target.closest("[data-close]") || e.target === $("ask")) { $("ask").close(); if (spend) go(""); }
 };
-$("sheet").onclick = (e) => { if (e.target.closest("[data-close]") || e.target === $("sheet")) $("sheet").close(); };
-$("watch").onclick = (e) => { const name = e.target.closest("[data-open]")?.dataset.open; if (name) openSheet(name); };
-const pickRow = (e) => { const row = e.target.closest("tr[data-id]"); if (row) go(`?game=${row.dataset.id}`); };
-$("view").onclick = pickRow;
-$("view").onkeydown = (e) => { if (e.key === "Enter") pickRow(e); };
-$("toggle").onclick = () => { pin(); if (view.playing) { pause(); schedule(); } else play(); };
-$("speed").onclick = () => { view.speed = SPEEDS[(SPEEDS.indexOf(view.speed) + 1) % SPEEDS.length]; if (view.playing) play(); else schedule(); };
-$("back").onclick = () => step(-1);
-$("next").onclick = () => step(1);
-$("seek").oninput = () => { pin(); pause(); seek(view.stops[Number($("seek").value)]); };
-addEventListener("popstate", route);
-addEventListener("keydown", (e) => {
-  if (page !== "watch" || $("reel").hidden || document.querySelector("dialog[open]") || e.target.closest("button, input, a")) return;
-  if (e.key === "ArrowLeft") step(-1);
-  else if (e.key === "ArrowRight") step(1);
-  else if (e.key === " ") { e.preventDefault(); $("toggle").click(); }
-});
+addEventListener("popstate", render);
 
 const source = new EventSource("/events");
-let opened = false;
-source.onerror = () => { $("mode").textContent = "Reconnecting"; };
-source.onopen = async () => {
-  const again = opened;
-  opened = true;
-  await load();
-  if (again && (isLive() || follow)) route();
+source.onopen = load;
+source.onmessage = (m) => {
+  const e = JSON.parse(m.data);
+  if (e.kind === "status") return load();
+  if (shown?.live) { onEvent(e); render(); }
 };
-source.onmessage = (m) => onLive(JSON.parse(m.data));
 Promise.all([get("/api/items"), load()]).then(([table]) => {
-  for (const g of table ?? []) items[g.id] ??= g;
-  route();
+  for (const g of table ?? []) { items[g.id] = g; byName[g.name] = g; }
+  loadSide();
 });
-setInterval(() => LOAD[page]?.().then(renderPage), SLOW_MS);
+setInterval(loadSide, SLOW_MS);
 </script>
 </body>
 </html>

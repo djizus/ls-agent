@@ -38,19 +38,17 @@ uses the contract's hash (same distribution, 30 times slower). A difference unde
 
 | Feature | How to reach it |
 |---|---|
-| Watch a game: live, replay or ended, the adventurer's level and what it is doing, its health and the beast's, its gold and the price of healing, what the agent decided with its reason and the odds it simulated, what followed, and the eight worn items on a body | `/` follows whatever is live; with nothing live it shows the latest game at its end; `/?game=<row id>` replays that game from its start |
-| Every move of the game in order | "Read the whole game" under the latest moves |
-| Abilities with what each buys, the bonus of every worn and carried item, the bag, the cheapest upgrade on the market | "Abilities, bonuses and bag" under the body |
-| Replay a finished game | Play/Pause, Back/Next (left/right arrows), the slider and the speed button at the bottom; space toggles play |
-| Return to the live game from a replay | "Watch the live game" beside the status |
-| Pick a game to watch | "Games" in the top bar (`/?view=games`): real games first, practice below; click a row |
-| Wallet: STRK, margin above the spend floor, tickets, SURVIVOR, STRK spent on real games and the average per game | "Wallet" (`/?view=wallet`); `GET /api/wallet` (cached 30 seconds) |
-| Beasts held, staked and Mega per collection, and kills still to claim | "Beasts" (`/?view=beasts`); `GET /api/beasts` (cached 60 seconds) |
-| Share of practice games reaching level 26, 30 and 35, and the best level, per policy version; the daily contract check result | "Results" (`/?view=results`); `GET /api/strategies`, `GET /api/check` (written by `scripts/check.sh`) |
-| Loot bags ranked by simulated level | "Loot bags" (`/?view=bags`); `GET /api/bags` reads `var/bag-ranking.json` |
-| Start a practice pass | "Start a game" in the top bar, then "Start practice games"; `POST /api/play` with `{"games": n}` |
-| Start an on-chain game (spends STRK) | "Start a game", "Start a real game", then "Spend STRK and start"; `POST /api/play` with `{"live": true}` |
-| Stop after the current move | "Stop the game" in the top bar while a game is live; `POST /api/stop` |
+| One screen, no tabs: the official Loot Survivor spectator in the middle, our panels around it | `/` shows the live real game, or the latest real game when none is live; `/?game=<row id>` shows that real game |
+| Watch a real game | The middle panel embeds `https://www.lootsurvivor.io/watch?id=<game id in decimal>`. A finished game opens at its first move: click inside it, then the right arrow steps the replay |
+| What the agent just decided in the live game: fight or flee with the chance to win and to escape, ability points spent, items bought with their price and reason, potions, drops | The bar under the spectator; for a finished game it shows the level reached, the beast that killed it and the STRK it cost |
+| Pick a real game | "Games" on the left: the three best as a podium, the rest as cards with the level reached; click one. "Live" in the bar returns to the live game |
+| Practice results: share of practice games of the newest policy version reaching level 26, 30 and 35, the best practice games by level, the daily contract check | "Practice" on the left; `GET /api/strategies`, `GET /api/check` (written by `scripts/check.sh`). Practice games cannot be watched on the page |
+| Wallet: STRK (red under the spend floor), tickets, SURVIVOR, average STRK per real game | "Wallet" on the right; `GET /api/wallet` (cached 30 seconds) |
+| Beasts held or won and not yet claimed, each with its level | "Beasts" on the right; `GET /api/beasts` (cached 60 seconds) |
+| Loot bags ranked by simulated level, best 25 | "Loot bags" on the right; `GET /api/bags` reads `var/bag-ranking.json` |
+| Start an on-chain game (spends STRK) | "Play", then "Spend STRK" under "This spends real money"; `POST /api/play` with `{"live": true}` |
+| Start a practice pass | `POST /api/play` with `{"games": n}` (not on the page) |
+| Stop after the current move | "Stop" replaces "Play" while a game is live; `POST /api/stop` |
 | Current game state | `GET /api/state` |
 | 200 games, on-chain first, each with `onchain`, `live`, `dungeon` and `gas_strk` (STRK balance spent during the game, null when not recorded) | `GET /api/games` |
 | One game with its stored events, states included | `GET /api/games/<row id>` |
@@ -89,5 +87,4 @@ daily check timer and the Traefik route.
 | Strategy choices for model deciders | `strategy/candidate.md` |
 | Dungeons, their claim call and species range, and benchmark adventurers | `src/config.ts` |
 | What the page shows about a state (luck, chances, what gear grants, purse) | `enrich` in `src/play.ts` |
-| Where each worn item sits on the body, and the words that replace game shorthand | `PLACE` and `WORDS` in `web/index.html` |
 | Which kills are collectable, and the beast inventory | `src/beasts.ts` |
