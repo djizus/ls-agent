@@ -117,6 +117,7 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 | What settling a finished game would cost (read-only) | `node src/cli.ts quote <game id>` |
 | A loot bag's price now, whether the pool holds it, and a simulated purchase (read-only) | `node src/cli.ts bag <bag number> [address]` |
 | Beasts an address holds or has staked, and its unclaimed kills (read-only) | `node src/cli.ts beasts [address]` |
+| Send every beast the wallet holds to another account (spends STRK; refuses an address with no account, and a transfer that would fail) | `node src/cli.ts send-beasts <address>` |
 | Import human games for study | `node scripts/import.ts <dir>...` |
 | Explain how a game died | `node scripts/autopsy.ts <file> <game>...` |
 

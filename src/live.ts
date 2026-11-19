@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hash, type Call } from "starknet";
 import { claims as pending } from "./beasts.ts";
-import { DUNGEON, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, SURVIVOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, VAR_DIR, type Dungeon } from "./config.ts";
+import { BEAST_NFT, DUNGEON, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, SURVIVOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, VAR_DIR, type Dungeon } from "./config.ts";
 import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
 import { randomHash, startOf, type Chain, type Game, type Snapshot } from "./practice.ts";
@@ -183,6 +183,20 @@ export async function collect(id: string): Promise<string | undefined> {
 }
 
 type Simulated = { calls: string[]; strk: number; revert: string | null };
+
+export async function sendBeasts(to: string): Promise<{ beasts: number; transaction: string | null }> {
+  const owner = keys().address;
+  await provider.getClassHashAt(to);
+  const nft = (entrypoint: string, calldata: string[]) => provider.callContract({ contractAddress: BEAST_NFT, entrypoint, calldata });
+  const count = Number((await nft("balance_of", [owner]))[0]);
+  const ids: string[] = [];
+  for (let i = 0; i < count; i++) ids.push((await nft("token_of_owner_by_index", [owner, hex(BigInt(i)), "0x0"]))[0]);
+  const calls = ids.map((id) => ({ contractAddress: BEAST_NFT, entrypoint: "transfer_from", calldata: [owner, to, ...u256(BigInt(id))] }));
+  if (!calls.length) return { beasts: 0, transaction: null };
+  const [checked] = await simulate(owner, [calls]);
+  if (checked.revert) throw new Error(`transfer would revert: ${checked.revert}`);
+  return { beasts: calls.length, transaction: (await send(calls)).transaction_hash };
+}
 
 export async function simulate(sender: string, txs: Call[][]): Promise<Simulated[]> {
   const nonce = BigInt(await provider.getNonceForAddress(sender));
