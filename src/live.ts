@@ -1,6 +1,8 @@
+import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hash, type Call } from "starknet";
-import { DUNGEON, EKUBO_QUOTER, GAME_API, EKUBO_ROUTER, GAME_CORE, STRK, STRK_FLOOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, VAR_DIR } from "./config.ts";
+import { claims as pending } from "./beasts.ts";
+import { DUNGEON, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, VAR_DIR, type Dungeon } from "./config.ts";
 import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
 import { randomHash, startOf, type Chain, type Game, type Snapshot } from "./practice.ts";
@@ -106,34 +108,95 @@ export async function liveGame(): Promise<Game> {
   return { id, seed: 0, packets, start: begin, local: fromSnapshot(replayLocal(begin, id, packets, chain.hashes)), chain };
 }
 
-export async function settle(id: string, claims: number[]): Promise<string> {
-  const { packets, chain } = await transcript(id);
-  const verified = BigInt((await view("is_verified", id))[0]) === 1n;
-  const receipt = await send([
-    ...(verified ? [] : [{ contractAddress: GAME_CORE, entrypoint: "verify_game", calldata: [id, hex(BigInt(packets.length)), ...packets.map(hex), hex(BigInt(packets.length)), ...chain.blocks.map(hex)] }]),
-    ...claims.map((xp) => ({ contractAddress: DUNGEON.address, entrypoint: "claim_beast", calldata: [id, hex(BigInt(xp))] })),
-  ]);
-  return receipt.transaction_hash;
+const dungeonOf = async (id: string): Promise<[string, Dungeon]> => {
+  const minter = Number((await view("minted_by", id))[0]);
+  const found = Object.entries(DUNGEONS).find(([, d]) => d.minterId === minter);
+  if (!found) throw new Error(`game ${id} belongs to no known dungeon (minter ${minter})`);
+  return found;
+};
+
+const ownerOf = async (id: string) => (await provider.callContract({ contractAddress: GAME_CORE, entrypoint: "owner_of", calldata: u256(BigInt(id)) }))[0];
+
+export function settleCalls(dungeon: Dungeon, id: string, packets: bigint[], blocks: bigint[], claims: number[], done: number, nonce: bigint, single = SETTLE_MAX_PACKETS, chunk = SETTLE_CHUNK): Call[][] {
+  const claimCalls = claims.map((xp) => ({ contractAddress: dungeon.address, entrypoint: dungeon.claim, calldata: [id, hex(BigInt(xp))] }));
+  const span = (from: number, to: number) => [packets, blocks].flatMap((list) => [hex(BigInt(to - from)), ...list.slice(from, to).map(hex)]);
+  const game = (entrypoint: string, calldata: string[]) => ({ contractAddress: GAME_CORE, entrypoint, calldata: [id, ...calldata] });
+  if (done >= packets.length) return claimCalls.length ? [claimCalls] : [];
+  if (done === 0 && packets.length <= single) return [[game("verify_game", span(0, packets.length)), ...claimCalls]];
+  const chunks: string[][] = [];
+  for (let from = done; from < packets.length; from += chunk) chunks.push([hex(nonce), ...span(from, Math.min(from + chunk, packets.length))]);
+  const txs = [...chunks.map((c) => [game("verify_actions", c)]), ...chunks.map((c) => [game("apply_actions", c)])];
+  txs[txs.length - 1].push(...claimCalls);
+  return txs;
 }
 
-type GameEvent = { event: { type: string; beast?: { isCollectable: boolean }; encounter_xp?: number } };
+export async function settlement(id: string, claims: number[]): Promise<Call[][]> {
+  const [{ packets, chain }, verified, checkpoint, [, dungeon]] = await Promise.all([transcript(id), view("is_verified", id), view("get_replay_checkpoint", id), dungeonOf(id)]);
+  const done = BigInt(verified[0]) === 1n ? packets.length : Number(checkpoint[3]);
+  return settleCalls(dungeon, id, packets, chain.blocks, claims, done, BigInt("0x" + randomBytes(8).toString("hex")));
+}
+
+export async function settle(id: string, claims: number[]): Promise<string | undefined> {
+  let last: string | undefined;
+  for (const calls of await settlement(id, claims)) last = (await send(calls)).transaction_hash;
+  return last;
+}
 
 export async function claimable(id: string): Promise<number[]> {
-  const res = await fetch(`${GAME_API}/adventurer/${id}/events?game_core=${GAME_CORE}&minter_id=${DUNGEON.minterId}`);
-  if (!res.ok) throw new Error(`game events ${res.status}`);
-  const { events } = (await res.json()) as { events: GameEvent[] };
-  let collectable = false;
-  const claims: number[] = [];
-  for (const { event } of events) {
-    if (event.type === "beast") collectable = event.beast!.isCollectable;
-    if (event.type === "defeated_beast" && collectable) claims.push(event.encounter_xp!);
-  }
-  return claims;
+  const [owner, [key]] = await Promise.all([ownerOf(id), dungeonOf(id)]);
+  return (await pending(owner, key, id)).map((c) => c.encounterXp);
 }
 
 export async function collect(id: string): Promise<string | undefined> {
   const claims = await claimable(id);
   return claims.length ? settle(id, claims) : undefined;
+}
+
+type Simulated = { calls: string[]; strk: number; revert: string | null };
+
+export async function simulate(sender: string, txs: Call[][]): Promise<Simulated[]> {
+  const nonce = BigInt(await provider.getNonceForAddress(sender));
+  const none = { max_amount: "0x0", max_price_per_unit: "0x0" };
+  const res = await fetch(RPC_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "starknet_simulateTransactions",
+      params: {
+        block_id: "latest",
+        simulation_flags: ["SKIP_VALIDATE", "SKIP_FEE_CHARGE"],
+        transactions: txs.map((calls, i) => ({
+          type: "INVOKE",
+          version: "0x3",
+          sender_address: sender,
+          calldata: [hex(BigInt(calls.length)), ...calls.flatMap((c) => [c.contractAddress, hash.getSelectorFromName(c.entrypoint), hex(BigInt((c.calldata as string[]).length)), ...(c.calldata as string[])])],
+          signature: [],
+          nonce: hex(nonce + BigInt(i)),
+          resource_bounds: { l1_gas: none, l2_gas: none, l1_data_gas: none },
+          tip: "0x0",
+          paymaster_data: [],
+          account_deployment_data: [],
+          nonce_data_availability_mode: "L1",
+          fee_data_availability_mode: "L1",
+        })),
+      },
+    }),
+  });
+  const body = (await res.json()) as { error?: unknown; result?: { fee_estimation: { overall_fee: string }; transaction_trace: { execute_invocation: { revert_reason?: string } } }[] };
+  if (!body.result) throw new Error(`simulation failed: ${JSON.stringify(body.error).slice(0, 300)}`);
+  return body.result.map((r, i) => ({
+    calls: txs[i].map((c) => c.entrypoint),
+    strk: Number(BigInt(r.fee_estimation.overall_fee)) / 1e18,
+    revert: r.transaction_trace.execute_invocation.revert_reason?.replace(/\s+/g, " ").slice(-200) ?? null,
+  }));
+}
+
+export async function quote(id: string): Promise<{ owner: string; claims: number[]; strk: number; transactions: Simulated[] }> {
+  const [owner, claims] = await Promise.all([ownerOf(id), claimable(id)]);
+  const transactions = await simulate(owner, await settlement(id, claims));
+  return { owner, claims, strk: transactions.reduce((sum, t) => sum + t.strk, 0), transactions };
 }
 
 export async function actLive(game: Game, actions: Action[]): Promise<Snapshot> {
