@@ -26,6 +26,7 @@ export type State = {
   bag: Gear[];
   market: (LootItem & { price: number })[];
   potionPrice: number;
+  happened: string[];
 };
 
 
@@ -51,6 +52,7 @@ export function describe(s: Snapshot, id: string): State {
     equipment: Object.values(a.equipment).filter((i) => i.id).map(gear),
     bag: s.bag.map(gear),
     potionPrice: potionPrice(levelOf(a.xp), a.stats.charisma),
+    happened: s.log ?? [],
     market: a.beast_health === 0 ? marketOf(a, id, MARKET).map((o) => ({ ...itemOf(o.id)!, price: o.price })) : [],
   };
 }

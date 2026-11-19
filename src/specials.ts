@@ -37,7 +37,22 @@ const SLOT_ORDER: Record<Slot, number[]> = {
   ring: [8, 4, 5, 6, 7],
 };
 
+const PIN_SLOTS: Slot[] = ["weapon", "chest", "head", "waist", "foot", "hand", "neck", "ring"];
+const pins = new Map<bigint, bigint>();
+
+export const pinSpecials = (gameId: bigint | string, packed: bigint | string): void => void pins.set(BigInt(gameId), BigInt(packed));
+
+export function pinned(itemId: number, gameId: bigint | string): { suffix: number; prefix: number; second: number } | undefined {
+  const packed = pins.get(BigInt(gameId));
+  const slot = BigInt(PIN_SLOTS.indexOf(itemOf(itemId)!.slot));
+  if (!packed || Number((packed >> (136n + 8n * slot)) & 255n) !== itemId) return undefined;
+  const bits = (packed >> (17n * slot)) & 131071n;
+  return { suffix: Number(bits & 31n) - 1, prefix: Number((bits >> 5n) & 127n) - 1, second: Number((bits >> 12n) & 31n) - 1 };
+}
+
 export function suffixOf(itemId: number, salt: number, gameId: bigint | string): string {
+  const pin = pinned(itemId, gameId);
+  if (pin) return NAMES[pin.suffix];
   const seed = Number(BigInt(hash.computePoseidonHashOnElements([BigInt(salt), BigInt(gameId)])) % 65536n);
   const order = SLOT_ORDER[itemOf(itemId)!.slot];
   const entropy = seed + itemId > 65535 ? seed - itemId : seed + itemId;
@@ -48,7 +63,7 @@ export function effectiveStats(adventurer: Adventurer, bag: Item[], gameId: bigi
   const stats = { ...adventurer.stats };
   const salt = adventurer.item_specials_salt;
   const boost = (item: Item, only?: (keyof Stats)[]) => {
-    if (!salt || item.id === 0 || levelOf(item.xp) < SUFFIX_GREATNESS) return;
+    if (item.id === 0 || levelOf(item.xp) < SUFFIX_GREATNESS || (!salt && !pinned(item.id, gameId))) return;
     for (const [stat, n] of Object.entries(SUFFIXES[suffixOf(item.id, salt, gameId)]) as [keyof Stats, number][])
       if (!only || only.includes(stat)) stats[stat] += n;
   };

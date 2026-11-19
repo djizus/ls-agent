@@ -4,13 +4,12 @@ import { greatness } from "../combat.ts";
 import { basePrice, itemOf, levelOf, potionPrice, priceOf } from "../items.ts";
 import { marketOf } from "../market.ts";
 import type { Snapshot } from "../practice.ts";
-import { MARKET } from "../settings.ts";
-import { SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "../specials.ts";
+import { AMBUSH_REDUCTION, MARKET } from "../settings.ts";
+import { SUFFIX_GREATNESS, SUFFIXES, effectiveStats, pinned, suffixOf } from "../specials.ts";
 import { beastHit, goldReward, obstacleHit, reduced, xpReward, yourHit, type Foe } from "./damage.ts";
 import { beastRolls, crit, dodged, kindOf, rolls, round, salt, seeds, poseidon, type Seeds } from "./rolls.ts";
 import { PREFIX_GREATNESS, specialsSeed } from "./specials.ts";
 
-export const BASE_DAMAGE_REDUCTION = 35;
 const BAG_SIZE = 15;
 const MAX_ITEM_XP = 400;
 const ARMOR_SLOTS = ["chest", "head", "waist", "foot", "hand"] as const;
@@ -22,7 +21,7 @@ const LOOT_BY_TIER = [
   [9, 13, 17, 22, 27, 32, 37, 42, 47, 52, 57, 67, 62, 72, 77, 82, 92, 97, 87],
 ];
 
-export type Local = { adventurer: Adventurer; slots: Item[]; over: boolean };
+export type Local = { adventurer: Adventurer; slots: Item[]; over: boolean; log?: string[] };
 
 export class Rejected extends Error {}
 
@@ -35,7 +34,7 @@ export function fromSnapshot(s: Snapshot): Local {
   return { adventurer: structuredClone(s.adventurer), slots, over: s.over };
 }
 
-export const toSnapshot = (l: Local): Snapshot => ({ adventurer: l.adventurer, bag: l.slots.filter((i) => i.id !== 0).map((i) => ({ ...i })), over: l.over });
+export const toSnapshot = (l: Local): Snapshot => ({ adventurer: l.adventurer, bag: l.slots.filter((i) => i.id !== 0).map((i) => ({ ...i })), over: l.over, log: l.log });
 
 function decode(packet: bigint): Action[] {
   const count = Number((packet >> 240n) & 15n) + 1;
@@ -84,6 +83,7 @@ class Game {
   readonly a: Adventurer;
   readonly slots: Item[];
   readonly id: bigint;
+  readonly log: string[] = [];
 
   constructor(local: Local, gameId: string) {
     this.a = local.adventurer;
@@ -167,8 +167,10 @@ class Game {
   strike(foe: Foe, location: number, critRoll: number, reduction = 0): void {
     const armor = this.a.equipment[ARMOR_SLOTS[location % 5]];
     const hit = beastHit(this.a, foe, armor, this.id);
-    const damage = crit(Math.min(levelOf(this.a.xp), 100), critRoll) ? hit.crit : hit.normal;
-    this.hurt(reduction > 0 ? reduced(damage, reduction) : damage);
+    const critical = crit(Math.min(levelOf(this.a.xp), 100), critRoll);
+    const damage = reduced(critical ? hit.crit : hit.normal, reduction);
+    this.log.push(`${reduction > 0 ? "Ambushed: the beast" : "The beast"} hits your ${ARMOR_SLOTS[location % 5]} for ${damage}${critical ? ", critical" : ""}`);
+    this.hurt(damage);
   }
 
   itemXp(amount: number, roll: number): void {
@@ -182,7 +184,7 @@ class Game {
       if (after === 20) this.addPoints(1);
       const suffix = before < SUFFIX_GREATNESS && after >= SUFFIX_GREATNESS;
       if (!suffix && !(before < PREFIX_GREATNESS && after >= PREFIX_GREATNESS)) continue;
-      if (specialsSeed(this.a.item_specials_salt, this.id) === 0) this.a.item_specials_salt = roll & 16383 || 1;
+      if (!pinned(item.id, this.id) && specialsSeed(this.a.item_specials_salt, this.id) === 0) this.a.item_specials_salt = roll & 16383 || 1;
       if (suffix) this.heal(15 * (SUFFIXES[suffixOf(item.id, this.a.item_specials_salt, this.id)].vitality ?? 0));
     }
   }
@@ -202,13 +204,19 @@ class Game {
       this.a.beast_salt = salt(s.action, 131071n);
       const b = beastRolls(this.a.beast_salt, this.id, this.a.xp);
       this.a.beast_health = Math.min(1023, 1 + (b[2] % (start * 20)) + healthBonus(start));
-      if (!dodged(stats.wisdom, start, r[6])) this.strike(this.foe(), r[4], r[5], BASE_DAMAGE_REDUCTION);
+      if (!dodged(stats.wisdom, start, r[6])) this.strike(this.foe(), r[4], r[5], AMBUSH_REDUCTION);
+      else this.log.push("Avoided the ambush");
     } else if (r[7] % 3 === 1) {
       const id = kindOf(r[0]);
       const foe: Foe = { level: 1 + (r[3] % (start * 3)) + levelBonus(start), tier: Math.floor(((id - 1) % 25) / 5) + 1, type: id < 26 ? "Magic" : id < 51 ? "Blade" : "Bludgeon", prefix: null, suffix: null };
       const armor = this.a.equipment[ARMOR_SLOTS[r[4] % 5]];
-      const damage = reduced(obstacleHit(foe, armor, this.a.equipment.neck, crit(Math.min(start, 100), r[5])), BASE_DAMAGE_REDUCTION);
-      if (!dodged(stats.intelligence, start, r[6])) this.hurt(damage);
+      const damage = reduced(obstacleHit(foe, armor, this.a.equipment.neck, crit(Math.min(start, 100), r[5])), AMBUSH_REDUCTION);
+      const trap = `${foe.type} trap, level ${foe.level} T${foe.tier}`;
+      if (dodged(stats.intelligence, start, r[6])) this.log.push(`Dodged a ${trap}`);
+      else {
+        this.log.push(`A ${trap} hits your ${ARMOR_SLOTS[r[4] % 5]} for ${damage}`);
+        this.hurt(damage);
+      }
       if (this.a.health > 0) {
         const xp = xpReward(foe, start);
         this.addXp(xp);
@@ -223,12 +231,19 @@ class Game {
 
   discover(level: number, kind: number, amount: number, pick: number): void {
     const roll = Math.floor((kind * 100 + 127) / 255);
-    if (roll < 45) return this.addGold((amount % level) + 1);
-    if (roll < 90) return this.heal(((amount % level) + 1) * 2);
+    if (roll < 45) {
+      this.log.push(`Found ${(amount % level) + 1} gold`);
+      return this.addGold((amount % level) + 1);
+    }
+    if (roll < 90) {
+      this.log.push(`Found a health potion, +${((amount % level) + 1) * 2} HP`);
+      return this.heal(((amount % level) + 1) * 2);
+    }
     const tier = Math.floor((amount * 100 + 127) / 255);
     const list = LOOT_BY_TIER[tier < 50 ? 0 : tier < 80 ? 1 : tier < 92 ? 2 : tier < 98 ? 3 : 4];
     const id = list[pick % list.length];
     const slot = itemOf(id)!.slot;
+    this.log.push(`Found ${itemOf(id)!.name}`);
     if (this.owns(id) || (this.bagFull() && this.a.equipment[slot].id !== 0)) return this.addGold(basePrice(itemOf(id)!.tier));
     if (this.a.equipment[slot].id === 0) this.a.equipment[slot] = { id, xp: 0 };
     else this.toBag({ id, xp: 0 });
@@ -245,7 +260,9 @@ class Game {
     const best = luck === 0 ? hit.normal : hit.crit;
     for (let n = 1; !(spare === 1 && this.a.beast_health <= surest) && !(spare === 2 && this.a.beast_health <= best); n++) {
       const r = round(this.a.xp, n, s.action);
-      const damage = crit(luck, r.yourCrit) ? hit.crit : hit.normal;
+      const critical = crit(luck, r.yourCrit);
+      const damage = critical ? hit.crit : hit.normal;
+      this.log.push(`You hit for ${damage}${critical ? ", critical" : ""}`);
       if (damage >= this.a.beast_health) {
         this.a.beast_health = 0;
         this.addGold(goldReward(foe, this.a.equipment.ring));
@@ -275,6 +292,7 @@ class Game {
         this.addXp(1);
         break;
       }
+      this.log.push("Failed to flee");
       this.strike(foe, r.location, r.beastCrit);
       if (this.a.health === 0 || this.a.health <= tillHealth) break;
     }
@@ -379,7 +397,7 @@ export function step(local: Local, gameId: string, packet: bigint, hash: string 
     if (next.adventurer.health === 0) break;
   }
   next.over = next.adventurer.health === 0;
-  return next;
+  return { ...next, log: game.log };
 }
 
 export function replayLocal(start: Snapshot, gameId: string, packets: bigint[], hashes: (string | bigint)[]): Snapshot {

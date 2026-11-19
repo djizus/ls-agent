@@ -3,9 +3,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { GAME_CORE, VAR_DIR } from "./config.ts";
 import { decodeAdventurer, decodeBag, encodePacket, type Action, type Adventurer, type Item } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot, type Local } from "./engine/engine.ts";
+import { pinSpecials } from "./specials.ts";
 import { provider } from "./wallet.ts";
 
-export type Snapshot = { adventurer: Adventurer; bag: Item[]; over: boolean };
+export type Snapshot = { adventurer: Adventurer; bag: Item[]; over: boolean; specials?: string; log?: string[] };
 export type Chain = { blocks: bigint[]; hashes: string[]; rolling: bigint };
 export type Game = { id: string; seed: number; packets: bigint[]; start: Snapshot; local: Local; chain?: Chain };
 
@@ -53,13 +54,20 @@ export async function replay(game: { id: string; seed?: number; packets: bigint[
 const startsFile = `${VAR_DIR}starts.json`;
 const starts = new Map<string, Snapshot>(existsSync(startsFile) ? Object.entries(JSON.parse(readFileSync(startsFile, "utf8"))) : []);
 
-export async function newPracticeGame(id: string, seed = 0): Promise<Game> {
+export async function startOf(id: string): Promise<Snapshot> {
   if (!starts.has(id)) {
-    starts.set(id, await replay({ id, packets: [] }));
+    const [, , specials] = await call({ contractAddress: GAME_CORE, entrypoint: "get_start_override", calldata: [id] });
+    starts.set(id, { ...(await replay({ id, packets: [] })), specials });
     mkdirSync(VAR_DIR, { recursive: true });
     writeFileSync(startsFile, JSON.stringify(Object.fromEntries(starts)));
   }
   const start = starts.get(id)!;
+  pinSpecials(id, start.specials ?? 0n);
+  return start;
+}
+
+export async function newPracticeGame(id: string, seed = 0): Promise<Game> {
+  const start = await startOf(id);
   return { id, seed, packets: [], start, local: fromSnapshot(start) };
 }
 

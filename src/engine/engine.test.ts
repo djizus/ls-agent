@@ -6,12 +6,12 @@ import * as combat from "../combat.ts";
 import { DUNGEON, GAME_CORE } from "../config.ts";
 import { ITEMS, itemOf, levelOf, potionPrice, priceOf } from "../items.ts";
 import { marketOf } from "../market.ts";
-import { hashes, replay, revertReason, type Snapshot } from "../practice.ts";
+import { hashes, replay, startOf, revertReason, type Snapshot } from "../practice.ts";
 import { MARKET } from "../settings.ts";
 import { effectiveStats } from "../specials.ts";
 import { provider } from "../wallet.ts";
 import { beastHit, yourHit } from "./damage.ts";
-import { BASE_DAMAGE_REDUCTION, Rejected, fromSnapshot, step, toSnapshot, type Local } from "./engine.ts";
+import { Rejected, fromSnapshot, step, toSnapshot, type Local } from "./engine.ts";
 
 const PACKETS = 60;
 
@@ -68,14 +68,15 @@ function choose(l: Local, id: string, rnd: () => number): Action[] {
   return out;
 }
 
-const same = (local: Snapshot, chain: Snapshot) => JSON.stringify(local) === JSON.stringify(chain);
+const core = (s: Snapshot) => JSON.stringify([s.adventurer, s.bag, s.over]);
+const same = (local: Snapshot, chain: Snapshot) => core(local) === core(chain);
 
 type Played = { game: { id: string; packets: bigint[] }; states: Local[] };
 
 async function play(id: string, seed: number): Promise<Played> {
   const game = { id, packets: [] as bigint[] };
   const rnd = random(seed);
-  const states = [fromSnapshot(await replay(game))];
+  const states = [fromSnapshot(await startOf(id))];
   let local = states[0];
   while (game.packets.length < PACKETS && !local.over) {
     const hash = hashes({ id, packets: [...game.packets, 0n] }).at(-1)!;
@@ -206,9 +207,4 @@ test("engine damage equals combat.ts when no jewelry or name match applies", () 
           assert.deepEqual(yourHit(adventurer, stats.strength, foe, 1n), combat.yourHit(gear, stats, beast));
         } else assert.deepEqual(beastHit(adventurer, foe, gear, 1n), combat.beastHit(beast, gear));
       }
-});
-
-test("engine damage reduction is the dungeon's setting", async () => {
-  const settings = await provider.callContract({ contractAddress: GAME_CORE, entrypoint: "get_settings", calldata: [String(DUNGEON.settingsId)] });
-  assert.equal(BASE_DAMAGE_REDUCTION, Number(settings[66]));
 });

@@ -1,6 +1,7 @@
 import type { Item } from "../codec.ts";
 import { greatness } from "../combat.ts";
 import { itemOf, type Slot } from "../items.ts";
+import { pinned } from "../specials.ts";
 import { poseidon } from "./rolls.ts";
 
 const SLOT_ORDER: Record<Slot, number[]> = {
@@ -20,6 +21,8 @@ export const specialsSeed = (salt: number, gameId: bigint): number => (salt === 
 
 export function specialsOf(item: Item, salt: number, gameId: bigint): { prefix: number; suffix: number } | null {
   if (!item.id || greatness(item) < PREFIX_GREATNESS) return null;
+  const pin = pinned(item.id, gameId);
+  if (pin) return { prefix: pin.prefix, suffix: pin.second };
   const seed = specialsSeed(salt, gameId);
   const order = SLOT_ORDER[itemOf(item.id)!.slot];
   const entropy = seed + item.id > 65535 ? seed - item.id : seed + item.id;

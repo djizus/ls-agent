@@ -3,7 +3,7 @@ import { hash, type Call } from "starknet";
 import { DUNGEON, EKUBO_QUOTER, GAME_API, EKUBO_ROUTER, GAME_CORE, STRK, STRK_FLOOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, VAR_DIR } from "./config.ts";
 import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
-import { randomHash, replay, type Chain, type Game, type Snapshot } from "./practice.ts";
+import { randomHash, startOf, type Chain, type Game, type Snapshot } from "./practice.ts";
 import { account, balanceOf, keys, provider, strkBalance } from "./wallet.ts";
 
 const ONE = 10n ** 18n;
@@ -90,7 +90,7 @@ export async function transcript(id: string): Promise<{ packets: bigint[]; chain
 async function start(id: string): Promise<Snapshot> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await replay({ id, packets: [] });
+      return await startOf(id);
     } catch (err) {
       if (attempt >= 30) throw err;
       await new Promise((r) => setTimeout(r, 4000));

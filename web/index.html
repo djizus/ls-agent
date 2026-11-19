@@ -544,6 +544,7 @@ function onState(s, still) {
   const show = still ? () => {} : stamp;
   if (prev) {
     if (!prev.beast && s.beast) { moment(`${s.beast.name} appears, level ${s.beast.level}`); show(s.beast.name, `level ${s.beast.level} ${s.beast.type.toLowerCase()} appears`); }
+    for (const line of s.happened ?? []) moment(line, /hits your|Failed/.test(line) ? "bad" : /Found|Dodged|Avoided/.test(line) ? "good" : "");
     if (prev.beast && !s.beast && !s.over) {
       if (scene.lastMove === "flee") { moment(`Escaped the ${prev.beast.name}`, "good"); show("Escaped"); }
       else { moment(`Slew the ${prev.beast.name}, +${s.xp - prev.xp} xp, +${s.gold - prev.gold} gold`, "good"); show("Victory", `${prev.beast.name} slain`); }
