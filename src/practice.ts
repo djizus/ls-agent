@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { GAME_CORE, VAR_DIR } from "./config.ts";
-import { decodeAdventurer, decodeBag, encodePacket, type Action, type Adventurer, type Item } from "./codec.ts";
+import { DUNGEON, GAME_CORE, VAR_DIR } from "./config.ts";
+import { STATS, decodeAdventurer, decodeBag, encodePacket, type Action, type Adventurer, type Item } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot, type Local } from "./engine/engine.ts";
 import { pinSpecials } from "./specials.ts";
 import { provider } from "./wallet.ts";
@@ -69,6 +69,19 @@ export async function startOf(id: string): Promise<Snapshot> {
 export async function newPracticeGame(id: string, seed = 0): Promise<Game> {
   const start = await startOf(id);
   return { id, seed, packets: [], start, local: fromSnapshot(start) };
+}
+
+const SYNTHETIC = 5n << 244n;
+
+export async function syntheticGame(index: number, seed = 0): Promise<Game> {
+  const template = await startOf(DUNGEON.benchmark[0]);
+  const roll = createHash("sha256").update(`start:${index}`).digest();
+  const stats = Object.fromEntries(STATS.map((s) => [s, 0])) as Adventurer["stats"];
+  const points = STATS.reduce((n, s) => n + template.adventurer.stats[s], 0);
+  for (let p = 0; p < points; p++) stats[STATS[roll.readUInt16BE(2 * p) % STATS.length]]++;
+  const health = template.adventurer.health + 15 * (stats.vitality - template.adventurer.stats.vitality);
+  const start = { ...template, adventurer: { ...template.adventurer, stats, health, level_salt: 1 + (roll.readUInt16BE(30) % 16383) } };
+  return { id: "0x" + (SYNTHETIC + BigInt(index)).toString(16), seed, packets: [], start, local: fromSnapshot(start) };
 }
 
 export function act(game: Game, actions: Action[]): Snapshot {

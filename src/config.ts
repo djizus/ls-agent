@@ -15,7 +15,7 @@ export const GAME_CORE = "0x03cafe867e9f5dc7ccf73471b98c1d6d6d54804744cef9626acc
 export const BEAST_NFT = "0x00f739e402e52830a736335a0f47d58ec78ba067443c9c6930da182eab2ff8b0";
 export const SETTLE_MAX_PACKETS = 469;
 export const SETTLE_CHUNK = 117;
-export type Dungeon = { name: string; address: string; minterId: number; settingsId: number; claim: string; firstSpecies: number; speciesCount: number; benchmark: string[] };
+export type Dungeon = { name: string; address: string; minterId: number; settingsId: number; claim: string; rolledStart: boolean; firstSpecies: number; speciesCount: number; benchmark: string[] };
 
 export const DUNGEONS: Record<string, Dungeon> = {
   beast: {
@@ -23,6 +23,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     address: "0x075ca042091b8e1418d0510b8d6519a89222ef5f7bbceb0ff760bb3c62c98174",
     minterId: 1,
     settingsId: 2,
+    rolledStart: true,
     claim: "claim_beast",
     firstSpecies: 1,
     speciesCount: 75,
@@ -54,6 +55,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     address: "0x03921001b64ad6af2bae27b95c27c465fc8921d9c537f4821eb3023b5889622f",
     minterId: 4,
     settingsId: 6,
+    rolledStart: false,
     claim: "claim_collectable",
     firstSpecies: 78,
     speciesCount: 30,
