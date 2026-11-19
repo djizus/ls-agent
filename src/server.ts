@@ -7,7 +7,7 @@ import { ITEMS } from "./items.ts";
 import { halt, play } from "./runner.ts";
 import { enrich, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
-import { inventory, pendingClaims } from "./beasts.ts";
+import { inventory, pendingClaims, sellPrices, worth, type Prices } from "./beasts.ts";
 import { liveRow, subscribe } from "./events.ts";
 import { handleMcp } from "./mcp.ts";
 import { summary } from "./summary.ts";
@@ -70,12 +70,22 @@ const wallet = cached(30_000, () => {
   );
 });
 
+const prices = cached(600_000, () => sellPrices().catch((): Prices => ({})));
+
 const beasts = cached(60_000, () => {
   const address = process.env.LS_BEASTS_ADDRESS ?? keys().address;
   const collections = Object.fromEntries(Object.entries(DUNGEONS).map(([key, d]) => [key, d.name]));
-  return Promise.all([inventory(address), pendingClaims(address)]).then(
-    ([held, claims]) => ({ address, collections, inventory: held, pendingClaims: claims }),
-    () => ({ address, collections }),
+  return Promise.all([inventory(address), pendingClaims(address), prices() as Promise<Prices>]).then(
+    ([held, claims, sell]) => ({
+      address,
+      groups: Object.entries(collections).map(([key, name]) => {
+        const own = (held[key] ?? []).map((b) => ({ ...b, strk: worth(sell, b) }));
+        const open = claims.filter((c) => c.collection === key).map((c) => ({ ...c, state: "claim", strk: worth(sell, c) }));
+        const all = [...own, ...open].sort((a, b) => Number(a.state === "claim") - Number(b.state === "claim") || a.tier - b.tier || b.level - a.level);
+        return { key, name, held: own.length, claims: open.length, strk: all.some((b) => b.strk !== null) ? all.reduce((n, b) => n + (b.strk ?? 0), 0) : null, beasts: all };
+      }),
+    }),
+    () => ({ address }),
   );
 });
 
