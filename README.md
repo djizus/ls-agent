@@ -46,11 +46,11 @@ uses the contract's hash (same distribution, 30 times slower). A difference unde
 | One screen, no tabs: the official Loot Survivor spectator in the middle, our panels around it | `/` shows the live real game, or the latest real game when none is live; `/?game=<row id>` shows that real game |
 | Watch a real game | The middle panel embeds `https://www.lootsurvivor.io/watch?id=<game id in decimal>`. A finished game opens at its first move: click inside it, then the right arrow steps the replay |
 | What the agent just decided in the live game: fight or flee with the chance to win and to escape, ability points spent, items bought with their price and reason, potions, drops | The bar under the spectator; for a finished game it shows the level reached, the beast that killed it and the STRK it cost |
-| Pick a real game | "Games" on the left: the three best as a podium, the rest as cards with the level reached; click one. "Live" in the bar returns to the live game |
+| Pick a real game | "Games" on the left: the three best by level as a podium, the rest as cards newest first with the level reached, the live game on top; click one. "Live" in the bar returns to the live game |
 | Practice results: share of practice games of the newest policy version reaching level 26, 30 and 35, the best practice games by level, the daily contract check | "Practice" on the left; `GET /api/strategies`, `GET /api/check` (written by `scripts/check.sh`). Practice games cannot be watched on the page |
 | Wallet: STRK (red under the spend floor), tickets, SURVIVOR, average STRK per real game | "Wallet" on the right; `GET /api/wallet` (cached 30 seconds) |
 | Beasts held or won and not yet claimed, each with its level | "Beasts" on the right; `GET /api/beasts` (cached 60 seconds) |
-| Loot bags ranked by simulated level, best 25 | "Loot bags" on the right; `GET /api/bags` reads `var/bag-ranking.json` |
+| Loot bags, best 25, with the copies the pool holds (x1, x2, x3) | "Loot bags" on the right; "Level" ranks by simulated mean level, "Beasts" by named beasts killed per game, and the choice is kept in the browser; `GET /api/bags` reads `var/bag-ranking.json` |
 | Start an on-chain game (spends STRK) | "Play", then "Spend STRK" under "This spends real money"; `POST /api/play` with `{"live": true}` |
 | Start a practice pass | `POST /api/play` with `{"games": n}` (not on the page) |
 | Stop after the current move | "Stop" replaces "Play" while a game is live; `POST /api/stop` |
