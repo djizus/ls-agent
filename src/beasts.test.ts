@@ -4,11 +4,11 @@ import { decodeBeast, describe, takeable, unclaimed } from "./beasts.ts";
 import { DUNGEONS, GAME_CORE } from "./config.ts";
 import { settleCalls } from "./live.ts";
 
-const held = ["0x35", "0x18", "0xa", "0x20", "0x1b6", "0x0", "0x0", "0x1", "0x2", "0x114f149"];
+const held = { tokenId: "0x01a9", beastId: 53, prefix: 24, suffix: 10, level: 32, health: 438, mega: false, mintedAtBlock: 18151753 };
 const kill = { adventurerId: "0x1", encounterXp: 77, actionIndex: 3, beastId: 19, prefix: 38, suffix: 5, level: 41, health: 442, gameOver: true, settled: false, claimed: false };
 
 test("decodes a beast token read from the collection", () => {
-  assert.deepEqual(decodeBeast("0x01a9", held), {
+  assert.deepEqual(decodeBeast(held), {
     collection: "beast",
     species: 53,
     kind: "Balrog",
@@ -20,6 +20,7 @@ test("decodes a beast token read from the collection", () => {
     tokenId: "0x1a9",
     level: 32,
     health: 438,
+    minted: 18151753,
     state: "held",
     transformsAt: null,
     queued: false,
@@ -27,9 +28,9 @@ test("decodes a beast token read from the collection", () => {
 });
 
 test("a staked beast carries its transformation time, a mega does not", () => {
-  const stake = { tokenId: "425", mega: false, staked: true, transformsAt: 1795210473, unsafeStake: true };
-  assert.deepEqual([decodeBeast("425", held, stake)].map((b) => [b.state, b.transformsAt, b.queued]), [["staked", 1795210473, true]]);
-  assert.deepEqual([decodeBeast("425", held, { ...stake, mega: true, staked: false })].map((b) => [b.state, b.transformsAt]), [["mega", null]]);
+  const stake = { mega: false, staked: true, transformsAt: 1795210473, unsafeStake: true };
+  assert.deepEqual([decodeBeast(held, stake)].map((b) => [b.state, b.transformsAt, b.queued]), [["staked", 1795210473, true]]);
+  assert.deepEqual([decodeBeast(held, { ...stake, mega: true, staked: false })].map((b) => [b.state, b.transformsAt]), [["mega", null]]);
 });
 
 test("names the collection, tier and type of a species", () => {

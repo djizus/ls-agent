@@ -90,6 +90,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .row > span { display: inline-flex; align-items: center; gap: 0.35rem; }
 #zoo { display: flex; flex-direction: column; gap: 0.4rem; max-height: 17rem; }
 #zoo .head span { display: inline-flex; gap: 0.6rem; align-items: baseline; }
+.tally { gap: 0.2rem 0.7rem; }
 .cells { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; }
 .cells div { position: relative; aspect-ratio: 1; padding: 0.15rem; }
 .cells img { width: 100%; height: 100%; object-fit: contain; }
@@ -156,6 +157,8 @@ const MOVES = { attack: "Fight", flee: "Flee", explore: "Explore" };
 const SLOW_MS = 60_000;
 const BAGS = 25;
 const LATEST = 20;
+const STRIP = 5;
+let zooAll = false;
 let every = false;
 const SORTS = { mean: "Level", kills: "Beasts" };
 const keep = (key, value) => { try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch { return null; } };
@@ -234,8 +237,10 @@ function render() {
   const b = data.beasts;
   const STATE = { held: "", staked: ", staked", mega: ", Mega", claim: ", to claim" };
   const cell = (x) => `<div class="card ${x.state}" title="${esc(`${x.name}: tier ${x.tier} ${x.type}, level ${x.level}${STATE[x.state]}${x.strk === null ? "" : `, sells for ${round(x.strk, 1)} STRK`}`)}"><img src="${face(x.kind)}" alt="${esc(x.name)}"><i>T${x.tier}</i><b>${x.level}</b></div>`;
-  const group = (x) => `<div class="head"><span><span class="dim">${x.name}</span><span class="n">${x.held}</span>${x.claims ? `<span class="gold">${x.claims} to claim</span>` : ""}</span>${x.strk === null ? "" : `<span title="What the pools pay for them now, one at a time"><span class="n">${round(x.strk)}</span> <span class="dim">STRK</span></span>`}</div>${x.beasts.length ? `<div class="cells">${x.beasts.map(cell).join("")}</div>` : ""}`;
-  put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.groups ? b.groups.reduce((n, x) => n + x.held, 0) : ""}</span></div>${b && !b.groups ? `<span class="bad">No answer</span>` : ""}${b?.groups ? `<div id="zoo" class="scroll">${b.groups.map(group).join("")}</div>` : ""}`);
+  const tiers = (x) => x.tiers.map((n, i) => (n ? `<span><span class="gold">T${i + 1}</span> <span class="n">${round(n)}</span></span>` : "")).join("");
+  const group = (x) => `<div class="head"><span><span class="dim">${x.name}</span><span class="n">${round(x.held)}</span>${x.claims ? `<span class="gold">${x.claims} to claim</span>` : ""}</span>${x.strk === null ? "" : `<span title="What the pools pay for them now, one at a time"><span class="n">${round(x.strk)}</span> <span class="dim">STRK</span></span>`}</div>${x.held ? `<div class="row tally">${tiers(x)}${x.mega ? `<span><span class="n">${x.mega}</span> Mega</span>` : ""}${x.staked ? `<span><span class="n">${x.staked}</span> staked</span>` : ""}</div>` : ""}${x.beasts.length ? `<div class="cells">${x.beasts.slice(0, zooAll ? undefined : STRIP).map(cell).join("")}</div>` : ""}`;
+  const more = !zooAll && b?.groups?.some((x) => x.beasts.length > STRIP);
+  put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.groups ? round(b.groups.reduce((n, x) => n + x.held, 0)) : ""}</span></div>${b?.failed ? `<span class="bad">No answer</span>` : ""}${b?.groups ? `<div id="zoo" class="scroll">${b.groups.map(group).join("")}${more ? `<div class="more"><button type="button" data-more>More</button></div>` : ""}</div>` : ""}`);
 
   const first = (text) => text.replace(/ (T\d|G\d).*$/, "");
   const sacks = [...(data.bags ?? [])].sort((a, b) => (b[bagSort] ?? -1) - (a[bagSort] ?? -1)).slice(0, BAGS);
@@ -267,6 +272,7 @@ function go(search) {
 const pick = (e) => { const m = e.target.closest("[data-mode]"); if (m) { keep("dungeon", m.dataset.mode); every = false; return render(); } if (e.target.closest("[data-more]")) { every = true; return render(); } const row = e.target.closest("li[data-id]"); if (row) go(Number(row.dataset.id) === liveReal()?.id ? "" : `?game=${row.dataset.id}`); };
 $("games").onclick = pick;
 $("games").onkeydown = (e) => { if (e.key === "Enter") pick(e); };
+$("beasts").onclick = (e) => { if (e.target.closest("[data-more]")) { zooAll = true; render(); } };
 $("bags").onclick = (e) => { const b = e.target.closest("[data-sort]"); if (b) { bagSort = b.dataset.sort; keep("bagSort", bagSort); render(); } };
 $("golive").onclick = () => go("");
 addEventListener("popstate", render);
