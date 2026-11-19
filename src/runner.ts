@@ -34,14 +34,14 @@ export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
   return { hash, text: full, rules: (p: Phase) => [common.trim(), sections[p] ?? ""].filter(Boolean).join("\n\n") };
 }
 
-async function playGame(id: string): Promise<void> {
+async function playGame(id: string, seed: number): Promise<void> {
   let ending = "stopped";
   const strategy = loadStrategy();
   db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(strategy.hash, strategy.text, Date.now());
-  row = Number(db.prepare("INSERT INTO games (mode, game_id, strategy, started_at) VALUES ('practice', ?, ?, ?)").run(id, strategy.hash, Date.now()).lastInsertRowid);
+  row = Number(db.prepare("INSERT INTO games (mode, game_id, seed, strategy, started_at) VALUES ('practice', ?, ?, ?, ?)").run(id, seed, strategy.hash, Date.now()).lastInsertRowid);
   emit({ kind: "status", text: `game ${row} on ${id.slice(-8)}` });
   try {
-    ending = await playMoves(id, strategy.rules);
+    ending = await playMoves(id, seed, strategy.rules);
   } catch (err) {
     ending = `failed: ${(err as Error).message.slice(0, 200)}`;
   } finally {
@@ -69,10 +69,19 @@ async function decideWithRetry(state: State, rules: string, prompt: string, choi
   }
 }
 
+function nextSeed(): number {
+  const { hash } = loadStrategy();
+  const played = db.prepare("SELECT seed, count(*) AS n FROM games WHERE strategy = ? AND ended_at IS NOT NULL GROUP BY seed ORDER BY seed").all(hash) as { seed: number; n: number }[];
+  const complete = played.filter((p) => p.n >= DUNGEON.benchmark.length).map((p) => p.seed);
+  let seed = 0;
+  while (complete.includes(seed)) seed++;
+  return seed;
+}
+
 const DOING: Record<string, string> = { explore: "exploring", attack: "fighting", flee: "fleeing" };
 
-async function playMoves(id: string, rules: (p: Phase) => string): Promise<string> {
-  let state = await begin(id);
+async function playMoves(id: string, seed: number, rules: (p: Phase) => string): Promise<string> {
+  let state = await begin(id, seed);
   let ending = "stopped";
   mismatches = 0;
   let note = "";
@@ -111,15 +120,18 @@ async function playMoves(id: string, rules: (p: Phase) => string): Promise<strin
   return ending;
 }
 
-export async function playBenchmark(count = DUNGEON.benchmark.length): Promise<void> {
+export async function playBenchmark(count = DUNGEON.benchmark.length, forever = false): Promise<void> {
   if (busy) return;
   busy = true;
   stopping = false;
   try {
-    for (const id of DUNGEON.benchmark.slice(0, count)) {
-      if (stopping) break;
-      await playGame(id).catch((err) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` }));
-    }
+    do {
+      const seed = nextSeed();
+      for (const id of DUNGEON.benchmark.slice(0, count)) {
+        if (stopping) break;
+        await playGame(id, seed).catch((err) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` }));
+      }
+    } while (forever && !stopping);
   } finally {
     busy = false;
     emit({ kind: "status", text: "batch done" });

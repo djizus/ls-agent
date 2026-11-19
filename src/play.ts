@@ -95,8 +95,8 @@ export function phase(s: State): Phase {
   return s.beast ? "battle" : "explore";
 }
 
-export async function begin(id: string): Promise<State> {
-  game = await newPracticeGame(id);
+export async function begin(id: string, seed = 0): Promise<State> {
+  game = await newPracticeGame(id, seed);
   last = game.start;
   return state();
 }
