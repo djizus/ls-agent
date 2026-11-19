@@ -8,7 +8,6 @@ http:
       middlewares:
         - globalHeaders@file
         - secureHeaders@file
-        - authelia@docker
       tls:
         certResolver: cfdns
   services:

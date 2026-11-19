@@ -68,6 +68,9 @@ const beasts = cached(60_000, () => {
 
 async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown> {
   const url = new URL(req.url ?? "/", "http://x");
+  const own = [HOST, "127.0.0.1", "::1"].includes((req.socket.remoteAddress ?? "").replace("::ffff:", ""));
+  if (!own && (req.method !== "GET" || url.pathname === "/mcp")) return res.writeHead(403).end();
+  if (url.pathname === "/api/me") return reply(res, { control: own });
   if (url.pathname === "/mcp") return handleMcp(req, res, req.method === "POST" ? await json(req) : undefined);
   if (url.pathname === "/events") {
     res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
