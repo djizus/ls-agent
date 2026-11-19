@@ -63,10 +63,11 @@ export function plan(s: State): Plan {
   const makeRoom = () => {
     if (room > 0) return true;
     const stash = (g: Gear) => (g.bonus?.vitality ?? 0) + (g.bonus?.charisma ?? 0);
-    const out = bag.filter((g) => stash(g) <= 1).sort((a, b) => use(a) + stash(a) - use(b) - stash(b) || b.tier - a.tier || a.greatness - b.greatness)[0];
+    const out = bag.filter((g) => stash(g) <= 1 && !(buys.length && g.bonus?.charisma)).sort((a, b) => use(a) + stash(a) - use(b) - stash(b) || b.tier - a.tier || a.greatness - b.greatness)[0];
     if (!out) return false;
     bag.splice(bag.indexOf(out), 1);
     drops.push({ type: "drop", item: out.id });
+    stats.charisma -= out.bonus?.charisma ?? 0;
     why.push(`drop ${out.name}`);
     room++;
     return true;

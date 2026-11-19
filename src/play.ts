@@ -12,7 +12,7 @@ import { ARMOR_SLOTS, toSnapshot } from "./engine/engine.ts";
 import { act, audit, newPracticeGame, preview, revertReason, type Game, type Snapshot } from "./practice.ts";
 
 type Worn = LootItem & { greatness: number; xp: number; suffix?: string; bonus?: Partial<Stats> };
-type Gear = Worn & { toNext: number; power: number; grants: string[] };
+type Gear = Worn & { toNext: number; grants: string[] };
 type Offer = LootItem & { price: number };
 export type State = {
   over: boolean;
@@ -63,9 +63,8 @@ export function enrich(s: Stored): State {
       greatness,
       xp,
       toNext: greatness >= MAX_GREATNESS ? 0 : (greatness + 1) ** 2 - xp,
-      power: jewel ? greatness * 5 : greatness * (6 - g.tier),
       grants: [
-        ...bonus.map(([stat, n]) => `+${n} ${ABBR[stat]}`),
+        ...bonus.map(([stat, n]) => `+${n} ${stat}`),
         ...(jewel ? [held && g.name === DOUBLE_LUCK ? `+${2 * greatness} luck (doubled while worn)` : `+${greatness} luck`] : []),
         ...(held && g.slot === "neck" ? [`${Object.keys(NECK).find((type) => NECK[type as ItemType] === g.name)} armor blocks ${3 * greatness}% more (${matching} of ${ARMOR.length} worn)`] : []),
         ...(held && RING[g.name] ? [RING[g.name](3 * greatness)] : []),
@@ -248,9 +247,10 @@ export function auditGame(): Promise<string | undefined> {
 export function shape(s: State, actions: Action[], reserve = 0): Action[] {
   if (s.beast) return actions;
   const ups = (stat: string) => actions.reduce((n, a) => n + (a.type === "upgrade" && a.stat === stat ? a.amount : 0), 0);
-  const charisma = s.stats.charisma + ups("charisma");
-  const maxHealth = s.maxHealth + 15 * ups("vitality");
-  const health = s.health + 15 * ups("vitality");
+  const lost = (stat: "vitality" | "charisma") => actions.reduce((n, a) => n + (a.type === "drop" ? ([...s.bag, ...s.equipment].find((g) => g.id === a.item)?.bonus?.[stat] ?? 0) : 0), 0);
+  const charisma = s.stats.charisma + ups("charisma") - lost("charisma");
+  const maxHealth = s.maxHealth + 15 * (ups("vitality") - lost("vitality"));
+  const health = Math.min(s.health, s.maxHealth - 15 * lost("vitality")) + 15 * ups("vitality");
   const gold = actions.reduce((g, a) => g - (a.type === "buy" ? priceOf(a.item, charisma) : 0), s.gold);
   const price = potionPrice(s.level, charisma);
   const wanted = actions.reduce((n, a) => n + (a.type === "potions" ? a.qty : 0), 0);
