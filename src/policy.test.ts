@@ -16,12 +16,14 @@ const stats = { strength: 0, dexterity: 20, vitality: 0, intelligence: 0, wisdom
 const state = (over: Partial<Parameters<typeof enrich>[0]>): State =>
   enrich({ over: false, level: 20, health: 100, maxHealth: 100, xp: 400, gold: 50, beast: null, statUpgradesAvailable: 0, stats, equipment: [], bag: [], market: [], ...over });
 
+const REST = [22, 27, 32, 37].map((id) => gear(id, 20));
+
 test("bag items are kept while there is room", () => {
-  assert.deepEqual(plan(state({ bag: [gear(SHIRT, 1)] })).actions, [{ type: "explore" }]);
+  assert.deepEqual(plan(state({ equipment: [gear(PLATE_MAIL, 5)], bag: [gear(SHIRT, 1)] })).actions, [{ type: "explore" }]);
 });
 
 test("a full bag gives up its least useful item for a purchase, and never one with a vitality or charisma bonus", () => {
-  const maxed = { equipment: [gear(PLATE_MAIL, 20)], market: [offer(HOLY_CHESTPLATE, 10)] };
+  const maxed = { equipment: [gear(PLATE_MAIL, 20), ...REST], market: [offer(HOLY_CHESTPLATE, 10)] };
   assert.deepEqual(plan(state({ ...maxed, bag: JUNK.map((id) => gear(id, 1)) })).actions, [
     { type: "drop", item: SHIRT },
     { type: "buy", item: HOLY_CHESTPLATE, equip: true },
@@ -62,7 +64,7 @@ test("a maxed ring makes way for the next one, bought only with two full heals o
 });
 
 test("a drop that takes vitality or charisma away is counted before healing and pricing", () => {
-  const maxed = { equipment: [gear(PLATE_MAIL, 20)], market: [offer(HOLY_CHESTPLATE, 10)] };
+  const maxed = { equipment: [gear(PLATE_MAIL, 20), ...REST], market: [offer(HOLY_CHESTPLATE, 10)] };
   const stash = JUNK.slice(1).map((id) => gear(id, 15, { vitality: 3 }));
   const sturdy = state({ ...maxed, maxHealth: 115, health: 105, bag: [gear(SHIRT, 15, { vitality: 1 }), ...stash] });
   assert.deepEqual(plan(sturdy).actions, [{ type: "drop", item: SHIRT }, { type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "explore" }]);
@@ -71,13 +73,13 @@ test("a drop that takes vitality or charisma away is counted before healing and 
 });
 
 const beast = (health: number) => ({ id: 29, name: "Dragon", baseName: "Dragon", tier: 1, type: "Blade" as const, level: 30, health, specialPrefix: null, specialSuffix: null, isCollectable: false });
-const hits = (yours: number, normal: number, crit: number) => ({ yours: { normal: yours, crit: 2 * yours }, theirs: Array.from({ length: 5 }, () => ({ normal, crit })) });
+const hits = (yours: number, normal: number, crit: number, spare: { id: number; hit: { normal: number; crit: number } }[] = []) => ({ yours: { normal: yours, crit: 2 * yours }, theirs: Array.from({ length: 5 }, () => ({ normal, crit })), spare });
 
-test("a fight that can be lost is taken one exchange at a time, while winning it is at most 25 points less likely than escaping", () => {
+test("a fight that can be lost is taken one exchange at a time, while winning it is at most 35 points less likely than escaping", () => {
   const twoBlows = { beast: beast(100), hits: hits(50, 10, 200), health: 100 };
   assert.deepEqual(plan(state({ ...twoBlows, level: 20 })).actions, [{ type: "attack", tillHealth: 99 }]);
-  assert.deepEqual(plan(state({ ...twoBlows, level: 30, stats: { ...stats, dexterity: 30 } })).actions, [{ type: "flee" }]);
-  assert.deepEqual(plan(state({ ...twoBlows, level: 30, stats: { ...stats, dexterity: 15 } })).actions, [{ type: "attack", tillHealth: 99 }]);
+  assert.deepEqual(plan(state({ ...twoBlows, level: 40, stats: { ...stats, dexterity: 40 } })).actions, [{ type: "flee" }]);
+  assert.deepEqual(plan(state({ ...twoBlows, level: 40, stats: { ...stats, dexterity: 20 } })).actions, [{ type: "attack", tillHealth: 99 }]);
   assert.deepEqual(plan(state({ beast: beast(50), hits: hits(50, 200, 400), health: 1 })).actions, [{ type: "attack" }]);
   assert.deepEqual(plan(state({ beast: beast(1000), hits: hits(4, 200, 400), health: 100, stats: { ...stats, dexterity: 0 } })).actions, [{ type: "attack", tillHealth: 99 }]);
 });
@@ -101,4 +103,23 @@ test("a move never holds more than 15 actions: a purchase that does not fit wait
   assert.equal(actions.filter((a) => a.type === "upgrade").length, 4);
   assert.equal(actions.filter((a) => a.type === "equip").length, 6);
   assert.equal(actions.filter((a) => a.type === "buy").length, 1);
+});
+
+test("armor that takes less from this beast is put on in the fight when that beats staying, the free strike counted", () => {
+  const other = JUNK.slice(0, 5);
+  const spare = (normal: number, crit: number) => other.map((id) => ({ id, hit: { normal, crit } }));
+  const stuck = { stats: { ...stats, dexterity: 0 }, bag: other.map((id) => gear(id, 20)) };
+  const long = state({ ...stuck, beast: beast(500), health: 300, hits: hits(50, 40, 80, spare(4, 8)) });
+  assert.deepEqual(plan(long).actions, other.map((item) => ({ type: "equip", item })));
+  const short = state({ ...stuck, beast: beast(100), health: 100, level: 30, hits: hits(50, 60, 120, spare(55, 110)) });
+  assert.deepEqual(plan(short).actions, [{ type: "attack", tillHealth: 99 }]);
+});
+
+test("after the fight the real armor goes back on", () => {
+  assert.deepEqual(plan(state({ equipment: [gear(SHIRT, 20)], bag: [gear(HOLY_CHESTPLATE, 20)] })).actions, [{ type: "equip", item: HOLY_CHESTPLATE }, { type: "explore" }]);
+});
+
+test("the chance to escape counts every failed try as a hit taken", () => {
+  const cornered = state({ level: 4, health: 100, stats: { ...stats, dexterity: 3 }, beast: beast(1000), hits: hits(4, 60, 60) });
+  assert.match(plan(cornered).why, /94% to escape/);
 });

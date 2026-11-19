@@ -2,7 +2,7 @@ import type { Action } from "./codec.ts";
 import { potionPrice } from "./items.ts";
 import { shape, type State } from "./play.ts";
 
-export const RULES = { potionPrice: 1, dexPerLevel: 1, weaponCatchUp: 5, jewelryLevel: 8, jewelryReserve: 2, armorReserve: 0.5, fightRisk: 0.25 };
+export const RULES = { potionPrice: 1, dexPerLevel: 0.9, weaponCatchUp: 5, jewelryLevel: 8, jewelryReserve: 2, armorReserve: 0.5, fightRisk: 0.35, swapGain: 0.05 };
 
 const RINGS = ["Titanium Ring", "Silver Ring", "Gold Ring", "Platinum Ring", "Bronze Ring"];
 
@@ -12,6 +12,7 @@ const MAX_GREATNESS = 20;
 const MAX_STAT = 31;
 const MAX_ROUNDS = 30;
 const MAX_ACTIONS = 15;
+const KEPT = 9;
 const SURE = 0.999999;
 const BAG_SIZE = 15;
 const FALLBACK = ["vitality", "strength", "dexterity", "charisma", "intelligence", "wisdom"] as const;
@@ -26,36 +27,39 @@ const maxed = (g: Gear) => g.greatness >= MAX_GREATNESS;
 
 type Blow = { damage: number; chance: number };
 
-function winChance(health: number, beast: number, mine: Blow[], theirs: Blow[]): number {
-  const memo = new Map<number, number>();
-  const go = (h: number, b: number, left: number): number => {
+function odds(mine: Blow[], theirs: Blow[], flee: number) {
+  const merged = new Map<number, number>();
+  for (const x of theirs) merged.set(x.damage, (merged.get(x.damage) ?? 0) + x.chance);
+  const strikes = [...merged].map(([damage, chance]) => ({ damage, chance }));
+  const reach = Math.max(...mine.map((m) => m.damage)) * MAX_ROUNDS;
+  const won = new Map<number, number>();
+  const fight = (h: number, b: number, left: number): number => {
     if (left === 0) return 0;
     const key = h * 2048 + b;
-    const known = memo.get(key);
+    const known = won.get(key);
     if (known !== undefined) return known;
     let win = 0;
     for (const m of mine) {
       if (m.damage >= b) win += m.chance;
-      else for (const x of theirs) if (x.damage < h) win += m.chance * x.chance * go(h - x.damage, b - m.damage, left - 1);
+      else for (const x of strikes) if (x.damage < h) win += m.chance * x.chance * fight(h - x.damage, b - m.damage, left - 1);
     }
-    memo.set(key, win);
+    won.set(key, win);
     return win;
   };
-  return go(health, beast, MAX_ROUNDS);
-}
-
-function escapeChance(health: number, escape: number, theirs: Blow[]): number {
-  if (escape <= 0 || escape >= 1) return Math.max(0, Math.min(1, escape));
-  const memo = new Map<number, number>();
-  const go = (h: number): number => {
-    const known = memo.get(h);
+  const fled = new Map<number, number>();
+  const run = (h: number): number => {
+    const known = fled.get(h);
     if (known !== undefined) return known;
-    let out = escape;
-    for (const x of theirs) if (x.damage < h) out += (1 - escape) * x.chance * go(h - x.damage);
-    memo.set(h, out);
+    let out = flee;
+    for (const x of strikes) if (x.damage < h) out += (1 - flee) * x.chance * run(h - x.damage);
+    fled.set(h, out);
     return out;
   };
-  return go(health);
+  return {
+    strikes,
+    win: (health: number, beast: number) => (reach < beast ? 0 : fight(health, beast, MAX_ROUNDS)),
+    escape: (health: number) => (flee <= 0 || flee >= 1 ? Math.max(0, Math.min(1, flee)) : run(health)),
+  };
 }
 
 export function plan(s: State): Plan {
@@ -64,11 +68,27 @@ export function plan(s: State): Plan {
     const lucky = Math.min(100, s.luck) / 100;
     const crit = Math.min(100, s.level) / 100;
     const mine = [{ damage: s.hits.yours.normal, chance: 1 - lucky }, { damage: s.hits.yours.crit, chance: lucky }];
-    const theirs = s.hits.theirs.flatMap((h) => [{ damage: h.normal, chance: (1 - crit) / ARMOR.length }, { damage: h.crit, chance: crit / ARMOR.length }]);
-    const win = winChance(s.health, s.beast.health, mine, theirs);
-    const escape = escapeChance(s.health, s.stats.dexterity >= s.level ? 1 : s.stats.dexterity / s.level, theirs);
+    const blows = (hits: { normal: number; crit: number }[]) => hits.flatMap((h) => [{ damage: h.normal, chance: (1 - crit) / ARMOR.length }, { damage: h.crit, chance: crit / ARMOR.length }]);
+    const theirs = blows(s.hits.theirs);
+    const flee = s.stats.dexterity >= s.level ? 1 : s.stats.dexterity / s.level;
+    const asWorn = odds(mine, theirs, flee);
+    const win = asWorn.win(s.health, s.beast.health);
+    const escape = asWorn.escape(s.health);
     const fight = win + RULES.fightRisk >= escape;
     const pct = (n: number) => `${Math.round(100 * n)}%`;
+    const spare = (slot: string, i: number) =>
+      s.bag
+        .filter((g) => g.slot === slot)
+        .map((g) => ({ g, hit: s.hits!.spare.find((x) => x.id === g.id)!.hit }))
+        .filter((x) => x.hit.normal < s.hits!.theirs[i].normal)
+        .sort((a, b) => a.hit.normal - b.hit.normal)[0];
+    const better = ARMOR.map(spare);
+    if (win < SURE && better.some(Boolean)) {
+      const dressed = odds(mine, blows(ARMOR.map((_, i) => better[i]?.hit ?? s.hits!.theirs[i])), flee);
+      const after = dressed.strikes.reduce((sum, x) => sum + (x.damage < s.health ? x.chance * Math.max(dressed.win(s.health - x.damage, s.beast!.health) + RULES.fightRisk, dressed.escape(s.health - x.damage)) : 0), 0);
+      const swaps = better.flatMap((x) => (x ? [x.g] : []));
+      if (after > Math.max(win + RULES.fightRisk, escape) + RULES.swapGain) return { actions: swaps.map((g) => ({ type: "equip" as const, item: g.id })), why: `${pct(win)} to win as dressed, better in ${swaps.map((g) => g.name).join(", ")}` };
+    }
     const attack: Action = win > SURE ? { type: "attack" } : { type: "attack", tillHealth: s.health - 1 };
     return { actions: [fight ? attack : { type: "flee" }], why: `${pct(win)} to win the fight, ${pct(escape)} to escape: ${fight ? "fight" : "flee"}` };
   }
@@ -100,11 +120,19 @@ export function plan(s: State): Plan {
   const equips: Action[] = [];
   const buys: Action[] = [];
   const owned = new Set([...s.equipment, ...s.bag].map((g) => g.id));
-  const use = (g: Gear) => (JEWELRY.includes(g.slot) ? 2 : g.tier < (worn(g.slot)?.tier ?? 6) ? 1 : 0);
+  const real = (slot: string): Gear | undefined => {
+    const mine = [...s.equipment, ...s.bag].filter((g) => g.slot === slot);
+    const done = mine.filter(maxed);
+    if (!done.length) return mine.sort((a, b) => b.greatness - a.greatness)[0];
+    const cap = Math.min(...done.map((g) => g.tier));
+    const top = done.filter((g) => g.tier === cap);
+    return mine.filter((g) => g.tier < cap).sort((a, b) => b.greatness - a.greatness)[0] ?? top.find((g) => g === worn(slot)) ?? top[0];
+  };
+  const use = (g: Gear) => (JEWELRY.includes(g.slot) ? 2 : g === real(g.slot) ? KEPT : maxed(g) || g.tier < (real(g.slot)?.tier ?? 6) ? 1 : 0);
   const makeRoom = () => {
     if (room > 0) return true;
     const stash = (g: Gear) => (g.bonus?.vitality ?? 0) + (g.bonus?.charisma ?? 0);
-    const out = bag.filter((g) => stash(g) <= 1 && !(buys.length && g.bonus?.charisma)).sort((a, b) => use(a) + stash(a) - use(b) - stash(b) || b.tier - a.tier || a.greatness - b.greatness)[0];
+    const out = bag.filter((g) => stash(g) <= 1 && use(g) < KEPT && !(buys.length && g.bonus?.charisma)).sort((a, b) => use(a) + stash(a) - use(b) - stash(b) || b.tier - a.tier || a.greatness - b.greatness)[0];
     if (!out) return false;
     bag.splice(bag.indexOf(out), 1);
     drops.push({ type: "drop", item: out.id });
@@ -134,9 +162,10 @@ export function plan(s: State): Plan {
   const blade = next("weapon", Math.min(2, weapon?.tier ?? 6));
   if (blade && (!weapon || maxed(weapon) || weapon.greatness * (6 - weapon.tier) <= RULES.weaponCatchUp * (6 - blade.tier))) take(blade, "T1 weapon");
   for (const slot of ARMOR) {
-    const now = worn(slot);
-    const pick = now ? maxed(now) && next(slot, now.tier, RULES.armorReserve * fullHeal) : offers(slot).sort((a, b) => price(a) - price(b))[0];
+    const now = real(slot);
+    const pick = now ? (maxed(now) ? next(slot, now.tier, RULES.armorReserve * fullHeal) : undefined) : offers(slot).sort((a, b) => price(a) - price(b))[0];
     if (pick) take(pick, now ? `${slot} maxed, T${pick.tier} next` : `empty ${slot}`);
+    else if (now && now !== worn(slot) && bag.includes(now)) take(now, `${slot} back on`);
   }
   const types = ARMOR.map((slot) => worn(slot)?.type).filter(Boolean) as string[];
   const main = [...new Set(types)].sort((a, b) => types.filter((t) => t === b).length - types.filter((t) => t === a).length)[0];

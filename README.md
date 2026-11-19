@@ -19,18 +19,23 @@ node scripts/bench.ts
 node scripts/bench.ts --rules '{}' --rules '{"jewelryLevel":99}'
 node scripts/bench.ts --gate
 node scripts/bench.ts --starts 50000 --from 1000000
+node scripts/bench.ts --starts 40000 --reach 30 --keep var/level30.json
+node scripts/bench.ts --late var/level30.json --seeds 0-10
 LS_DUNGEON=lootBag node scripts/bench.ts --ids bags.json --by-id
 node scripts/search.ts --grid '{"fightRisk":[0.15,0.25,0.35],"jewelryLevel":[6,8,10]}' --level 35
 ```
 
 Beast Mode: plays the rule policy from 10,000 generated starts (the same every run: each has its own rolled stats, market and
 luck) in about 15 seconds, and prints mean, spread and the share of games reaching level 26, 30, 35 and 40. `--starts` sets how many
-and `--from` where they begin, so a result can be confirmed on starts it was not chosen on. Loot Dungeon starts are
+and `--from` where they begin, so a result can be confirmed on starts it was not chosen on. Under the level figures it prints beasts killed per game, named beasts (level 19+) killed with the standard error,
+named kills per 100 moves, and what became of the named beasts met (killed, fled, died to). `--reach 30 --keep file` saves the state
+of every game at the moment it reaches level 30; `--late file` plays those states forward on `--seeds` luck seeds each, to measure
+late-game rules on many more deep games than a run from level 1 gives. Loot Dungeon starts are
 fixed by the bag, so there it plays each game id for 500 luck seeds (`--seeds 0-500`); `--ids file.json` takes a list of game
 ids and `--by-id` adds a line per id. Each extra `--rules` overrides fields of `RULES` in `src/policy.ts` and is compared with
-the first on the same games: the difference in mean level and in the 30+, 35+ and 40+ shares, each with its standard error.
+the first on the same games: the difference in named kills, in mean level and in the 30+, 35+ and 40+ shares, each with its standard error.
 `scripts/search.ts` takes a grid of values per `RULES` field, moves one field at a time to the value that raises the chosen
-share most on one set of starts, and confirms the result on another. `--gate` fails when the mean drops 0.25 levels or the 30+ share drops 1 point below
+share most on one set of starts, and confirms the result on another. `--gate` fails when the mean drops 0.25 levels, the 30+ share drops 1 point or named kills per game drop 0.1 below
 `scripts/baseline.json`; `--save` writes the baseline after a change that is meant to move it. Luck uses a fast hash; `--exact`
 uses the contract's hash (same distribution, 30 times slower). A difference under two standard errors is noise.
 
