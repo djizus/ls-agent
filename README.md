@@ -46,7 +46,7 @@ Real games send transactions on Starknet mainnet and spend STRK from the bot's o
 1. `node src/cli.ts wallet` prints the wallet address, creating the key if needed.
 2. Send STRK to that address. The bot refuses to send a transaction while the balance is under 100 STRK, so fund more than that.
 3. `node src/cli.ts deploy` deploys the account (one small fee).
-4. Open the page on the same machine and press "Play", then "Spend STRK". This plays one game. `curl -X POST 127.0.0.1:4100/api/play -d '{"live":true,"games":3}'` plays three.
+4. On the same machine, `curl -X POST 127.0.0.1:4100/api/play -d '{"live":true}'` plays one game; `'{"live":true,"games":3}'` plays three.
 
 | What | Cost or risk |
 |---|---|
@@ -55,8 +55,8 @@ Real games send transactions on Starknet mainnet and spend STRK from the bot's o
 | Tickets | A game uses one dungeon ticket. With less than one ticket left, the bot buys 10 on Ekubo and refuses if they cost more than 2 STRK. |
 | A game | Each move is one transaction. 8 recorded Beast Mode games cost 0.8 to 3.9 STRK each, 2.5 at the median, about 0.04 STRK per move. Fees change with the network. |
 | Settlement | When a finished game killed a beast that can be collected, the bot settles the game on chain a minute later and claims the beast. Simulated cost: 0.5 STRK for a 13-move game, 3.1 STRK for a 115-move game. `node src/cli.ts quote <game id>` simulates it for one game without sending anything. |
-| Stopping | "Stop" ends play after the current move. An unfinished game is kept in `var/live.json` and resumes on the next "Play". The bot stops by itself if its local state differs from the contract. |
-| Other machines | By default only your machine can reach the page. If you set `LS_HOST` to serve other machines, they can read everything and change nothing: the server refuses any request that is not a GET, and `GET /api/me` answers `{"control": false}`. A reverse proxy running on the same machine makes every visitor look local, so do not put one in front without its own access control. |
+| Stopping | `curl -X POST 127.0.0.1:4100/api/stop` ends play after the current move. An unfinished game is kept in `var/live.json` and resumes on the next start. The bot stops by itself if its local state differs from the contract. |
+| Other machines | By default only your machine can reach the page. If you set `LS_HOST` to serve other machines, they can read everything and change nothing: the server refuses any request that is not a GET. A reverse proxy running on the same machine makes every visitor look local, so do not put one in front without its own access control. |
 | Outside services | A public Starknet node, the game's API (beasts), Ekubo (ticket price) and `lootsurvivor.io` (the embedded spectator). |
 
 The policy loses most games early. In the benchmark, 13% of games reach level 26. Expect to pay for many short games.
@@ -100,15 +100,15 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 | One screen: the official Loot Survivor spectator in the middle, panels around it | `/` shows the live real game, or the latest real game when none is live. `/?game=<row id>` shows that real game. |
 | Watch a real game | The middle panel embeds `https://www.lootsurvivor.io/watch?id=<game id in decimal>`. A finished game opens at its first move: click inside it, then the right arrow steps the replay. |
 | What the bot just decided in the live game | The bar under the spectator. For a finished game it shows the level reached, the beast that killed it and the STRK it cost. |
-| Pick a real game | "Games" on the left, with "Beast" or "Loot" in its header choosing the dungeon: the three best by level as a podium, the rest newest first, the live game on top. "Live" in the bar returns to the live game. |
+| Pick a real game | "Games" on the left, with "Beast" or "Loot" in its header choosing the dungeon: the three best by level as a podium, the rest newest first, the live game on top. The list holds every game of the dungeon, podium games included. Each finished game shows the named beasts it killed beside a skull, counted when the game ends and stored in `games.beasts`. "Live" in the bar returns to the live game. |
 | Practice results and the contract check | "Practice" on the left. `GET /api/strategies`, `GET /api/check`. "Checked" appears after `scripts/check.sh` has run the tests and written `var/contract-check.json`. |
 | Wallet: STRK (red under the spend floor), tickets, SURVIVOR, average STRK per real game | "Wallet" on the right. `GET /api/wallet` (cached 30 seconds). |
 | Beasts held or won and not yet claimed | "Beasts" on the right. `GET /api/beasts` (cached 60 seconds). |
 | Loot bags, best 25, with the copies the pool holds | "Loot bags" on the right, ranked by mean level or by named beasts killed. `GET /api/bags` reads `scripts/bag-ranking.json`. |
-| Start a real game (spends STRK) | On the machine itself: "Play", then "Spend STRK". `POST /api/play` with `{"live": true}`. |
+| Start a real game (spends STRK) | `curl -X POST 127.0.0.1:4100/api/play -d '{"live":true}'` on the machine itself. |
 | Start a practice pass | `POST /api/play` with `{"games": n}`. Not on the page. |
-| Stop after the current move | On the machine itself: "Stop" replaces "Play" while a game is live. `POST /api/stop`. |
-| Read-only for visitors | From another machine the page has no Play or Stop. `GET /api/me` returns `{"control": false}` and the server answers 403 to any request that is not a GET. |
+| Stop after the current move | `curl -X POST 127.0.0.1:4100/api/stop` on the machine itself. |
+| The page is read-only | The page sends only GET requests and has no control. From another machine the server answers 403 to any request that is not a GET, and to `/mcp`. |
 | Game data | `GET /api/state` (current game), `GET /api/games` (200 games, real ones first), `GET /api/games/<row id>` (one game with its events), `GET /events` (live stream), `GET /api/items` (item table) |
 | Wallet address, deployment and balance | `node src/cli.ts wallet` |
 | Deploy the wallet account (spends STRK) | `node src/cli.ts deploy` |

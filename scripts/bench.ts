@@ -4,7 +4,7 @@ import { availableParallelism } from "node:os";
 import { parseArgs } from "node:util";
 import { DUNGEON, DUNGEON_KEY } from "../src/config.ts";
 import { useFastLuck } from "../src/hash.ts";
-import { describe } from "../src/play.ts";
+import { describe, slewNamed } from "../src/play.ts";
 import { RULES, plan } from "../src/policy.ts";
 import { toSnapshot, type Local } from "../src/engine/engine.ts";
 import { act, newPracticeGame, syntheticGame, type Game } from "../src/practice.ts";
@@ -89,7 +89,7 @@ async function play(share: number): Promise<Run> {
         if (!before.beast && state.beast?.specialPrefix != null) tally.met++;
         if (before.beast && !state.beast && !state.over && move === "attack") {
           tally.kills++;
-          if (named) {
+          if (slewNamed(before, state, move)) {
             tally.named++;
             kinds.add(`${before.beast.id}:${before.beast.specialPrefix}:${before.beast.specialSuffix}`);
           }
