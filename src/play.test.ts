@@ -79,12 +79,12 @@ test("a stored state gains luck, chances, grants and purse, whatever its age", (
   assert.equal(state.luck, 10 + 2 * 6 + 3);
   assert.deepEqual(state.buys, { attack: 40, flee: 50, trap: 10, ambush: 25, crit: 25 });
   assert.deepEqual(state.baseStats, { strength: 4, dexterity: 10, vitality: 8, intelligence: 2, wisdom: 2, charisma: 9 });
-  assert.deepEqual(state.equipment.map((g) => [g.greatness, g.toNext, g.power, g.grants]), [
-    [16, 33, 32, ["+3 WIS"]],
-    [10, 21, 50, ["+10 luck", "Hide armor blocks 30% more (1 of 5 worn)"]],
-    [6, 9, 30, ["+12 luck (doubled while worn)"]],
+  assert.deepEqual(state.equipment.map((g) => [g.greatness, g.toNext, g.grants]), [
+    [16, 33, ["+3 wisdom"]],
+    [10, 21, ["+10 luck", "Hide armor blocks 30% more (1 of 5 worn)"]],
+    [6, 9, ["+12 luck (doubled while worn)"]],
   ]);
-  assert.deepEqual(state.bag.map((g) => g.grants), [["+3 luck"], ["+2 VIT"]]);
+  assert.deepEqual(state.bag.map((g) => g.grants), [["+3 luck"], ["+2 vitality"]]);
   assert.deepEqual(state.purse, { potions: 15, toFull: 15, deal: { ...state.market[1], why: "empty head" } });
   assert.deepEqual(enrich(state), state);
 });

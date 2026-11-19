@@ -12,7 +12,7 @@ import { ARMOR_SLOTS, toSnapshot } from "./engine/engine.ts";
 import { act, audit, newPracticeGame, preview, revertReason, type Game, type Snapshot } from "./practice.ts";
 
 type Worn = LootItem & { greatness: number; xp: number; suffix?: string; bonus?: Partial<Stats> };
-type Gear = Worn & { toNext: number; power: number; grants: string[] };
+type Gear = Worn & { toNext: number; grants: string[] };
 type Offer = LootItem & { price: number };
 export type State = {
   over: boolean;
@@ -63,9 +63,8 @@ export function enrich(s: Stored): State {
       greatness,
       xp,
       toNext: greatness >= MAX_GREATNESS ? 0 : (greatness + 1) ** 2 - xp,
-      power: jewel ? greatness * 5 : greatness * (6 - g.tier),
       grants: [
-        ...bonus.map(([stat, n]) => `+${n} ${ABBR[stat]}`),
+        ...bonus.map(([stat, n]) => `+${n} ${stat}`),
         ...(jewel ? [held && g.name === DOUBLE_LUCK ? `+${2 * greatness} luck (doubled while worn)` : `+${greatness} luck`] : []),
         ...(held && g.slot === "neck" ? [`${Object.keys(NECK).find((type) => NECK[type as ItemType] === g.name)} armor blocks ${3 * greatness}% more (${matching} of ${ARMOR.length} worn)`] : []),
         ...(held && RING[g.name] ? [RING[g.name](3 * greatness)] : []),
