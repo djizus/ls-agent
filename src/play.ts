@@ -22,7 +22,7 @@ export type State = {
   xp: number;
   gold: number;
   beast: Beast | null;
-  hits: { yours: Hit; theirs: Hit[]; spare: { id: number; hit: Hit }[] } | null;
+  hits: { yours: Hit; theirs: Hit[]; spare: { id: number; hit: Hit }[]; arms: { id: number; hit: Hit }[] } | null;
   statUpgradesAvailable: number;
   stats: Stats;
   baseStats: Stats;
@@ -139,6 +139,11 @@ export function describe(s: Snapshot, id: string): State {
       yours: yourHit(a, a.stats.strength, foe, BigInt(id)),
       theirs: ARMOR_SLOTS.map((slot) => beastHit(a, foe, a.equipment[slot], BigInt(id))),
       spare: s.bag.filter((i) => ARMOR.includes(itemOf(i.id)!.slot)).map((i) => ({ id: i.id, hit: beastHit(a, foe, i, BigInt(id)) })),
+      arms: s.bag.filter((i) => itemOf(i.id)!.slot === "weapon").map((i) => {
+        const armed = { ...s.adventurer, equipment: { ...s.adventurer.equipment, weapon: i } };
+        const rest = [...s.bag.filter((b) => b.id !== i.id), s.adventurer.equipment.weapon];
+        return { id: i.id, hit: yourHit({ ...a, equipment: armed.equipment }, effectiveStats(armed, rest, id).strength, foe, BigInt(id)) };
+      }),
     },
     statUpgradesAvailable: a.stat_upgrades_available,
     stats: a.stats,

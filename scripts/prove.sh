@@ -7,7 +7,7 @@ port="${LS_PROVE_PORT:-4199}"
 mkdir -p "$out"
 [[ -f "$HOME/.config/ls-agent/env" ]] && set -a && source "$HOME/.config/ls-agent/env" && set +a
 
-LS_PORT="$port" LS_VAR_DIR="$out/" node --disable-warning=ExperimentalWarning "$root/src/main.ts" > "$out/service.log" 2>&1 &
+LS_HOST=127.0.0.1 LS_PORT="$port" LS_VAR_DIR="$out/" node --disable-warning=ExperimentalWarning "$root/src/main.ts" > "$out/service.log" 2>&1 &
 service=$!
 trap 'kill $service 2>/dev/null; wait $service 2>/dev/null || true' EXIT
 for _ in $(seq 40); do curl -sf "127.0.0.1:$port/" > /dev/null && break; sleep 0.5; done

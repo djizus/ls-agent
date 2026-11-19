@@ -88,6 +88,7 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 | `npm run bench -- --gate` | Fails when the mean drops 0.25 levels, the 30+ share drops 1 point or named kills per game drop 0.1 below `scripts/baseline.json`. `--save` rewrites the baseline. |
 | `npm run bench -- --starts 50000 --from 1000000` | More starts, or other starts, to confirm a result on games it was not chosen on |
 | `npm run bench -- --starts 40000 --reach 30 --keep var/level30.json` | Saves every game at the moment it reaches level 30 |
+| `npm run bench -- --starts 30000 --reach weapon --keep var/weapon20.json` | Saves every game at the moment its worn weapon reaches greatness 20 |
 | `npm run bench -- --late var/level30.json --seeds 0-10` | Plays those saved games forward on 10 luck seeds each, to measure late-game rules |
 | `npm run bench -- --exact` | Uses the contract's hash for luck in place of the fast one: same distribution, 30 times slower |
 | `LS_DUNGEON=lootBag npm run bench -- --ids bags.json --by-id` | Loot bag starts are fixed, so each game id in the file is played on 500 luck seeds, with one line per id |

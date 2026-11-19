@@ -73,7 +73,7 @@ test("a drop that takes vitality or charisma away is counted before healing and 
 });
 
 const beast = (health: number) => ({ id: 29, name: "Dragon", baseName: "Dragon", tier: 1, type: "Blade" as const, level: 30, health, specialPrefix: null, specialSuffix: null, isCollectable: false });
-const hits = (yours: number, normal: number, crit: number, spare: { id: number; hit: { normal: number; crit: number } }[] = []) => ({ yours: { normal: yours, crit: 2 * yours }, theirs: Array.from({ length: 5 }, () => ({ normal, crit })), spare });
+const hits = (yours: number, normal: number, crit: number, spare: { id: number; hit: { normal: number; crit: number } }[] = []) => ({ yours: { normal: yours, crit: 2 * yours }, theirs: Array.from({ length: 5 }, () => ({ normal, crit })), spare, arms: [] as { id: number; hit: { normal: number; crit: number } }[] });
 
 test("a fight that can be lost is taken one exchange at a time, while winning it is at most 35 points less likely than escaping", () => {
   const twoBlows = { beast: beast(100), hits: hits(50, 10, 200), health: 100 };
@@ -122,4 +122,21 @@ test("after the fight the real armor goes back on", () => {
 test("the chance to escape counts every failed try as a hit taken", () => {
   const cornered = state({ level: 4, health: 100, stats: { ...stats, dexterity: 3 }, beast: beast(1000), hits: hits(4, 60, 60) });
   assert.match(plan(cornered).why, /94% to escape/);
+});
+
+const GHOST_WAND = 9, WARHAMMER = 72;
+
+test("once a tier 1 weapon is maxed, the type that covers its weak matchup is bought with three full heals to spare and carried", () => {
+  const first = { equipment: [gear(KATANA, 20), gear(PLATE_MAIL, 5)], market: [offer(WARHAMMER, 10), offer(GHOST_WAND, 10)] };
+  assert.deepEqual(plan(state({ ...first, gold: 40 })).actions, [{ type: "buy", item: GHOST_WAND, equip: false }, { type: "explore" }]);
+  assert.deepEqual(plan(state({ ...first, gold: 39 })).actions, [{ type: "explore" }]);
+  assert.deepEqual(plan(state({ ...first, bag: [gear(GHOST_WAND, 3)] })).actions, [{ type: "equip", item: GHOST_WAND }, { type: "explore" }]);
+});
+
+test("the weapon that wins the fight is taken up when that beats staying, the free strike counted", () => {
+  const carried = { equipment: [gear(GHOST_WAND, 3)], bag: [gear(KATANA, 20)], stats: { ...stats, dexterity: 0 }, beast: beast(300), health: 300 };
+  const strong = { ...hits(10, 20, 40), arms: [{ id: KATANA, hit: { normal: 100, crit: 200 } }] };
+  assert.deepEqual(plan(state({ ...carried, hits: strong })).actions, [{ type: "equip", item: KATANA }]);
+  const weak = { ...hits(10, 20, 40), arms: [{ id: KATANA, hit: { normal: 8, crit: 16 } }] };
+  assert.deepEqual(plan(state({ ...carried, hits: weak })).actions, [{ type: "attack", tillHealth: 299 }]);
 });
