@@ -51,9 +51,10 @@ uses the contract's hash (same distribution, 30 times slower). A difference unde
 | Wallet: STRK (red under the spend floor), tickets, SURVIVOR, average STRK per real game | "Wallet" on the right; `GET /api/wallet` (cached 30 seconds) |
 | Beasts held or won and not yet claimed, each with its level | "Beasts" on the right; `GET /api/beasts` (cached 60 seconds) |
 | Loot bags, best 25, with the copies the pool holds (x1, x2, x3) | "Loot bags" on the right; "Level" ranks by simulated mean level, "Beasts" by named beasts killed per game, and the choice is kept in the browser; `GET /api/bags` reads `var/bag-ranking.json` |
-| Start an on-chain game (spends STRK) | "Play", then "Spend STRK" under "This spends real money"; `POST /api/play` with `{"live": true}` |
+| Read-only for visitors | Opened from another machine the page has no Play or Stop and writes nothing; `GET /api/me` returns `{"control": false}` and the server refuses every other method with 403 |
+| Start an on-chain game (spends STRK) | On the machine itself: "Play", then "Spend STRK" under "This spends real money"; `POST /api/play` with `{"live": true}` |
 | Start a practice pass | `POST /api/play` with `{"games": n}` (not on the page) |
-| Stop after the current move | "Stop" replaces "Play" while a game is live; `POST /api/stop` |
+| Stop after the current move | On the machine itself: "Stop" replaces "Play" while a game is live; `POST /api/stop` |
 | Current game state | `GET /api/state` |
 | 200 games, on-chain first, each with `onchain`, `live`, `dungeon` and `gas_strk` (STRK balance spent during the game, null when not recorded) | `GET /api/games` |
 | One game with its stored events, states included | `GET /api/games/<row id>` |

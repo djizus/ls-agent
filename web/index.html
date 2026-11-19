@@ -131,13 +131,11 @@ dialog h2 { text-align: center; margin-bottom: 1rem; font-size: 2.4rem; color: v
     <div class="panel" id="dock"><span id="mode"></span><span id="which"></span><div id="plan"></div><button type="button" id="golive" hidden>Live</button></div>
   </main>
   <aside class="panel">
-    <button type="button" id="run"></button>
     <section id="wallet"></section>
     <section id="beasts"></section>
     <section id="bags"></section>
   </aside>
 </div>
-<dialog id="ask"></dialog>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -213,8 +211,7 @@ function render() {
   $("which").textContent = g ? `Game ${g.id}` : "";
   put($("plan"), !g ? "" : g.live ? (move ? planHtml(move) : "") : endHtml(g));
   $("golive").hidden = !liveReal() || g?.live;
-  $("run").textContent = live ? "Stop" : "Play";
-  $("run").className = live ? "stop" : "";
+  if ($("run")) { $("run").textContent = live ? "Stop" : "Play"; $("run").className = live ? "stop" : ""; }
 
   const ranked = realGames().filter((x) => !x.live).sort((a, b) => b.level - a.level || b.id - a.id);
   const cls = (x) => `card${x.id === g?.id ? " on" : ""}`;
@@ -279,16 +276,21 @@ $("games").onclick = pick;
 $("games").onkeydown = (e) => { if (e.key === "Enter") pick(e); };
 $("bags").onclick = (e) => { const b = e.target.closest("[data-sort]"); if (b) { bagSort = b.dataset.sort; keep("bagSort", bagSort); render(); } };
 $("golive").onclick = () => go("");
-$("run").onclick = () => {
-  if (liveGame()) return post("/api/stop");
-  $("ask").innerHTML = askHtml();
-  $("ask").showModal();
-};
-$("ask").onclick = (e) => {
-  const spend = e.target.closest("[data-do]");
-  if (spend) post("/api/play", { live: true });
-  if (spend || e.target.closest("[data-close]") || e.target === $("ask")) { $("ask").close(); if (spend) go(""); }
-};
+function control() {
+  $("wallet").insertAdjacentHTML("beforebegin", `<button type="button" id="run"></button>`);
+  document.body.insertAdjacentHTML("beforeend", `<dialog id="ask"></dialog>`);
+  $("run").onclick = () => {
+    if (liveGame()) return post("/api/stop");
+    $("ask").innerHTML = askHtml();
+    $("ask").showModal();
+  };
+  $("ask").onclick = (e) => {
+    const spend = e.target.closest("[data-do]");
+    if (spend) post("/api/play", { live: true });
+    if (spend || e.target.closest("[data-close]") || e.target === $("ask")) { $("ask").close(); if (spend) go(""); }
+  };
+  render();
+}
 addEventListener("popstate", render);
 
 const source = new EventSource("/events");
@@ -303,6 +305,7 @@ Promise.all([get("/api/items"), load()]).then(([table]) => {
   loadSide();
 });
 setInterval(loadSide, SLOW_MS);
+get("/api/me").then((me) => { if (me?.control) control(); });
 </script>
 </body>
 </html>
