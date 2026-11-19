@@ -43,6 +43,8 @@ const MEAN_SLACK = 0.25;
 const SHARE_SLACK = 1;
 const DEEP = values.late ? [35, 40, 45] : [30, 35, 40];
 const MARKS = [35, 40];
+const [KILLS, NAMED, KINDS, MET, FLED, DIED] = [4, 5, 6, 7, 8, 9];
+const NAMED_SLACK = 0.1;
 const reach = Number(values.reach ?? 0);
 const defaults = { ...RULES };
 
@@ -63,6 +65,8 @@ async function play(share: number): Promise<Run> {
       const first = game.packets.length;
       const points: (number | null)[] = MARKS.map(() => null);
       let snapped = v > 0 || !reach;
+      const tally = { kills: 0, named: 0, met: 0, fled: 0, died: 0 };
+      const kinds = new Set<string>();
       while (!state.over) {
         const spare = Object.values(state.baseStats).reduce((a, b) => a + b, 0) + state.statUpgradesAvailable - (state.level - 1);
         MARKS.forEach((mark, k) => (points[k] ??= state.level >= mark ? spare : null));
@@ -70,9 +74,22 @@ async function play(share: number): Promise<Run> {
           snaps.push({ id: game.id, moves: game.packets.length, local: game.local });
           snapped = true;
         }
-        state = describe(act(game, plan(state).actions), game.id);
+        const before = state;
+        const move = plan(state).actions[0].type;
+        state = describe(act(game, plan(before).actions), game.id);
+        const named = before.beast?.specialPrefix != null;
+        if (!before.beast && state.beast?.specialPrefix != null) tally.met++;
+        if (before.beast && !state.beast && !state.over && move === "attack") {
+          tally.kills++;
+          if (named) {
+            tally.named++;
+            kinds.add(`${before.beast.id}:${before.beast.specialPrefix}:${before.beast.specialSuffix}`);
+          }
+        }
+        if (before.beast && named && !state.beast && !state.over && move === "flee") tally.fled++;
+        if (before.beast && named && state.over) tally.died++;
       }
-      out.push([state.level, game.packets.length - first, ...points]);
+      out.push([state.level, game.packets.length - first, ...points, tally.kills, tally.named, kinds.size, tally.met, tally.fled, tally.died]);
     }
     rows.push(out);
   }
@@ -106,7 +123,11 @@ if (process.send) {
       const seen = games.map((g) => g[column]).filter((x): x is number => x !== null);
       return seen.length ? +(seen.reduce((a, b) => a + b, 0) / seen.length).toFixed(1) : null;
     };
+    const total = (column: number) => games.reduce((n, g) => n + g[column]!, 0);
+    const named = summary(games.map((g) => g[NAMED]!));
+    const of = (column: number) => +((100 * total(column)) / Math.max(1, total(MET))).toFixed(1);
     console.log(rules, JSON.stringify({ ...summary(levels), moves: average(1), ...Object.fromEntries(MARKS.map((mark, k) => [`points at ${mark}`, average(2 + k)])) }));
+    console.log(`  kills per game ${(total(KILLS) / games.length).toFixed(2)}; named ${named.mean} ± ${named.se}, distinct ${(total(KINDS) / games.length).toFixed(2)}, per 100 moves ${((100 * total(NAMED)) / total(1)).toFixed(2)}; named beasts met ${(total(MET) / games.length).toFixed(2)}: killed ${of(NAMED)}%, fled ${of(FLED)}%, died to ${of(DIED)}%`);
     if (v > 0) {
       const base = order.map(([share, at]) => shares[share].rows[0][at][0]!);
       const d = summary(levels.map((l, i) => l - base[i]));
@@ -114,23 +135,26 @@ if (process.send) {
         const s = summary(levels.map((l, i) => 100 * (Number(l >= n) - Number(base[i] >= n))));
         return `${n}+ ${s.mean > 0 ? "+" : ""}${s.mean} ± ${s.se}`;
       });
-      console.log(`  against the first: ${d.mean > 0 ? "+" : ""}${d.mean} ± ${d.se} levels; share in points: ${moved.join(", ")}`);
+      const first = order.map(([share, at]) => shares[share].rows[0][at][NAMED]!);
+      const k = summary(games.map((g, i) => g[NAMED]! - first[i]));
+      console.log(`  against the first: named kills ${k.mean > 0 ? "+" : ""}${k.mean} ± ${k.se}; ${d.mean > 0 ? "+" : ""}${d.mean} ± ${d.se} levels; share in points: ${moved.join(", ")}`);
     }
     if (values["by-id"]) ids.forEach((id, n) => console.log(" ", String(id).slice(-8), JSON.stringify(summary(levels.slice(n * (to - from), (n + 1) * (to - from))))));
   });
   const baselineFile = new URL("baseline.json", import.meta.url);
-  const baselines: Record<string, { mean: number; "30+": number }> = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : {};
+  const baselines: Record<string, { mean: number; "30+": number; named?: number }> = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : {};
   const now = summary(order.map(([share, at]) => shares[share].rows[0][at][0]!));
+  const kills = summary(order.map(([share, at]) => shares[share].rows[0][at][NAMED]!)).mean;
   if (values.keep) writeFileSync(values.keep, JSON.stringify(shares.flatMap((s) => s.snaps)));
   if (values.save) {
-    baselines[DUNGEON_KEY] = { mean: now.mean, "30+": now["30+"] };
+    baselines[DUNGEON_KEY] = { mean: now.mean, "30+": now["30+"], named: kills };
     writeFileSync(baselineFile, JSON.stringify(baselines, null, 2) + "\n");
   }
   if (values.gate) {
     const base = baselines[DUNGEON_KEY];
     if (!base) throw new Error(`no baseline for ${DUNGEON_KEY}: run with --save first`);
-    const worse = now.mean < base.mean - MEAN_SLACK || now["30+"] < base["30+"] - SHARE_SLACK;
-    console.log(`gate ${worse ? "FAILED" : "passed"}: mean ${now.mean} against ${base.mean}, 30+ ${now["30+"]}% against ${base["30+"]}%`);
+    const worse = now.mean < base.mean - MEAN_SLACK || now["30+"] < base["30+"] - SHARE_SLACK || kills < (base.named ?? 0) - NAMED_SLACK;
+    console.log(`gate ${worse ? "FAILED" : "passed"}: mean ${now.mean} against ${base.mean}, 30+ ${now["30+"]}% against ${base["30+"]}%, named kills ${kills} against ${base.named ?? "none"}`);
     if (worse) process.exitCode = 1;
   }
   console.log(`${games.length * values.rules.length} games in ${((Date.now() - started) / 1000).toFixed(1)} s on ${procs} processes${values.exact ? ", contract hash" : ", fast luck"}`);
