@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
 import { DUNGEON, DUNGEON_KEY } from "./config.ts";
 import { db } from "./db.ts";
-import { collect } from "./live.ts";
+import { collect, type Entry } from "./live.ts";
 import { strkBalance } from "./wallet.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
@@ -44,13 +44,13 @@ export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
   return { hash, text: full, rules: (p: Phase) => [common.trim(), sections[p] ?? ""].filter(Boolean).join("\n\n") };
 }
 
-async function playGame(practiceId: string | undefined, seed: number): Promise<void> {
+async function playGame(practiceId: string | undefined, seed: number, entry?: Entry): Promise<void> {
   let ending = "stopped";
   const strategy = loadStrategy();
   db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(strategy.hash, strategy.text, Date.now());
   const funds = () => (practiceId ? null : strkBalance().then(Number, () => null));
   const before = await funds();
-  const id = await begin(practiceId, seed);
+  const id = await begin(practiceId, seed, entry);
   const mode = practiceId ? "practice" : DUNGEON_KEY;
   const resumed = practiceId ? undefined : (db.prepare("SELECT id FROM games WHERE game_id = ? AND mode = ?").get(id, mode) as { id: number } | undefined);
   row = resumed?.id ?? Number(db.prepare("INSERT INTO games (mode, game_id, seed, strategy, started_at) VALUES (?, ?, ?, ?, ?)").run(mode, id, seed, strategy.hash, Date.now()).lastInsertRowid);
@@ -145,7 +145,7 @@ async function playMoves(rules: (p: Phase) => string): Promise<string> {
   return ending;
 }
 
-export async function play(count: number, live: boolean): Promise<void> {
+export async function play(count: number, live: boolean, entry?: Entry): Promise<void> {
   if (busy) return;
   busy = true;
   stopping = false;
@@ -153,7 +153,7 @@ export async function play(count: number, live: boolean): Promise<void> {
     const seed = nextSeed();
     for (const id of live ? Array<undefined>(count).fill(undefined) : DUNGEON.benchmark.slice(0, count)) {
       if (stopping) break;
-      await playGame(id, seed).catch((err) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` }));
+      await playGame(id, seed, entry).catch((err) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` }));
     }
   } finally {
     busy = false;

@@ -82,8 +82,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     return;
   }
   if (url.pathname === "/api/play" && req.method === "POST") {
-    const body = (await json(req)) as { games?: number; live?: boolean } | undefined;
-    play(Number(body?.games) || (body?.live ? 1 : DUNGEON.benchmark.length), body?.live === true);
+    const body = (await json(req)) as { games?: number; live?: boolean; bag?: number; maxSurvivor?: number } | undefined;
+    play(Number(body?.games) || (body?.live ? 1 : DUNGEON.benchmark.length), body?.live === true, body?.bag ? { bag: Number(body.bag), maxSurvivor: Number(body.maxSurvivor) } : undefined);
     return res.end("ok");
   }
   if (url.pathname === "/api/stop" && req.method === "POST") {
