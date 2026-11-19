@@ -1,10 +1,20 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
+import { NAMES } from "./beast.ts";
+import { STATS } from "./codec.ts";
 import { ITEMS } from "./items.ts";
 
-const art = (name: string) => new URL(`../web/assets/loot/${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.png`, import.meta.url);
+const missing = (files: string[]) => files.filter((f) => !existsSync(new URL(`../web/assets/${f}`, import.meta.url)));
 
 test("every item has art on the page", () => {
-  assert.deepEqual(ITEMS.filter((i) => !existsSync(art(i.name))).map((i) => i.name), []);
+  assert.deepEqual(missing(ITEMS.map((i) => `loot/${i.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.png`)), []);
+});
+
+test("every beast has a portrait on the page", () => {
+  assert.deepEqual(missing(NAMES.map((n) => `beasts/${n.toLowerCase()}.png`)), []);
+});
+
+test("every ability has an icon on the page", () => {
+  assert.deepEqual(missing(STATS.map((s) => `icons/${s[0].toUpperCase()}${s.slice(1)}.svg`)), []);
 });
