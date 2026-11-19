@@ -21,7 +21,7 @@ In a second terminal, play 20 practice games (about three minutes):
 curl -X POST 127.0.0.1:4100/api/play -d '{"games":20}'
 ```
 
-The service log prints each decision. The "Practice" panel on the page shows the share that reached level 26, 30 and 35. The middle of the page stays on "No real game yet", because it only shows games played on chain. A pass plays up to 20 fixed starts, and each complete pass of 20 uses new luck.
+The service log prints each decision. "Practice" in the Games panel on the page lists them with their main figures, the share that reached level 30 among them. The middle of the page stays on "No real game yet", because it only shows games played on chain. A pass plays up to 20 fixed starts, and each complete pass of 20 uses new luck.
 
 Measure the policy on 10,000 generated starts (under a minute on 14 cores):
 
@@ -101,8 +101,8 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 | One screen: the official Loot Survivor spectator in the middle, panels around it | `/` shows the live real game, or the latest real game when none is live. `/?game=<row id>` shows that real game. |
 | Watch a real game | The middle panel embeds `https://www.lootsurvivor.io/watch?id=<game id in decimal>`. A finished game opens at its first move: click inside it, then the right arrow steps the replay. |
 | What the bot just decided in the live game | The bar under the spectator. For a finished game it shows the level reached, the beast that killed it and the STRK it cost. |
-| Pick a real game | "Games" on the left, with "Beast" or "Loot" in its header choosing the dungeon: the three best by level as a podium, the rest newest first, the live game on top. The list holds every game of the dungeon, podium games included. Each finished game shows the named beasts it killed beside a skull, counted when the game ends and stored in `games.beasts`. "Live" in the bar returns to the live game. |
-| Practice results and the contract check | "Practice" on the left. `GET /api/strategies`, `GET /api/check`. "Checked" appears after `scripts/check.sh` has run the tests and written `var/contract-check.json`. |
+| Pick a real game | "Games" on the left, with "Beast" or "Loot" in its header choosing the dungeon ("Practice" lists the practice games of the newest policy version, which cannot be opened): the three best by level as a podium, the rest newest first, the live game on top. The list holds every game of the dungeon, podium games included. Each finished game shows the named beasts it killed beside a skull, counted when the game ends and stored in `games.beasts`. "Live" in the bar returns to the live game. |
+| Main figures of the selected games | Six tiles under the Games header: games ended, best level, average level, named beasts slain (per game on "Practice"), share that reached level 30, and STRK spent per game. On "Practice" the last tile is the contract check, "OK" after `scripts/check.sh` has run the tests and written `var/contract-check.json` (`GET /api/check`). `GET /api/summary` computes the figures for each dungeon and for practice. |
 | Wallet: STRK (red under the spend floor), tickets, SURVIVOR, average STRK per real game | "Wallet" on the right. `GET /api/wallet` (cached 30 seconds). |
 | Beasts held or won and not yet claimed | "Beasts" on the right. `GET /api/beasts` (cached 60 seconds). |
 | Loot bags, best 25, with the copies the pool holds | "Loot bags" on the right, ranked by mean level or by named beasts killed. `GET /api/bags` reads `scripts/bag-ranking.json`. |

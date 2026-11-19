@@ -50,17 +50,17 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 #podium li:nth-child(2) { order: 1; } #podium li:nth-child(3) { order: 3; }
 #podium img { width: 3.6rem; height: 3.6rem; object-fit: contain; filter: drop-shadow(0 3px 0 rgb(0 0 0 / 0.7)); }
 #podium b { font: 400 2.6rem/0.9 var(--num); color: var(--gold); }
-#games li { cursor: pointer; }
+#games li[data-id] { cursor: pointer; }
 #board li { grid-template-columns: auto 1fr auto 2.4rem; }
 #board b { text-align: right; }
 .slain { display: flex; align-items: center; gap: 0.2rem; font-size: 1.4rem; line-height: 1; }
 #games .slain img { width: 1.2rem; height: 1.2rem; filter: none; }
-#games li:hover { background: #1e2619; }
+#games li[data-id]:hover { background: #1e2619; }
 #games li.on { border-color: var(--gold); box-shadow: var(--bevel), 0 0 0 2px var(--gold), 0 3px 0 rgb(0 0 0 / 0.6); }
-#results { flex: none; }
-#reach { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+#reach { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
 #reach div { text-align: center; padding: 0.4rem 0 0.5rem; }
-#reach b { display: block; font: 400 2rem/1 var(--num); color: var(--lime); }
+#reach b { display: block; font: 400 2rem/1 var(--num); color: var(--gold); }
+#reach b.good { color: var(--lime); } #reach b.bad { color: var(--blood); }
 
 #mid { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; min-height: 0; }
 #stage { position: relative; flex: 1; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--drop); background: #000; overflow: hidden; display: grid; place-content: center; text-align: center; }
@@ -114,8 +114,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 <div class="win">
   <aside class="panel">
     <img id="logo" src="/assets/logo.png" alt="Loot Survivor">
-    <section id="games"><div class="head" id="modes"></div><ol id="podium"></ol><ol id="board" class="rows scroll"></ol></section>
-    <section id="results"></section>
+    <section id="games"><div class="head" id="modes"></div><div id="sum"></div><ol id="podium"></ol><ol id="board" class="rows scroll"></ol></section>
   </aside>
   <main id="mid">
     <div id="stage"></div>
@@ -151,7 +150,7 @@ let bagSort = keep("bagSort") in SORTS ? keep("bagSort") : "mean";
 
 const items = {};
 const byName = {};
-const data = { games: [], wallet: null, beasts: null, results: null, bags: null, check: null };
+const data = { games: [], wallet: null, beasts: null, summary: null, bags: null, check: null };
 let shown;
 let move = null;
 let market = [];
@@ -200,26 +199,24 @@ function render() {
   put($("plan"), !g ? "" : g.live ? (move ? planHtml(move) : "") : endHtml(g));
   $("golive").hidden = !liveReal() || g?.live;
 
-  const modes = data.beasts?.collections ?? {};
-  const mode = keep("dungeon") in modes ? keep("dungeon") : (liveReal() ?? realGames()[0])?.mode;
-  const inMode = realGames().filter((x) => x.mode === mode);
-  const liveHere = inMode.find((x) => x.live);
-  put($("modes"), `<h2>Games</h2><span class="seg">${Object.entries(modes).map(([k, name]) => `<button type="button" data-mode="${k}" aria-pressed="${k === mode}">${name.split(" ")[0]}</button>`).join("")}</span>`);
-  const ranked = inMode.filter((x) => !x.live).sort((a, b) => b.level - a.level || b.id - a.id);
-  const cls = (x) => `card${x.id === g?.id ? " on" : ""}`;
-  put($("podium"), ranked.slice(0, 3).map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0" title="Game ${x.id}"><img src="${face(killer(x)?.[1])}" alt=""><b>${x.level}</b>${slain(x)}<span class="dim">${x.id}</span></li>`).join(""));
-  put($("board"), !inMode.length ? `<li class="none">No games</li>` : [...(liveHere ? [liveHere] : []), ...ranked.slice().sort((a, b) => b.started_at - a.started_at)].map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0"><img src="${x.live ? "/assets/favicon.png" : face(killer(x)?.[1])}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.live ? "" : x.level}</b></li>`).join(""));
-
-  const l = data.results?.[0];
+  const sums = data.summary ?? [];
+  const sum = sums.find((x) => x.mode === keep("dungeon")) ?? sums.find((x) => x.mode === (liveReal() ?? realGames()[0])?.mode) ?? sums[0];
+  const mode = sum?.mode;
+  const inMode = data.games.filter((x) => x.mode === mode && (!sum.strategy || x.strategy === sum.strategy));
   const c = data.check;
-  put($("results"), `<div class="head"><h2>Practice</h2>${c ? (c.failed ? `<span class="bad" title="${esc(c.failed)}">Check failed</span>` : `<span class="good" title="The local game matches the one on Starknet">Checked</span>`) : ""}</div>
-    ${l ? `<div id="reach">${l.reach.map((r) => `<div class="card" title="Share of ${l.games} practice games that reached level ${r.level}"><b>${Math.round(100 * r.share)}%</b><span class="dim">Level ${r.level}</span></div>`).join("")}</div>` : ""}`);
+  const tile = (value, label, tone = "") => `<div class="card"><b class="${tone}">${value}</b><span class="dim">${label}</span></div>`;
+  const check = !c ? tile("-", "Check") : c.failed ? tile("Failed", "Check", "bad") : tile("OK", "Check", "good");
+  put($("sum"), !sum?.games ? "" : `<div id="reach">${tile(round(sum.games), "Games")}${tile(sum.best, "Best")}${tile(round(sum.mean, 1), "Average")}${sum.strategy ? tile(sum.slainEach === null ? "-" : round(sum.slainEach, 1), "Slain each") : tile(sum.slain === null ? "-" : round(sum.slain), "Slain")}${tile(`${Math.round(100 * sum.reach.share)}%`, `Level ${sum.reach.level}`, "good")}${sum.strategy ? check : tile(sum.strk === null ? "-" : round(sum.strk, 1), "STRK each")}</div>`);
+  const liveHere = inMode.find((x) => x.live);
+  put($("modes"), `<h2>Games</h2><span class="seg">${sums.map((x) => `<button type="button" data-mode="${x.mode}" aria-pressed="${x.mode === mode}">${x.name.split(" ")[0]}</button>`).join("")}</span>`);
+  const ranked = inMode.filter((x) => !x.live).sort((a, b) => b.level - a.level || b.id - a.id);
+  const cls = (x) => (x.onchain ? `class="card${x.id === g?.id ? " on" : ""}" data-id="${x.id}" tabindex="0"` : `class="card"`);
+  put($("podium"), ranked.slice(0, 3).map((x) => `<li ${cls(x)} title="Game ${x.id}"><img src="${face(killer(x)?.[1])}" alt=""><b>${x.level}</b>${slain(x)}<span class="dim">${x.id}</span></li>`).join(""));
+  put($("board"), !inMode.length ? `<li class="none">No games</li>` : [...(liveHere ? [liveHere] : []), ...ranked.slice().sort((a, b) => b.started_at - a.started_at)].map((x) => `<li ${cls(x)}><img src="${x.live ? "/assets/favicon.png" : face(killer(x)?.[1])}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.live ? "" : x.level}</b></li>`).join(""));
 
   const w = data.wallet;
-  const paid = realGames().filter((x) => x.gas_strk !== null);
-  const each = paid.length ? paid.reduce((n, x) => n + x.gas_strk, 0) / paid.length : null;
   put($("wallet"), `<h2>Wallet</h2>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
-    <div class="row"><span>${pic("dungeon_ticket", "Tickets")}<span class="n">${round(w.tickets, 1)}</span></span><span>${pic("survivor_token", "SURVIVOR tokens")}<span class="n">${round(w.survivor, 1)}</span></span>${each === null ? "" : `<span class="dim" title="Average cost of a real game"><span class="n">${round(each, 1)}</span>a game</span>`}</div>`}`);
+    <div class="row"><span>${pic("dungeon_ticket", "Tickets")}<span class="n">${round(w.tickets, 1)}</span></span><span>${pic("survivor_token", "SURVIVOR tokens")}<span class="n">${round(w.survivor, 1)}</span></span></div>`}`);
 
   const b = data.beasts;
   const held = Object.values(b?.inventory ?? {}).flat();
@@ -233,13 +230,14 @@ function render() {
 }
 
 async function load() {
-  data.games = (await get("/api/games")) ?? data.games;
+  const [games, summary] = await Promise.all([get("/api/games"), get("/api/summary")]);
+  Object.assign(data, { games: games ?? data.games, summary: summary ?? data.summary });
   render();
 }
 
 async function loadSide() {
-  const [w, b, l, c, bags] = await Promise.all(["wallet", "beasts", "strategies", "check", "bags"].map((p) => get(`/api/${p}`)));
-  Object.assign(data, { wallet: w ?? data.wallet, beasts: b ?? data.beasts, results: l ?? data.results, check: c, bags: bags ?? data.bags });
+  const [w, b, c, bags] = await Promise.all(["wallet", "beasts", "check", "bags"].map((p) => get(`/api/${p}`)));
+  Object.assign(data, { wallet: w ?? data.wallet, beasts: b ?? data.beasts, check: c, bags: bags ?? data.bags });
   render();
 }
 

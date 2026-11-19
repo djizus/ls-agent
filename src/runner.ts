@@ -32,7 +32,9 @@ subscribe((e) => {
 const slain = (game: number): number =>
   namedSlain((db.prepare("SELECT body FROM events WHERE game = ? ORDER BY rowid").all(game) as { body: string }[]).map((e) => JSON.parse(e.body)));
 
-for (const { id } of db.prepare("SELECT id FROM games WHERE ended_at IS NOT NULL AND beasts IS NULL").all() as { id: number }[])
+const RECORDED = `EXISTS (SELECT 1 FROM events WHERE game = games.id AND body LIKE '{"kind":"state"%')`;
+db.exec(`UPDATE games SET beasts = NULL WHERE beasts = 0 AND NOT ${RECORDED}`);
+for (const { id } of db.prepare(`SELECT id FROM games WHERE ended_at IS NOT NULL AND beasts IS NULL AND ${RECORDED}`).all() as { id: number }[])
   db.prepare("UPDATE games SET beasts = ? WHERE id = ?").run(slain(id), id);
 
 export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
