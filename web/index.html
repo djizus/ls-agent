@@ -88,10 +88,16 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .big small { font-size: 1.3rem; color: var(--dim); }
 .row { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: center; }
 .row > span { display: inline-flex; align-items: center; gap: 0.35rem; }
-#zoo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; max-height: 11rem; }
-#zoo div { position: relative; aspect-ratio: 1; padding: 0.15rem; }
-#zoo img { width: 100%; height: 100%; object-fit: contain; }
-#zoo b { position: absolute; right: 0.2rem; bottom: 0; font: 400 1.2rem/1 var(--num); text-shadow: 0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000; }
+#zoo { display: flex; flex-direction: column; gap: 0.4rem; max-height: 17rem; }
+#zoo .head span { display: inline-flex; gap: 0.6rem; align-items: baseline; }
+.cells { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; }
+.cells div { position: relative; aspect-ratio: 1; padding: 0.15rem; }
+.cells img { width: 100%; height: 100%; object-fit: contain; }
+.cells b { position: absolute; right: 0.2rem; bottom: 0; font: 400 1.2rem/1 var(--num); text-shadow: 0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000; }
+.cells i { position: absolute; left: 0.2rem; top: 0.1rem; font-style: normal; line-height: 1; color: var(--gold); text-shadow: 0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000; }
+.cells .claim { border-style: dashed; border-color: var(--dim); background: none; box-shadow: none; }
+.cells .claim img { opacity: 0.35; filter: grayscale(1); }
+.cells .mega { border-color: var(--gold); }
 #bags { flex: 1; }
 #sacks .arts { display: flex; gap: 0.15rem; }
 #sacks img { width: 2rem; height: 2rem; }
@@ -226,10 +232,10 @@ function render() {
     <div class="row"><span>${pic("dungeon_ticket", "Tickets")}<span class="n">${round(w.tickets, 1)}</span></span><span>${pic("survivor_token", "SURVIVOR tokens")}<span class="n">${round(w.survivor, 1)}</span></span></div>`}`);
 
   const b = data.beasts;
-  const held = Object.values(b?.inventory ?? {}).flat();
-  const claims = b?.pendingClaims ?? [];
-  const cell = (x) => `<div class="card" title="${esc(`${x.name}, level ${x.level}`)}"><img src="${face(x.name.split(" ").at(-1))}" alt="${esc(x.name)}"><b>${x.level}</b></div>`;
-  put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.inventory ? held.length : ""}</span></div>${b && !b.inventory ? `<span class="bad">No answer</span>` : ""}${claims.length ? `<span class="gold">${claims.length} to claim</span>` : ""}${held.length + claims.length ? `<div id="zoo" class="scroll">${[...held, ...claims].map(cell).join("")}</div>` : ""}`);
+  const STATE = { held: "", staked: ", staked", mega: ", Mega", claim: ", to claim" };
+  const cell = (x) => `<div class="card ${x.state}" title="${esc(`${x.name}: tier ${x.tier} ${x.type}, level ${x.level}${STATE[x.state]}${x.strk === null ? "" : `, sells for ${round(x.strk, 1)} STRK`}`)}"><img src="${face(x.kind)}" alt="${esc(x.name)}"><i>T${x.tier}</i><b>${x.level}</b></div>`;
+  const group = (x) => `<div class="head"><span><span class="dim">${x.name}</span><span class="n">${x.held}</span>${x.claims ? `<span class="gold">${x.claims} to claim</span>` : ""}</span>${x.strk === null ? "" : `<span title="What the pools pay for them now, one at a time"><span class="n">${round(x.strk)}</span> <span class="dim">STRK</span></span>`}</div>${x.beasts.length ? `<div class="cells">${x.beasts.map(cell).join("")}</div>` : ""}`;
+  put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.groups ? b.groups.reduce((n, x) => n + x.held, 0) : ""}</span></div>${b && !b.groups ? `<span class="bad">No answer</span>` : ""}${b?.groups ? `<div id="zoo" class="scroll">${b.groups.map(group).join("")}</div>` : ""}`);
 
   const first = (text) => text.replace(/ (T\d|G\d).*$/, "");
   const sacks = [...(data.bags ?? [])].sort((a, b) => (b[bagSort] ?? -1) - (a[bagSort] ?? -1)).slice(0, BAGS);

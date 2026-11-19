@@ -4,6 +4,7 @@ export const PORT = Number(process.env.LS_PORT ?? 4100);
 export const HOST = process.env.LS_HOST ?? "127.0.0.1";
 
 export const OZ_ACCOUNT_CLASS = "0x061dac032f228abef9c6626f995015233097ae253a7f72d68552db02f2971b8f";
+export const ETH = "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7";
 export const STRK = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 export const EKUBO_ROUTER = "0x0199741822c2dc722f6f605204f35e56dbc23bceed54818168c4c49e4fb8737e";
 export const EKUBO_QUOTER = "https://prod-api-quoter.ekubo.org/23448594291968334";
@@ -15,7 +16,7 @@ export const GAME_CORE = "0x03cafe867e9f5dc7ccf73471b98c1d6d6d54804744cef9626acc
 export const BEAST_NFT = "0x00f739e402e52830a736335a0f47d58ec78ba067443c9c6930da182eab2ff8b0";
 export const SETTLE_MAX_PACKETS = 469;
 export const SETTLE_CHUNK = 117;
-export type Dungeon = { name: string; address: string; minterId: number; settingsId: number; claim: string; rolledStart: boolean; pool?: string; firstSpecies: number; speciesCount: number; benchmark: string[] };
+export type Dungeon = { name: string; address: string; minterId: number; settingsId: number; claim: string; rolledStart: boolean; pool?: string; sell?: { normal: string[]; mega: string[] }; firstSpecies: number; speciesCount: number; benchmark: string[] };
 
 export const DUNGEONS: Record<string, Dungeon> = {
   beast: {
@@ -57,6 +58,22 @@ export const DUNGEONS: Record<string, Dungeon> = {
     settingsId: 6,
     rolledStart: false,
     pool: "0x0127d3c4e2f5b651257a1b6ec52e1168b3b7150d0323a4e616dd65b08854a12c",
+    sell: {
+      normal: [
+        "0x045b30f28826bb61f85b2d357c0aeacb6543e8f88e797ad1728224e99e87ae7f",
+        "0x04d1ae4abc19f75aa4d79e0c5a830850f464a40eca1ec18861bc9774d58bb3ef",
+        "0x06ad78117e48b13b9733da751c12c7dabb936d50dc78f410ee380799c956c1e3",
+        "0x0765cb969d1b875df19b8e766442214efe4cef4551988c2b751d75c797f7b5fd",
+        "0x05559044a0123b38e2f0f5c830d8c2cdd3077ae94e15f77b80bb68ae6129d28c",
+      ],
+      mega: [
+        "0x0621bde4b28ed47c402e81f510bff6258438da3931ea714e9191b5fcc11a5baa",
+        "0x00194be6400b870901bff7ddc84aa3a83cc50c9d75aa8220658a88a4ed4c4df2",
+        "0x06b449b0bec31bf33615ca2efd0482404726efb068082bbc2d1640907da67030",
+        "0x0757dcc3913df8302ea87308f79377f6a3401281047fa7d804d76cb63a5dc6f0",
+        "0x07b469185ae44e31e37eaca7649e8ba9dea5f58fc591492733afe64342a68c71",
+      ],
+    },
     claim: "claim_collectable",
     firstSpecies: 78,
     speciesCount: 30,

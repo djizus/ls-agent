@@ -11,6 +11,7 @@ test("decodes a beast token read from the collection", () => {
   assert.deepEqual(decodeBeast("0x01a9", held), {
     collection: "beast",
     species: 53,
+    kind: "Balrog",
     name: '"Eagle Shadow" Balrog',
     prefix: 24,
     suffix: 10,
@@ -32,11 +33,11 @@ test("a staked beast carries its transformation time, a mega does not", () => {
 });
 
 test("names the collection, tier and type of a species", () => {
-  assert.deepEqual(describe(74, 9, 2), { collection: "beast", species: 74, name: '"Brimstone Root" Orc', prefix: 9, suffix: 2, tier: 5, type: "Bludgeon" });
-  assert.deepEqual(describe(30, 0, 0), { collection: "beast", species: 30, name: "Minotaur", prefix: 0, suffix: 0, tier: 1, type: "Blade" });
-  assert.deepEqual(describe(96, 38, 5), { collection: "lootBag", species: 96, name: '"Hypnotic Roar" Loot Bag #19', prefix: 38, suffix: 5, tier: 5, type: "Blade" });
+  assert.deepEqual(describe(74, 9, 2), { collection: "beast", species: 74, kind: "Orc", name: '"Brimstone Root" Orc', prefix: 9, suffix: 2, tier: 5, type: "Bludgeon" });
+  assert.deepEqual(describe(30, 0, 0), { collection: "beast", species: 30, kind: "Minotaur", name: "Minotaur", prefix: 0, suffix: 0, tier: 1, type: "Blade" });
+  assert.deepEqual(describe(96, 38, 5), { collection: "lootBag", species: 96, kind: "Enfield", name: '"Hypnotic Roar" Enfield', prefix: 38, suffix: 5, tier: 5, type: "Blade" });
   assert.deepEqual([78, 79, 88, 99, 100, 107].map((s) => describe(s, 0, 0).tier), [1, 1, 1, 1, 2, 5]);
-  assert.deepEqual(describe(76, 0, 0), { collection: "other", species: 76, name: "Beast #76", prefix: 0, suffix: 0, tier: 0, type: "" });
+  assert.deepEqual(describe(76, 0, 0), { collection: "other", species: 76, kind: null, name: "Beast #76", prefix: 0, suffix: 0, tier: 0, type: "" });
 });
 
 test("keeps finished unclaimed kills, one per beast, with the collection's species", () => {

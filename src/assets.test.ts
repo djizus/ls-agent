@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
-import { NAMES } from "./beast.ts";
+import { LOOT_NAMES, NAMES } from "./beast.ts";
 import { STATS } from "./codec.ts";
 import { ITEMS } from "./items.ts";
 
@@ -12,7 +12,7 @@ test("every item has art on the page", () => {
 });
 
 test("every beast has a portrait on the page", () => {
-  assert.deepEqual(missing(NAMES.map((n) => `beasts/${n.toLowerCase()}.png`)), []);
+  assert.deepEqual(missing([...NAMES, ...LOOT_NAMES].map((n) => `beasts/${n.toLowerCase()}.png`)), []);
 });
 
 test("every ability has an icon on the page", () => {
