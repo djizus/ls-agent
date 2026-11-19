@@ -23,10 +23,12 @@ export function account(): Account {
   return new Account({ provider, address: k.address, signer: k.privateKey });
 }
 
-export async function strkBalance(address = keys().address): Promise<bigint> {
-  const [low, high] = await provider.callContract({ contractAddress: STRK, entrypoint: "balance_of", calldata: [address] });
+export async function balanceOf(token: string, address = keys().address): Promise<bigint> {
+  const [low, high] = await provider.callContract({ contractAddress: token, entrypoint: "balance_of", calldata: [address] });
   return BigInt(low) + (BigInt(high) << 128n);
 }
+
+export const strkBalance = (): Promise<bigint> => balanceOf(STRK);
 
 export async function isDeployed(address = keys().address): Promise<boolean> {
   try {

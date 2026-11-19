@@ -6,6 +6,8 @@ import { beastHit, yourHit } from "./combat.ts";
 import { marketOf } from "./market.ts";
 import { MARKET } from "./settings.ts";
 import { SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
+import { actLive, liveGame } from "./live.ts";
+import { toSnapshot } from "./engine/engine.ts";
 import { act, audit, newPracticeGame, preview, revertReason, type Game, type Snapshot } from "./practice.ts";
 
 type Gear = LootItem & { greatness: number; xp: number; suffix?: string; bonus?: Partial<State["stats"]> };
@@ -95,15 +97,17 @@ export function phase(s: State): Phase {
   return s.beast ? "battle" : "explore";
 }
 
-export async function begin(id: string, seed = 0): Promise<State> {
-  game = await newPracticeGame(id, seed);
-  last = game.start;
-  return state();
+export async function begin(id: string | undefined, seed = 0): Promise<string> {
+  game = id ? await newPracticeGame(id, seed) : await liveGame();
+  last = toSnapshot(game.local);
+  return game.id;
 }
+
+export const current = (): State => state();
 
 export async function commit(actions: Action[]): Promise<State> {
   try {
-    last = act(game!, actions);
+    last = game!.chain ? await actLive(game!, actions) : act(game!, actions);
   } catch (err) {
     throw new Error(revertReason(err));
   }

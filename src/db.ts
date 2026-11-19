@@ -29,6 +29,7 @@ db.exec(`
     at INTEGER NOT NULL,
     body TEXT NOT NULL
   );
+  CREATE INDEX IF NOT EXISTS events_game ON events (game);
 `);
 
 const columns = (db.prepare("PRAGMA table_info(games)").all() as { name: string }[]).map((c) => c.name);

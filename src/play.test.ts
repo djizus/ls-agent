@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DUNGEON } from "./config.ts";
-import { begin, commit, render, shape, type State } from "./play.ts";
+import { begin, commit, current, render, shape, type State } from "./play.ts";
 import { act, newPracticeGame, preview, replay, type Snapshot } from "./practice.ts";
 
 test("market and potions are open between fights, not only at level-up", { timeout: 120_000 }, async () => {
-  let state = await begin(DUNGEON.benchmark[0]);
+  await begin(DUNGEON.benchmark[0]);
+  let state = current();
   while (state.beast || state.statUpgradesAvailable > 0 || state.health === state.maxHealth) {
     const points = state.statUpgradesAvailable;
     const upgrade = points > 0 ? [{ type: "upgrade" as const, stat: "dexterity" as const, amount: points }] : [];
@@ -33,7 +34,8 @@ test("attack and flee without a threshold run until the fight ends; tillHealth s
 
 test("potion price formula matches the contract; explores are healed first and pending points hold the explore", { timeout: 300_000 }, async () => {
   const hurtWithGold = async (id: string): Promise<State | undefined> => {
-    let state = await begin(id);
+    await begin(id);
+    let state = current();
     while (state.beast || state.statUpgradesAvailable > 0 || state.health > state.maxHealth - 20 || state.gold < 2) {
       if (state.statUpgradesAvailable > 0) {
         const pending = shape(state, [{ type: "upgrade", stat: "charisma", amount: state.statUpgradesAvailable }, { type: "explore" }]);

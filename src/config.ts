@@ -5,6 +5,11 @@ export const HOST = process.env.LS_HOST ?? "127.0.0.1";
 
 export const OZ_ACCOUNT_CLASS = "0x061dac032f228abef9c6626f995015233097ae253a7f72d68552db02f2971b8f";
 export const STRK = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+export const EKUBO_ROUTER = "0x0199741822c2dc722f6f605204f35e56dbc23bceed54818168c4c49e4fb8737e";
+export const EKUBO_QUOTER = "https://prod-api-quoter.ekubo.org/23448594291968334";
+export const STRK_FLOOR = 80;
+export const TICKET_BATCH = 10;
+export const TICKET_BATCH_MAX_STRK = 2;
 export const GAME_API = "https://api-v2-next.up.railway.app";
 export const GAME_CORE = "0x03cafe867e9f5dc7ccf73471b98c1d6d6d54804744cef9626accd217b6ad1dd2";
 export type Dungeon = { name: string; address: string; minterId: number; settingsId: number; benchmark: string[] };
@@ -47,5 +52,6 @@ export const DUNGEONS: Record<string, Dungeon> = {
   },
 };
 
-export const DUNGEON = DUNGEONS[process.env.LS_DUNGEON ?? "beast"];
+export const DUNGEON_KEY = process.env.LS_DUNGEON ?? "beast";
+export const DUNGEON = DUNGEONS[DUNGEON_KEY];
 export const TICKET = "0x0452810188C4Cb3AEbD63711a3b445755BC0D6C4f27B923fDd99B1A118858136";

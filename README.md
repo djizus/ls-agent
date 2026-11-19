@@ -26,13 +26,17 @@ difference under 1 level on 200 games is noise.
 
 | Feature | How to reach it |
 |---|---|
-| Live show: adventurer, beast, odds, decision log, gear, recent games | `/` (ls.example.com) |
+| Watch the live game: adventurer, beast, odds, decision log, gear, bag | `/` follows whatever is live; with nothing live it shows the top game of the list at its end |
+| Pick a game to watch | click a row in the Games list, or open `/?game=<row id>`; "On-chain" filters the list, on-chain games rank first |
+| Replay a finished game | pick it, then Play/Pause, Back/Next (left/right arrows), the slider, and the speed button; space toggles play |
+| Return to the live game from a replay | "Watch live" in the top bar |
+| Start an on-chain game (spends STRK) | "Play on-chain" in the top bar, then confirm; `POST /api/play` with `{"live": true}` |
 | Start a benchmark pass | `POST /api/play` with `{"games": n}` |
 | Stop after the current move | `POST /api/stop` |
 | Current game state | `GET /api/state` |
-| Last 200 games | `GET /api/games` |
+| 200 games, on-chain first, each with `onchain` and `live` flags | `GET /api/games` |
+| One game with its stored events, states included | `GET /api/games/<row id>` |
 | Results per strategy version | `GET /api/strategies` |
-| Recent events for a late page load | `GET /api/recent` |
 | Live event stream | `GET /events` |
 | Item table | `GET /api/items` |
 | Daily contract check result | `GET /api/check`, written by `scripts/check.sh` |
@@ -47,7 +51,6 @@ difference under 1 level on 200 games is noise.
 |---|---|---|
 | `LS_DECIDER` | `rules` | `rules`, `jev` or `model` |
 | `LS_DUNGEON` | `beast` | key in `DUNGEONS` in `src/config.ts` |
-| `LS_AUTOPLAY` | unset | play the benchmark forever with fresh luck seeds |
 | `LS_PACE_MS` | 0 | pause between moves, for watching |
 | `LS_RPC_URL` | public node | Starknet RPC |
 | `LS_HOST`, `LS_PORT` | 127.0.0.1, 4100 | where the page is served |

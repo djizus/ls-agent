@@ -6,14 +6,15 @@ import { fromSnapshot, replayLocal, step, toSnapshot, type Local } from "./engin
 import { provider } from "./wallet.ts";
 
 export type Snapshot = { adventurer: Adventurer; bag: Item[]; over: boolean };
-export type Game = { id: string; seed: number; packets: bigint[]; start: Snapshot; local: Local };
+export type Chain = { blocks: bigint[]; hashes: string[]; rolling: bigint };
+export type Game = { id: string; seed: number; packets: bigint[]; start: Snapshot; local: Local; chain?: Chain };
 
 const FAR_BLOCK = 4_000_000_000n;
 
-const randomHash = () => "0x" + randomBytes(31).toString("hex");
+export const randomHash = () => "0x" + randomBytes(31).toString("hex");
 const luck = (game: { id: string; seed?: number }, move: number) =>
   "0x" + createHash("sha256").update(game.seed ? `${game.id}:${game.seed}:${move}` : `${game.id}:${move}`).digest("hex").slice(0, 62);
-export const hashes = (game: { id: string; seed?: number; packets: bigint[] }) => game.packets.map((_, i) => luck(game, i));
+export const hashes = (game: { id: string; seed?: number; packets: bigint[]; chain?: Chain }) => game.chain?.hashes ?? game.packets.map((_, i) => luck(game, i));
 
 const MAX_IN_FLIGHT = 4;
 let inFlight = 0;
@@ -41,8 +42,8 @@ async function call(request: Parameters<typeof provider.callContract>[0], attemp
   }
 }
 
-export async function replay(game: { id: string; seed?: number; packets: bigint[] }, packets = game.packets, luckHashes = hashes(game)): Promise<Snapshot> {
-  const blocks = packets.map((_, i) => (FAR_BLOCK + BigInt(i)).toString());
+export async function replay(game: { id: string; seed?: number; packets: bigint[]; chain?: Chain }, packets = game.packets, luckHashes = hashes(game)): Promise<Snapshot> {
+  const blocks = packets.map((_, i) => (game.chain?.blocks[i] ?? FAR_BLOCK + BigInt(i)).toString());
   const calldata = [game.id, String(packets.length), ...packets.map(String), String(blocks.length), ...blocks, String(luckHashes.length), ...luckHashes, "0"];
   const out = await call({ contractAddress: GAME_CORE, entrypoint: "replay_transcript", calldata });
   const adventurer = decodeAdventurer(BigInt(out[3]));

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Death Mountain Live</title>
+<title>Death Mountain</title>
 <link rel="icon" href="/assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,7 +12,7 @@
   :root {
     --night: #111; --stone: #282729; --rock: #1b1a1c; --seam: #3a372f;
     --parchment: #d0c98d; --faded: rgba(208, 201, 141, .62); --gold: #edcf33; --ember: #f59100; --life: #80ff00; --blood: #e5523d;
-    --chat: 360px; --dock: 196px;
+    --rail: 280px; --chat: 360px; --dock: 196px;
     --display: Cinzel, Georgia, serif; --pixel: VT323, ui-monospace, monospace;
   }
   * { box-sizing: border-box; }
@@ -26,19 +26,25 @@
   :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   .px { font-family: var(--pixel); }
 
-  .app { height: 100vh; display: grid; grid-template: "top top" auto "stage chat" 1fr "dock chat" var(--dock) / 1fr var(--chat); }
+  .app { height: 100vh; display: grid; grid-template: "top top top" auto "rail stage chat" 1fr "rail dock chat" var(--dock) / var(--rail) minmax(0, 1fr) var(--chat); }
 
   .top { grid-area: top; display: flex; align-items: center; gap: 18px; padding: 8px 16px; border-bottom: 1px solid var(--seam); background: var(--rock); }
   .brand { display: flex; align-items: center; gap: 10px; font: 800 20px var(--display); color: var(--gold); letter-spacing: .05em; white-space: nowrap; }
   .brand img { width: 30px; height: 30px; }
-  .onair { display: inline-flex; align-items: center; gap: 7px; font: 22px var(--pixel); color: var(--faded); padding: 0 10px; border: 1px solid var(--seam); border-radius: 3px; }
+  .onair { display: inline-flex; align-items: center; gap: 7px; font: 22px var(--pixel); color: var(--faded); padding: 0 10px; border: 1px solid var(--seam); border-radius: 3px; white-space: nowrap; }
   .onair i { width: 9px; height: 9px; border-radius: 50%; background: var(--faded); }
   .live .onair { color: #fff; background: #b8231a; border-color: #b8231a; }
   .live .onair i { background: #fff; animation: beat 1.6s ease-in-out infinite; }
-  .game { font: 22px var(--pixel); display: flex; gap: 18px; white-space: nowrap; overflow: hidden; }
+  .replay .onair { color: var(--night); background: var(--gold); border-color: var(--gold); }
+  .replay .onair i { border-radius: 0; background: none; width: 0; height: 0; border: 6px solid transparent; border-left: 9px solid var(--night); border-right: 0; }
+  .game { font: 22px var(--pixel); display: flex; gap: 18px; white-space: nowrap; overflow: hidden; min-width: 0; flex: 1; }
   .game b { color: var(--gold); font-weight: 400; }
   .game span { color: var(--faded); }
-  .top .controls { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .game .chain { color: var(--life); }
+  .game .fate { overflow: hidden; text-overflow: ellipsis; color: var(--parchment); }
+  .top .controls { margin-left: auto; display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+  #golive { background: #b8231a; border-color: #b8231a; color: #fff; }
+  #chain { border-color: var(--life); color: var(--life); }
   .check { font: 18px var(--pixel); color: var(--faded); margin-right: 6px; }
   .check.bad { color: var(--blood); }
 
@@ -93,6 +99,17 @@
   .act img { width: 20px; height: 20px; }
   .act.move { background: var(--parchment); color: var(--night); }
 
+  .reel { display: flex; align-items: center; gap: 8px; background: rgba(17, 17, 17, .92); border: 1px solid var(--gold); border-radius: 4px; padding: 6px 10px; font: 21px var(--pixel); }
+  .reel button { padding: 4px 12px; }
+  .reel #toggle { min-width: 84px; }
+  .reel #speed { font: 21px var(--pixel); letter-spacing: 0; padding: 1px 10px; }
+  .reel input { flex: 1; min-width: 60px; accent-color: var(--gold); }
+  .reel span { color: var(--faded); white-space: nowrap; }
+  .reel span b { color: var(--parchment); font-weight: 400; }
+  .unseen { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); width: min(520px, 80%); margin: 0; text-align: center; background: rgba(17, 17, 17, .88); border: 1px solid var(--seam); border-radius: 4px; padding: 14px 18px; font: 24px/1.15 var(--pixel); z-index: 1; }
+  .unseen b { display: block; font: 700 18px var(--display); color: var(--gold); margin-bottom: 4px; }
+  .blind .hud { visibility: hidden; }
+
   .odds { background: rgba(17, 17, 17, .88); border: 1px solid var(--seam); border-radius: 4px; padding: 6px 14px 8px; display: grid; grid-template-columns: auto minmax(110px, .7fr) minmax(160px, 1.6fr) auto auto auto; gap: 4px 18px; align-items: center; font: 21px var(--pixel); }
   .odds .head { color: var(--faded); font: 600 13px var(--display); letter-spacing: .04em; }
   .odds .move { font: 700 17px var(--display); color: var(--parchment); white-space: nowrap; }
@@ -113,7 +130,7 @@
   .gain b { color: var(--parchment); font-weight: 400; }
 
   .chat { grid-area: chat; display: flex; flex-direction: column; min-height: 0; background: var(--rock); border-left: 1px solid var(--seam); }
-  .chat h2, .dock h2 { margin: 0; font: 700 15px var(--display); color: var(--faded); letter-spacing: .04em; }
+  .chat h2, .dock h2, .rail h2 { margin: 0; font: 700 15px var(--display); color: var(--faded); letter-spacing: .04em; }
   .chat h2 { padding: 10px 14px; border-bottom: 1px solid var(--seam); display: flex; justify-content: space-between; align-items: baseline; }
   .chat h2 span { font: 18px var(--pixel); }
   .log { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 14px; font: 20px/1.2 var(--pixel); overscroll-behavior: contain; }
@@ -130,7 +147,26 @@
   .jump { margin: 0 14px 10px; display: none; }
   .scrolled .jump { display: block; }
 
-  .dock { grid-area: dock; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); border-top: 1px solid var(--seam); background: var(--rock); min-height: 0; }
+  .rail { grid-area: rail; display: flex; flex-direction: column; min-height: 0; background: var(--rock); border-right: 1px solid var(--seam); }
+  .rail h2 { padding: 10px 12px 8px; display: flex; justify-content: space-between; align-items: center; }
+  .filter { display: flex; }
+  .filter button { font: 19px var(--pixel); letter-spacing: 0; padding: 0 9px; border-radius: 0; color: var(--faded); }
+  .filter button + button { border-left: 0; }
+  .filter button[aria-pressed="true"] { background: var(--parchment); border-color: var(--parchment); color: var(--night); }
+  .rows { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid var(--seam); }
+  .rows p { margin: 0; padding: 12px; font: 20px var(--pixel); color: var(--faded); }
+  .row { display: grid; grid-template-columns: 4ch 8ch 1fr auto; white-space: nowrap; overflow: hidden; gap: 8px; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid #232224; border-left: 3px solid transparent; border-radius: 0; padding: 3px 10px 3px 9px; font: 19px var(--pixel); letter-spacing: 0; color: var(--faded); background: linear-gradient(90deg, rgba(208, 201, 141, .09) var(--reach), transparent var(--reach)) var(--rock); }
+  .row:hover { color: var(--parchment); }
+  .row b { color: var(--parchment); font-weight: 400; }
+  .row .chain { color: var(--life); }
+  .row .end { color: var(--parchment); text-align: right; }
+  .row .bad { color: var(--blood); }
+  .row.on { border-left-color: var(--gold); background-color: var(--stone); }
+  .row.on b { color: var(--gold); }
+  .row .air { color: #fff; background: #b8231a; padding: 0 6px; }
+  .rail .strats { border-top: 1px solid var(--seam); padding: 8px 12px; flex-direction: column; gap: 0; font-size: 17px; }
+
+  .dock { grid-area: dock; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); border-top: 1px solid var(--seam); background: var(--rock); min-height: 0; }
   .dock > section { padding: 10px 16px; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
   .dock > section + section { border-left: 1px solid var(--seam); }
   .dock h2 { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
@@ -144,25 +180,16 @@
   .stats div { display: flex; align-items: baseline; gap: 6px; font: 22px var(--pixel); background: var(--stone); padding: 1px 8px; }
   .stats img { width: 15px; height: 17px; opacity: .85; align-self: center; }
   .stats small { font-size: 17px; color: var(--faded); }
-  .gear { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; flex: 1; min-height: 0; }
+  .gear, .bag { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; flex: 1; min-height: 0; }
+  .bag { grid-auto-rows: minmax(0, 72px); align-content: start; }
+  .bag .slot span { font-size: 14px; }
+  .none { font: 20px var(--pixel); color: var(--faded); margin: 0; }
   .slot { background: var(--stone); display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center; padding: 3px; min-height: 0; position: relative; }
   .slot img { width: 100%; max-width: 46px; height: 100%; max-height: 46px; object-fit: contain; min-height: 0; }
   .slot.empty img { opacity: .28; width: 24px; height: 24px; }
   .slot span { font: 16px var(--pixel); color: var(--faded); white-space: nowrap; }
   .slot.suffixed { box-shadow: inset 0 0 0 1px var(--gold); }
 
-  .run { display: grid; grid-template-rows: 1fr auto; gap: 8px; min-height: 0; flex: 1; }
-  .bars { display: flex; align-items: flex-end; gap: 3px; min-height: 0; position: relative; border-bottom: 1px solid var(--seam); }
-  .bars div { flex: 1 1 0; max-width: 26px; background: var(--parchment); opacity: .8; position: relative; min-height: 2px; }
-  .bars div.fighting { background: var(--blood); }
-  .bars div.fleeing { background: var(--ember); }
-  .bars div.other { background: #6b6a5f; }
-  .bars div.now { background: transparent; outline: 1px dashed var(--gold); opacity: 1; }
-  .bars .median { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--faded); max-width: none; opacity: 1; background: none; flex: none; }
-  .legend { display: flex; gap: 14px; font: 18px var(--pixel); color: var(--faded); flex-wrap: wrap; }
-  .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; }
-  .last { font: 19px var(--pixel); color: var(--parchment); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bars div.older { opacity: .35; }
   .strats { font: 18px var(--pixel); color: var(--faded); display: flex; gap: 14px; overflow: hidden; white-space: nowrap; }
   .strats b { color: var(--parchment); font-weight: 400; }
 
@@ -170,11 +197,16 @@
   @keyframes dots { from { width: 0; } to { width: 2em; } }
   @keyframes stamp { 0% { opacity: 0; transform: scale(1.5); letter-spacing: .3em; } 18% { opacity: 1; transform: scale(1); letter-spacing: .08em; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
 
-  @media (max-width: 1500px) { :root { --chat: 320px; --dock: 172px; } .caption { font-size: 26px; } .odds { font-size: 19px; } }
+  @media (max-width: 1500px) { :root { --rail: 280px; --chat: 300px; --dock: 172px; } .caption { font-size: 26px; } .odds { font-size: 19px; } }
   @media (max-height: 950px) { :root { --dock: 168px; } .fighter { padding: 6px 10px 8px; } }
   @media (max-width: 900px) {
     body { overflow: auto; }
-    .app { height: auto; grid-template: "top" auto "stage" auto "chat" auto "dock" auto / minmax(0, 1fr); }
+    .app { height: auto; grid-template: "top" auto "stage" auto "rail" auto "chat" auto "dock" auto / minmax(0, 1fr); }
+    .rail { border-right: 0; border-top: 1px solid var(--seam); max-height: 300px; }
+    .reel { flex-wrap: wrap; }
+    .reel input { flex-basis: 100%; order: 9; }
+    .game { flex-wrap: wrap; gap: 0 12px; }
+    .game .fate { white-space: normal; }
     .top { flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; }
     .game { order: 3; flex-basis: 100%; gap: 12px; font-size: 20px; }
     .check { display: none; }
@@ -200,13 +232,10 @@
     .dock h2 { flex-wrap: wrap; }
     .chat { border-left: 0; border-top: 1px solid var(--seam); height: 60vh; }
     .dock { grid-template-columns: minmax(0, 1fr); }
-    .strats { flex-direction: column; gap: 2px; }
-    .last { white-space: normal; }
     .dock > section + section { border-left: 0; border-top: 1px solid var(--seam); }
     .stats { grid-template-columns: repeat(3, 1fr); }
     .gear { grid-template-columns: repeat(4, 1fr); }
     .slot img { height: 40px; }
-    .bars { height: 110px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
@@ -218,14 +247,22 @@
 <div class="app" id="app">
   <header class="top">
     <div class="brand"><img src="/assets/skull.png" alt="">Death Mountain</div>
-    <span class="onair"><i></i><span id="onair">Offline</span></span>
+    <span class="onair"><i></i><span id="onair"></span></span>
     <div class="game" id="game"></div>
     <div class="controls">
+      <button id="golive" type="button" hidden>Watch live</button>
       <span class="check" id="check"></span>
       <button class="go" id="play" type="button">Run benchmark</button>
+      <button id="chain" type="button">Play on-chain</button>
       <button id="stop" type="button">Stop</button>
     </div>
   </header>
+
+  <nav class="rail" aria-label="Games">
+    <h2>Games <span class="filter" id="filter"><button type="button" data-only="">All</button><button type="button" data-only="1">On-chain</button></span></h2>
+    <div class="rows" id="rows"></div>
+    <div class="strats" id="strats"></div>
+  </nav>
 
   <main class="stage" id="stage" aria-label="Game stage">
     <img class="foe" id="foe" alt="">
@@ -239,34 +276,38 @@
         <div class="hp" id="themHp"><div class="trail"></div><div class="fill"></div><b></b></div>
       </div>
     </div>
+    <p class="unseen" id="unseen" hidden></p>
     <div class="stamp" id="stamp" aria-live="polite"></div>
     <div class="third">
-      <div class="caption" id="caption"><span class="said">Waiting for the next game</span></div>
+      <div class="caption" id="caption"></div>
       <div class="odds" id="odds" hidden></div>
+      <div class="reel" id="reel" hidden>
+        <button id="back" type="button" title="Previous decision (left arrow)">Back</button>
+        <button id="toggle" type="button" class="go" title="Space"></button>
+        <button id="next" type="button" title="Next decision (right arrow)">Next</button>
+        <input id="seek" type="range" min="0" step="1" aria-label="Position in the game">
+        <span id="where"></span>
+        <button id="speed" type="button" title="Playback speed"></button>
+      </div>
     </div>
   </main>
 
   <aside class="chat" id="chat">
-    <h2>Jev's log <span id="moves"></span></h2>
+    <h2>Agent's log <span id="moves"></span></h2>
     <div class="log" id="log" role="log" aria-live="off"></div>
-    <button class="jump" id="jump" type="button">Back to live</button>
+    <button class="jump" id="jump" type="button">Back to latest</button>
   </aside>
 
   <footer class="dock">
     <section>
-      <h2>Adventurer <span id="bag"></span></h2>
+      <h2>Adventurer</h2>
       <div class="purse" id="purse"></div>
       <div class="stats" id="stats"></div>
       <div class="gear" id="gear"></div>
     </section>
     <section>
-      <h2>Recent games <span id="runsum"></span></h2>
-      <div class="run">
-        <div class="bars" id="bars" role="img"></div>
-        <div class="legend"><span><i style="background:var(--parchment)"></i>died exploring</span><span><i style="background:var(--blood)"></i>died fighting</span><span><i style="background:var(--ember)"></i>died fleeing</span></div>
-      </div>
-      <div class="last" id="last"></div>
-      <div class="strats" id="strats"></div>
+      <h2>Bag <span id="bagsum"></span></h2>
+      <div class="bag" id="bag"></div>
     </section>
   </footer>
 </div>
@@ -279,19 +320,23 @@ const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() =
 const STATS = [["strength", "Strength", "STR"], ["dexterity", "Dexterity", "DEX"], ["vitality", "Vitality", "VIT"], ["intelligence", "Intelligence", "INT"], ["wisdom", "Wisdom", "WIS"], ["charisma", "Charisma", "CHA"]];
 const SLOTS = ["weapon", "chest", "head", "waist", "foot", "hand", "neck", "ring"];
 const MOVE = { attack: "Fight", flee: "Flee", explore: "Explore" };
+const SPEEDS = [1, 2, 4, 8];
+const TICK_MS = 800;
+const DEATH_HOLD_MS = 4000;
 const quiet = matchMedia("(prefers-reduced-motion: reduce)");
 
 const items = {};
-const live = { state: null, prev: null, beastMax: {}, lastMove: null, game: null, strategy: null, moves: 0, ending: null, running: false };
+let games = [];
+let liveRow = null;
+let follow = true;
+let onlyChain = false;
+const view = { id: null, game: null, events: [], stops: [0], cursor: 0, loading: false, inbox: [], playing: false, speed: SPEEDS[0], timer: 0 };
+let scene = {};
 let dirty = false;
 
-function setRunning(on) {
-  live.running = on;
-  $("app").classList.toggle("live", on);
-  $("onair").textContent = on ? "Live" : "Offline";
-  $("play").disabled = on;
-  $("stop").disabled = !on;
-}
+const isLive = () => view.id !== null && view.id === liveRow;
+const tail = (g) => g.game_id.slice(-8);
+const atEnd = () => view.cursor >= view.events.length;
 
 function hpBar(el, now, max) {
   const pct = max ? Math.max(0, Math.min(100, (100 * now) / max)) : 0;
@@ -304,50 +349,53 @@ function hpBar(el, now, max) {
 let fallenShown = false;
 function renderStage() {
   dirty = false;
-  const holding = Date.now() < live.holdUntil && live.fallen;
-  const s = holding ? live.fallen : live.state;
-  if (!s) return;
-  if (holding) setTimeout(schedule, live.holdUntil - Date.now());
-  if (s.over !== fallenShown) {
-    fallenShown = s.over;
-    stampQueue.length = 0;
-    $("stamp").innerHTML = s.over ? `Slain<small>at level ${s.level}</small>` : "";
-    $("stamp").className = s.over ? "stamp bad hold" : "stamp";
-  }
-  const b = live.shown;
+  const s = scene.state;
+  const b = s && scene.shown;
+  $("stage").classList.toggle("blind", !s);
   $("stage").classList.toggle("fight", !!b && !s.over);
   $("stage").classList.toggle("gone", !!b?.gone);
-  $("stage").classList.toggle("fallen", s.over);
-  $("usName").textContent = `Level ${s.level}`;
-  $("usMeta").textContent = s.over ? "fallen" : b ? "in battle" : "exploring";
-  hpBar($("usHp"), s.health, s.maxHealth);
+  $("stage").classList.toggle("fallen", !!s?.over);
+  if (!!s?.over !== fallenShown) {
+    fallenShown = !!s?.over;
+    stampQueue.length = 0;
+    $("stamp").innerHTML = fallenShown ? `Slain<small>at level ${s.level}</small>` : "";
+    $("stamp").className = fallenShown ? "stamp bad hold" : "stamp";
+  }
+  if (s) {
+    $("usName").textContent = `Level ${s.level}`;
+    $("usMeta").textContent = s.over ? "fallen" : b ? "in battle" : "exploring";
+    hpBar($("usHp"), s.health, s.maxHealth);
+  }
   if (b) {
     const key = `${b.name}:${b.level}`;
-    live.beastMax[key] = Math.max(live.beastMax[key] ?? 0, b.health);
+    scene.beastMax[key] = Math.max(scene.beastMax[key] ?? 0, b.health);
     const src = `/assets/beasts/${slug(b.baseName)}.png`;
     if ($("foe").getAttribute("src") !== src) $("foe").src = src;
     $("foe").alt = b.name;
     $("themName").textContent = b.name;
     $("themMeta").textContent = b.gone ?? `level ${b.level}  tier ${b.tier} ${b.type.toLowerCase()}`;
-    hpBar($("themHp"), b.health, live.beastMax[key]);
+    hpBar($("themHp"), b.health, scene.beastMax[key]);
   }
-  if (!holding) renderCall(s);
+  renderCall(s);
   renderDock(s);
+  renderReel();
 }
 
+const slotHtml = (g) => `<div class="slot${g.suffix ? " suffixed" : ""}" title="${esc(g.name)}${g.suffix ? ` ${esc(g.suffix)}` : ""}, tier ${g.tier} ${esc(g.type)}, greatness ${g.greatness}"><img src="/assets/loot/${slug(g.name)}.png" alt="${esc(g.name)}"><span>T${g.tier} G${g.greatness}</span></div>`;
+
 function renderDock(s) {
-  for (const g of [...s.equipment, ...s.bag, ...s.market]) items[g.id] = g;
+  if (!s) {
+    $("purse").innerHTML = view.game ? `<p class="none">Not recorded for this game</p>` : "";
+    for (const id of ["stats", "gear", "bag", "bagsum"]) $(id).innerHTML = "";
+    return;
+  }
   const next = (s.level + 1) ** 2, base = s.level ** 2;
   $("purse").innerHTML = `<span><b>${s.gold}</b> gold</span><span><b>${s.xp}</b> xp</span><div class="xpbar" title="${next - s.xp} xp to level ${s.level + 1}"><div style="width:${Math.min(100, (100 * (s.xp - base)) / (next - base))}%"></div></div><span>potion ${s.potionPrice}g</span>${s.statUpgradesAvailable ? `<span class="points">${s.statUpgradesAvailable} stat point${s.statUpgradesAvailable > 1 ? "s" : ""}</span>` : ""}`;
   $("stats").innerHTML = STATS.map(([k, icon, short]) => `<div title="${icon}"><img src="/assets/icons/${icon}.svg" alt="">${s.stats[k]}<small>${short}</small></div>`).join("");
   const bySlot = Object.fromEntries(s.equipment.map((g) => [g.slot, g]));
-  $("gear").innerHTML = SLOTS.map((slot) => {
-    const g = bySlot[slot];
-    return g
-      ? `<div class="slot${g.suffix ? " suffixed" : ""}" title="${esc(g.name)}${g.suffix ? ` ${esc(g.suffix)}` : ""}, tier ${g.tier} ${esc(g.type)}, greatness ${g.greatness}"><img src="/assets/loot/${slug(g.name)}.png" alt="${esc(g.name)}"><span>T${g.tier} G${g.greatness}</span></div>`
-      : `<div class="slot empty" title="No ${slot}"><img src="/assets/icons/${slot}.svg" alt="No ${slot}"><span>empty</span></div>`;
-  }).join("");
-  $("bag").textContent = s.bag.length ? `bag: ${s.bag.map((g) => g.name).join(", ")}` : "bag empty";
+  $("gear").innerHTML = SLOTS.map((slot) => (bySlot[slot] ? slotHtml(bySlot[slot]) : `<div class="slot empty" title="No ${slot}"><img src="/assets/icons/${slot}.svg" alt="No ${slot}"><span>empty</span></div>`)).join("");
+  $("bagsum").textContent = s.bag.length ? `${s.bag.length} item${s.bag.length > 1 ? "s" : ""}` : "";
+  $("bag").innerHTML = s.bag.length ? s.bag.map(slotHtml).join("") : `<p class="none">empty</p>`;
 }
 
 function schedule() {
@@ -407,32 +455,33 @@ function actionHtml(a) {
   }
 }
 
-let called = null;
+let called;
 function renderCall(s) {
-  const d = live.decision;
-  const key = s.beast && d?.phase !== "battle" ? `size:${s.beast.name}` : d;
+  const d = scene.decision;
+  const key = s?.beast && d?.phase !== "battle" ? `size:${s.beast.name}` : d ?? `none:${view.id}:${view.loading}`;
   if (key === called) return;
   called = key;
-  if (!d || typeof key === "string") {
+  if (typeof key === "string") {
     $("odds").hidden = true;
-    $("caption").innerHTML = `<span class="name">Jev</span><span class="said thinking">${s.beast ? `sizing up the ${esc(s.beast.name)}` : "getting ready"}</span>`;
+    $("caption").innerHTML = !view.game
+      ? `<span class="said">${view.loading ? "Loading" : view.id ? `Game ${view.id} was not found` : "No game yet. Run the benchmark to start one."}</span>`
+      : `<span class="name">Agent</span><span class="said${isLive() ? " thinking" : ""}">${s?.beast ? `sizing up the ${esc(s.beast.name)}` : view.events.length ? "getting ready" : "nothing was recorded for this game"}</span>`;
     return;
   }
-  $("caption").innerHTML = `<span class="name">Jev</span>${thoughtHtml(d.thought || d.note)}${chips(d, "span")}`;
+  $("caption").innerHTML = `<span class="name">Agent</span>${thoughtHtml(d.thought || d.note)}${chips(d, "span")}`;
   renderOdds(d);
 }
 
 function renderOdds(e) {
   const box = $("odds");
-  const s = e.before ?? live.state;
+  const s = e.before;
   const chosen = e.actions?.at(-1)?.type;
-  const max = s?.maxHealth || 1;
+  box.hidden = false;
   if (!e.options?.length) {
-    box.hidden = false;
     box.innerHTML = `<div class="note">Level up: spending stat points and shopping before the next move</div>`;
     return;
   }
-  box.hidden = false;
+  const max = s?.maxHealth ?? Math.max(1, ...e.options.map((o) => o.hp?.[2] ?? 0));
   const pos = (v) => `${Math.max(0, Math.min(100, (100 * v) / max))}%`;
   box.innerHTML = `<span class="head">Move</span><span class="head">Death risk</span><span class="head">HP after, worst to best</span><span class="head">Likely HP</span><span class="head">XP</span><span class="head">Gold</span>` + e.options.map((o) => {
     const cls = o.move === chosen ? "move chosen" : "move";
@@ -440,7 +489,7 @@ function renderOdds(e) {
     const d = Math.round(100 * o.death);
     return `<span class="${cls}">${MOVE[o.move] ?? esc(o.move)}</span>
       <span class="risk ${d === 0 ? "safe" : d >= 50 ? "dead" : ""}"><span class="bar"><div style="width:${d}%"></div></span><b>${d}%</b></span>
-      <span class="track" title="HP after: worst ${o.hp[0]}, median ${o.hp[1]}, best ${o.hp[2]}"><span class="band" style="left:${pos(o.hp[0])};right:calc(100% - ${pos(o.hp[2])})"></span><span class="mid" style="left:${pos(o.hp[1])}"></span><span class="now" style="left:${pos(s?.health ?? 0)}"></span></span>
+      <span class="track" title="HP after: worst ${o.hp[0]}, median ${o.hp[1]}, best ${o.hp[2]}"><span class="band" style="left:${pos(o.hp[0])};right:calc(100% - ${pos(o.hp[2])})"></span><span class="mid" style="left:${pos(o.hp[1])}"></span>${s ? `<span class="now" style="left:${pos(s.health)}"></span>` : ""}</span>
       <span class="gain"><b>${o.hp[1]}</b> HP</span><span class="gain">+${o.xp} xp</span><span class="gain">${o.gold >= 0 ? "+" : ""}${o.gold} gold</span>`;
   }).join("");
 }
@@ -458,7 +507,6 @@ function say(html, cls = "") {
   if (cls) div.className = cls;
   div.innerHTML = html;
   log.append(div);
-  while (log.childElementCount > 160) log.firstElementChild.remove();
   if (pinned) log.scrollTop = log.scrollHeight;
   return div;
 }
@@ -478,8 +526,8 @@ function chatDecision(e) {
     return;
   }
   const div = say(plain
-    ? `<span class="by">Jev</span><span class="times">explores</span>`
-    : `<span class="by">Jev</span>${esc(e.thought || e.note)}${chips(e)}${e.note && e.thought ? `<div class="sys">${esc(e.note)}</div>` : ""}`);
+    ? `<span class="by">Agent</span><span class="times">explores</span>`
+    : `<span class="by">Agent</span>${esc(e.thought || e.note)}${chips(e)}${e.note && e.thought ? `<div class="sys">${esc(e.note)}</div>` : ""}`);
   streak = plain ? div : null;
   if (plain) div.count = 1;
 }
@@ -489,114 +537,251 @@ function moment(text, tone = "") {
   say(esc(text), `moment ${tone}`);
 }
 
-function onState(s, replaying) {
-  const prev = live.state;
-  live.state = s;
+function onState(s, still) {
+  const prev = scene.state;
+  scene.state = s;
   for (const g of [...s.equipment, ...s.bag, ...s.market]) items[g.id] = g;
-  if (prev && !replaying) {
-    if (!prev.beast && s.beast) { moment(`${s.beast.name} appears, level ${s.beast.level}`); stamp(s.beast.name, `level ${s.beast.level} ${s.beast.type.toLowerCase()} appears`); }
+  const show = still ? () => {} : stamp;
+  if (prev) {
+    if (!prev.beast && s.beast) { moment(`${s.beast.name} appears, level ${s.beast.level}`); show(s.beast.name, `level ${s.beast.level} ${s.beast.type.toLowerCase()} appears`); }
     if (prev.beast && !s.beast && !s.over) {
-      if (live.lastMove === "flee") { moment(`Escaped the ${prev.beast.name}`, "good"); stamp("Escaped"); }
-      else { moment(`Slew the ${prev.beast.name}, +${s.xp - prev.xp} xp, +${s.gold - prev.gold} gold`, "good"); stamp("Victory", `${prev.beast.name} slain`); }
+      if (scene.lastMove === "flee") { moment(`Escaped the ${prev.beast.name}`, "good"); show("Escaped"); }
+      else { moment(`Slew the ${prev.beast.name}, +${s.xp - prev.xp} xp, +${s.gold - prev.gold} gold`, "good"); show("Victory", `${prev.beast.name} slain`); }
     }
-    if (s.level > prev.level && !s.over) { moment(`Reached level ${s.level}`, "good"); if (!stampBusy) stamp(`Level ${s.level}`); }
+    if (s.level > prev.level && !s.over) { moment(`Reached level ${s.level}`, "good"); if (!stampBusy) show(`Level ${s.level}`); }
     if (s.over && !prev.over) moment(`Slain at level ${s.level}`, "bad");
   }
-  if (s.over) { live.fallen = s; live.holdUntil = Date.now() + 4500; }
-  clearTimeout(live.linger);
-  if (s.beast) live.shown = s.beast;
-  else if (live.shown && prev?.beast && !replaying) {
-    const fled = live.lastMove === "flee";
-    live.shown = { ...prev.beast, health: fled ? prev.beast.health : 0, gone: fled ? "escaped" : "slain" };
-    live.linger = setTimeout(() => { live.shown = null; schedule(); }, 2400);
-  } else live.shown = null;
-  schedule();
+  clearTimeout(scene.linger);
+  if (s.beast) scene.shown = s.beast;
+  else if (prev?.beast && !still) {
+    const fled = scene.lastMove === "flee";
+    const of = scene;
+    scene.shown = { ...prev.beast, health: fled ? prev.beast.health : 0, gone: fled ? "escaped" : "slain" };
+    scene.linger = setTimeout(() => { if (of === scene) { scene.shown = null; schedule(); } }, 2400);
+  } else scene.shown = null;
 }
 
-function onDecision(e, replaying) {
-  live.moves++;
-  live.lastMove = e.actions?.at(-1)?.type ?? live.lastMove;
-  live.decision = { ...e, before: live.state };
-  schedule();
+function onDecision(e, still) {
+  scene.moves++;
+  scene.lastMove = e.actions?.at(-1)?.type ?? scene.lastMove;
+  scene.decision = { ...e, before: scene.state };
   chatDecision(e);
-  $("moves").textContent = `${live.moves} decisions`;
-  if (!replaying && e.phase === "battle" && MOVE[live.lastMove]) stamp(MOVE[live.lastMove]);
+  if (!still && e.phase === "battle" && MOVE[scene.lastMove]) stamp(MOVE[scene.lastMove]);
 }
 
-function onStatus(text, replaying) {
-  const start = text.match(/^game (\d+) on (\w+)/);
-  if (start) {
-    live.game = start[1];
-    live.ending = null;
-    live.beastMax = {};
-    if (!replaying) { live.moves = 0; streak = null; say(`Game ${live.game} begins`, "split"); setRunning(true); }
-    renderGame();
-    loadHistory();
-    return;
+function onStatus(e) {
+  streak = null;
+  if (e.ending !== undefined) say(esc(`Game ${e.row} ${e.ending}`), "moment bad");
+  else if (e.row) say(`Game ${e.row} ${scene.begun ? "resumes" : "begins"}`, "split");
+  else say(esc(e.text), "sys");
+  if (e.row) scene.begun = true;
+}
+
+function apply(e, still) {
+  if (e.kind === "state") onState(e.state, still);
+  else if (e.kind === "decision") onDecision(e, still);
+  else if (e.kind === "status") onStatus(e);
+  else if (e.kind === "rejected") { streak = null; say(`The game refused that move: ${esc(e.reason)}`, "sys"); }
+}
+
+function seek(to) {
+  to = Math.max(0, Math.min(view.events.length, to));
+  const still = to !== view.cursor + 1;
+  if (to < view.cursor || !scene.beastMax) {
+    clearTimeout(scene.linger);
+    scene = { state: null, decision: null, shown: null, beastMax: {}, lastMove: null, moves: 0, begun: false, linger: 0 };
+    view.cursor = 0;
+    log.replaceChildren();
+    pinned = true;
+    streak = null;
+    stampQueue.length = 0;
   }
-  const end = text.match(/^game (\d+) (died .*|stopped.*|failed.*)/);
-  if (end) { live.ending = end[2]; renderGame(); loadHistory(); say(esc(`Game ${end[1]} ${end[2]}`), "moment bad"); return; }
-  if (/agent running/.test(text)) setRunning(true);
-  if (/agent idle|batch done/.test(text)) setRunning(false);
-  if (/CONTRACT MISMATCH|retry|failed/.test(text)) say(esc(text), "sys");
+  if (still && !fallenShown) { stampQueue.length = 0; $("stamp").className = "stamp"; }
+  while (view.cursor < to) apply(view.events[view.cursor++], still);
+  $("moves").textContent = scene.moves ? `${scene.moves} decision${scene.moves > 1 ? "s" : ""}` : "";
+  schedule();
+  renderGame();
 }
 
-function onEvent(e, replaying = false) {
-  if (e.kind === "state") return onState(e.state, replaying);
-  if (e.kind === "decision") return onDecision(e, replaying);
-  if (e.kind === "status") return onStatus(e.text, replaying);
-  if (e.kind === "rejected") { streak = null; say(`The game refused that move: ${esc(e.reason)}`, "sys"); }
+function index() {
+  const ends = view.events.flatMap((e, i) => (e.kind === "decision" ? [i + 1] : []));
+  view.stops = [...new Set([0, ...ends, view.events.length])];
+}
+
+function renderReel() {
+  const live = isLive();
+  $("reel").hidden = live || view.events.length === 0;
+  const at = view.stops.findLastIndex((x) => x <= view.cursor);
+  const total = view.events.filter((e) => e.kind === "decision").length;
+  $("seek").max = view.stops.length - 1;
+  $("seek").value = at;
+  $("back").disabled = view.cursor === 0;
+  $("next").disabled = atEnd();
+  $("toggle").textContent = view.playing ? "Pause" : atEnd() ? "Replay" : "Play";
+  $("speed").textContent = `speed ${view.speed}x`;
+  $("where").innerHTML = `decision <b>${scene.moves}</b> of ${total}${scene.state ? ` <b>level ${scene.state.level}</b>` : ""}`;
 }
 
 function renderGame() {
-  const s = live.state;
-  $("game").innerHTML = live.game
-    ? `<span>Game <b>${live.game}</b></span>${live.strategy ? `<span>strategy <b>${esc(live.strategy)}</b></span>` : ""}${live.ending ? `<span>${esc(live.ending)}</span>` : ""}`
-    : `<span>No game yet. Run the benchmark to start one.</span>`;
+  const g = view.game;
+  const live = isLive();
+  const mode = live ? "live" : g && (view.playing || !atEnd()) ? "replay" : "";
+  $("app").classList.toggle("live", mode === "live");
+  $("app").classList.toggle("replay", mode === "replay");
+  $("onair").textContent = live ? "Live" : mode ? "Replay" : !g ? "Nothing live" : g.ended_at ? "Ended" : "Unfinished";
+  $("golive").hidden = liveRow === null || live;
+  $("play").disabled = $("chain").disabled = liveRow !== null;
+  $("stop").disabled = liveRow === null;
+  document.title = g ? `Game ${g.id} ${live ? "live" : "replay"}, Death Mountain` : "Death Mountain";
+  const level = live ? scene.state?.level : g?.ended_at && !/^died/.test(g.ending) ? g.level : null;
+  const fate = !g ? "" : live ? "so far" : g.ending ?? "unfinished";
+  $("game").innerHTML = g
+    ? `<span>Game <b>${g.id}</b></span><span title="Adventurer ${esc(g.game_id)}"><b>${esc(tail(g))}</b></span><span class="${g.onchain ? "chain" : ""}">${esc(g.onchain ? `on-chain ${g.mode}` : g.mode)}</span>${level ? `<span><b>level ${level}</b></span>` : ""}<span class="fate" title="${esc(fate)}">${esc(fate)}</span>`
+    : "";
+  const blind = g && view.events.length > 0 && !view.events.some((e) => e.kind === "state");
+  $("unseen").hidden = !blind;
+  if (blind) $("unseen").innerHTML = `<b>Decisions only</b>Game ${g.id} was played before the adventurer's state was recorded. The log and the odds still replay.`;
 }
 
-const ENDING = (g) => (!g.ended_at ? "now" : /while fighting/.test(g.ending) ? "fighting" : /while fleeing/.test(g.ending) ? "fleeing" : /while exploring/.test(g.ending) ? "" : "other");
-async function loadHistory() {
-  const [strategies, games] = await Promise.all([get("/api/strategies"), get("/api/games")]);
-  if (!games) return;
-  const recent = games.filter((g) => g.mode === "practice").slice(0, 36).reverse();
-  const current = recent.at(-1);
-  if (current) { live.strategy = current.strategy; if (!live.game) live.game = String(current.id); renderGame(); }
-  const done = recent.filter((g) => g.ended_at && g.strategy === current?.strategy).map((g) => g.level).sort((a, b) => a - b);
-  const top = Math.max(10, ...recent.map((g) => g.level ?? 0), live.state?.level ?? 0);
-  const median = done[Math.floor(done.length / 2)];
-  $("runsum").textContent = done.length ? `median level ${median}, best ${done.at(-1)} over ${done.length} games` : "first game of this strategy";
-  $("bars").innerHTML = recent.map((g) => {
-    const lvl = g.ended_at ? g.level : live.state?.level ?? 1;
-    return `<div class="${ENDING(g)}${g.strategy === current.strategy ? "" : " older"}" style="height:${(100 * lvl) / top}%" title="Game ${g.id}, strategy ${esc(g.strategy)}: ${g.ended_at ? esc(g.ending) : `playing, level ${lvl}`}"></div>`;
-  }).join("") + (median ? `<div class="median" style="bottom:${(100 * median) / top}%" title="median level ${median}"></div>` : "");
-  $("bars").setAttribute("aria-label", `Levels reached in recent games: ${recent.map((g) => g.level ?? "playing").join(", ") || "none yet"}`);
-  const last = recent.filter((g) => g.ended_at).at(-1);
-  $("last").textContent = last ? `Game ${last.id} ${last.ending}` : "";
-  $("strats").innerHTML = (strategies ?? []).slice(0, 4).map((r) => `<span title="${esc(r.text.slice(0, 600))}"><b>${esc(r.hash)}</b> ${r.games} games, median ${r.median ?? "–"}, best ${r.best ?? "–"}</span>`).join("");
+function renderRows() {
+  const list = games.filter((g) => !onlyChain || g.onchain);
+  const top = Math.max(10, ...list.map((g) => g.level ?? 0));
+  for (const b of $("filter").children) b.setAttribute("aria-pressed", String(!!b.dataset.only === onlyChain));
+  $("rows").innerHTML = list.map((g) => {
+    const live = g.id === liveRow;
+    const end = live ? `<span class="air">live</span>` : g.ended_at ? `level ${g.level}` : "unfinished";
+    return `<button type="button" class="row${g.id === view.id ? " on" : ""}" data-id="${g.id}" style="--reach:${live || !g.ended_at ? 0 : Math.round((100 * g.level) / top)}%" title="Game ${g.id}, strategy ${esc(g.strategy)}: ${esc(live ? "playing now" : g.ending ?? "unfinished")}${g.mismatches ? ", differs from the contract" : ""}"><b>${g.id}</b><span>${esc(tail(g))}</span><span class="${g.onchain ? "chain" : ""}">${esc(g.onchain ? "on-chain" : g.mode)}${g.mismatches ? ` <span class="bad">!</span>` : ""}</span><span class="end">${end}</span></button>`;
+  }).join("") || `<p>${onlyChain ? "No on-chain game yet." : "No game yet."}</p>`;
 }
 
-$("play").onclick = () => { setRunning(true); post("/api/play", {}); };
+let asked = 0;
+let fresh;
+const refresh = () => (fresh = load());
+async function load() {
+  const ticket = ++asked;
+  const [list, strategies] = await Promise.all([get("/api/games"), get("/api/strategies")]);
+  if (ticket !== asked) return fresh;
+  if (!list) return;
+  games = list;
+  liveRow = games.find((g) => g.live)?.id ?? null;
+  view.game = games.find((g) => g.id === view.id) ?? view.game;
+  $("strats").innerHTML = (strategies ?? []).slice(0, 3).map((r) => `<span title="${esc(r.text.slice(0, 600))}"><b>${esc(r.hash)}</b> median ${r.median ?? "none"}, best ${r.best ?? "none"}, ${r.games} games</span>`).join("");
+  renderRows();
+  renderGame();
+}
+
+function pause() {
+  clearInterval(view.timer);
+  view.playing = false;
+}
+
+function play() {
+  pause();
+  if (atEnd()) seek(0);
+  view.playing = true;
+  view.timer = setInterval(() => {
+    seek(view.cursor + 1);
+    if (atEnd()) { pause(); renderGame(); schedule(); }
+  }, TICK_MS / view.speed);
+  renderGame();
+  schedule();
+}
+
+let watching = 0;
+async function watch(id, fromStart = false) {
+  const ticket = ++watching;
+  pause();
+  Object.assign(view, { id, game: null, events: [], stops: [0], cursor: 0, loading: id !== null, inbox: [] });
+  scene = {};
+  seek(0);
+  renderRows();
+  if (id === null) return;
+  const data = await get(`/api/games/${id}`);
+  if (ticket !== watching) return;
+  view.loading = false;
+  if (data) {
+    const last = data.events.at(-1)?.at ?? 0;
+    view.game = data.game;
+    view.events = [...data.events, ...view.inbox.filter((e) => e.at > last)];
+    if (data.game.live && liveRow === null && !view.inbox.some((e) => e.ending !== undefined)) liveRow = id;
+  }
+  index();
+  called = undefined;
+  if (fromStart && !isLive() && view.events.length) play();
+  else seek(view.events.length);
+  renderRows();
+}
+
+function pin() {
+  if (!follow) return;
+  follow = false;
+  history.replaceState(null, "", `?game=${view.id}`);
+}
+
+function route() {
+  const id = Number(new URLSearchParams(location.search).get("game"));
+  follow = !id;
+  watch(id || liveRow || games[0]?.id || null, !!id);
+}
+
+function pick(id) {
+  history.pushState(null, "", `?game=${id}`);
+  route();
+}
+
+let handover = 0;
+function onLive(e) {
+  if (e.kind === "status") refresh();
+  if (e.kind === "status" && e.row && e.ending === undefined) {
+    liveRow = e.row;
+    clearTimeout(handover);
+    if (follow && view.id !== liveRow) handover = setTimeout(() => follow && liveRow && watch(liveRow), scene.state?.over && atEnd() ? DEATH_HOLD_MS : 0);
+  }
+  if (isLive()) {
+    if (view.loading) view.inbox.push(e);
+    else {
+      view.events.push(e);
+      index();
+      seek(view.events.length);
+    }
+  }
+  if (e.kind === "status" && e.ending !== undefined) { liveRow = null; renderRows(); renderGame(); schedule(); }
+}
+
+$("rows").onclick = (e) => { const row = e.target.closest(".row"); if (row) pick(Number(row.dataset.id)); };
+$("filter").onclick = (e) => { if (e.target.dataset.only !== undefined) { onlyChain = !!e.target.dataset.only; renderRows(); } };
+$("golive").onclick = () => { history.pushState(null, "", location.pathname); route(); };
+$("play").onclick = () => post("/api/play", {});
+$("chain").onclick = () => { if (confirm("Start one on-chain game? It spends real money: about 4 STRK of gas.")) post("/api/play", { live: true }); };
 $("stop").onclick = () => post("/api/stop");
-
-setRunning(false);
-renderGame();
-const pending = [];
-let flushing = false;
-const source = new EventSource("/events");
-source.onerror = () => { $("onair").textContent = "Reconnecting"; };
-source.onmessage = (m) => {
-  pending.push(JSON.parse(m.data));
-  if (!flushing) { flushing = true; requestAnimationFrame(() => { flushing = false; const batch = pending.splice(0); batch.forEach((e, i) => onEvent(e, false)); }); }
-};
-Promise.all([get("/api/state"), get("/api/recent"), get("/api/items")]).then(([state, events, table]) => {
-  for (const g of table ?? []) items[g.id] ??= g;
-  (events ?? []).forEach((e) => onEvent(e, true));
-  if (state) onState(state, true);
-  if (state && !state.over && events?.length) setRunning(true);
+$("toggle").onclick = () => { pin(); if (view.playing) { pause(); renderGame(); schedule(); } else play(); };
+$("speed").onclick = () => { view.speed = SPEEDS[(SPEEDS.indexOf(view.speed) + 1) % SPEEDS.length]; if (view.playing) play(); else schedule(); };
+const step = (by) => { pin(); pause(); seek(view.stops[Math.max(0, view.stops.findLastIndex((x) => (by > 0 ? x <= view.cursor : x < view.cursor)) + (by > 0 ? 1 : 0))] ?? view.events.length); };
+$("back").onclick = () => step(-1);
+$("next").onclick = () => step(1);
+$("seek").oninput = () => { pin(); pause(); seek(view.stops[Number($("seek").value)]); };
+addEventListener("popstate", route);
+addEventListener("keydown", (e) => {
+  if ($("reel").hidden || e.target.closest("button, input")) return;
+  if (e.key === "ArrowLeft") step(-1);
+  else if (e.key === "ArrowRight") step(1);
+  else if (e.key === " ") { e.preventDefault(); $("toggle").click(); }
 });
-loadHistory();
-setInterval(() => { if (live.running && live.state) loadHistory(); }, 15000);
+
+const source = new EventSource("/events");
+let opened = false;
+source.onerror = () => { $("onair").textContent = "Reconnecting"; };
+source.onopen = async () => {
+  const again = opened;
+  opened = true;
+  await refresh();
+  if (again && (isLive() || follow)) route();
+};
+source.onmessage = (m) => onLive(JSON.parse(m.data));
+Promise.all([get("/api/items"), refresh()]).then(([table]) => {
+  for (const g of table ?? []) items[g.id] ??= g;
+  route();
+});
 get("/api/check").then((c) => {
   if (!c) return;
   $("check").textContent = c.failed ? `contract check failed ${c.failed}` : "contract check ok";
