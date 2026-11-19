@@ -15,12 +15,15 @@ the database, service log, event stream and game list in `var/evidence/<timestam
 ## Measure a policy
 
 ```
-node scripts/bench.ts 10
+node scripts/bench.ts --seeds 0-80
+node scripts/bench.ts --seeds 0-500 --rules '{}' --rules '{"jewelryLevel":99}'
 ```
 
-Plays the rule policy on every benchmark adventurer with 10 luck seeds each (200 games, about
-80 seconds) and prints mean, spread and percentiles. Compare changes on the same seeds; a
-difference under 1 level on 200 games is noise.
+Plays the rule policy on every benchmark adventurer for each seed, in parallel, and prints mean, spread and the share of games
+reaching level 26, 30 and 35. 1,600 games take about 5 seconds, 20,000 about 20. Each extra `--rules` overrides fields of `RULES`
+in `src/policy.ts` and is compared with the first on the same games. `LS_DUNGEON=lootBag` switches dungeon, `--ids file.json`
+takes a list of game ids, `--by-id` adds a line per game id. Games use a fast hash for luck; `--exact` uses the contract's hash
+(8 times slower, same distribution). A difference under two standard errors is noise.
 
 ## Feature map
 

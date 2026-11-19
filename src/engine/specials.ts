@@ -2,6 +2,7 @@ import type { Item } from "../codec.ts";
 import { greatness } from "../combat.ts";
 import { itemOf, type Slot } from "../items.ts";
 import { pinned } from "../specials.ts";
+import { cached } from "../cache.ts";
 import { poseidon } from "./rolls.ts";
 
 const SLOT_ORDER: Record<Slot, number[]> = {
@@ -17,7 +18,7 @@ const SLOT_ORDER: Record<Slot, number[]> = {
 
 export const PREFIX_GREATNESS = 19;
 
-export const specialsSeed = (salt: number, gameId: bigint): number => (salt === 0 ? 0 : Number(poseidon(salt, gameId) % 65536n));
+export const specialsSeed = (salt: number, gameId: bigint): number => (salt === 0 ? 0 : cached(`specials:${salt}:${gameId}`, () => Number(poseidon(salt, gameId) % 65536n)));
 
 export function specialsOf(item: Item, salt: number, gameId: bigint): { prefix: number; suffix: number } | null {
   if (!item.id || greatness(item) < PREFIX_GREATNESS) return null;

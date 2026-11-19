@@ -1,11 +1,11 @@
-import { hash } from "starknet";
+import { poseidon as felt } from "../hash.ts";
+import { cached } from "../cache.ts";
 import type { Adventurer } from "../codec.ts";
 
 const U64 = (1n << 64n) - 1n;
 const U128 = (1n << 128n) - 1n;
 
-export const poseidon = (...values: (bigint | number | string)[]): bigint =>
-  BigInt(hash.computePoseidonHashOnElements(values.map((v) => BigInt(v))));
+export const poseidon = (...values: (bigint | number | string)[]): bigint => felt(values.map((v) => BigInt(v)));
 
 export function rolls(value: bigint): number[] {
   const t = value & U128;
@@ -31,7 +31,7 @@ export function round(xp: number, n: number, seed: bigint): Round {
 export const salt = (seed: bigint, mask: bigint): number => Number(seed & mask) || 1;
 
 export const beastRolls = (beastSalt: number, gameId: bigint, xp: number): number[] =>
-  rolls(poseidon(xp, poseidon(beastSalt, gameId, xp) & U64));
+  cached(`beast:${beastSalt}:${gameId}:${xp}`, () => rolls(poseidon(xp, poseidon(beastSalt, gameId, xp) & U64)));
 
 export const kindOf = (roll: number): number => (roll % 15) * 5 + (Math.floor(roll / 15) % 5) + 1;
 

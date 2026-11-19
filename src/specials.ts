@@ -1,4 +1,5 @@
 import { hash } from "starknet";
+import { cached } from "./cache.ts";
 import type { Adventurer, Item, Stats } from "./codec.ts";
 import { itemOf, levelOf, type Slot } from "./items.ts";
 
@@ -53,7 +54,7 @@ export function pinned(itemId: number, gameId: bigint | string): { suffix: numbe
 export function suffixOf(itemId: number, salt: number, gameId: bigint | string): string {
   const pin = pinned(itemId, gameId);
   if (pin) return NAMES[pin.suffix];
-  const seed = Number(BigInt(hash.computePoseidonHashOnElements([BigInt(salt), BigInt(gameId)])) % 65536n);
+  const seed = cached(`suffix:${salt}:${gameId}`, () => Number(BigInt(hash.computePoseidonHashOnElements([BigInt(salt), BigInt(gameId)])) % 65536n));
   const order = SLOT_ORDER[itemOf(itemId)!.slot];
   const entropy = seed + itemId > 65535 ? seed - itemId : seed + itemId;
   return NAMES[((entropy % 101) * order.length + order.indexOf(itemId)) % NAMES.length];
