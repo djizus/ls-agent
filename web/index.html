@@ -92,7 +92,11 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 #bags { flex: 1; }
 #sacks .arts { display: flex; gap: 0.15rem; }
 #sacks img { width: 2rem; height: 2rem; }
-#sacks li { padding-left: 0.7rem; }
+#sacks li { padding-left: 0.7rem; grid-template-columns: auto 1fr auto 3.4rem; }
+#sacks b { text-align: right; }
+.seg { display: flex; gap: 0.3rem; }
+.seg button { padding: 0 0.5rem; border: 2px solid var(--edge); border-radius: 3px; color: var(--dim); }
+.seg button[aria-pressed="true"] { color: #000; background: var(--gold); border-color: var(--gold); }
 
 dialog { margin: auto; width: min(34rem, calc(100vw - 2rem)); color: var(--bone); background: linear-gradient(#141a10, #0a0d08); border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--bevel), 0 0 0 2px #000, 0 20px 60px #000; padding: 1.4rem; }
 dialog::backdrop { background: rgb(0 0 0 / 0.78); }
@@ -153,6 +157,9 @@ const MOVES = { attack: "Fight", flee: "Flee", explore: "Explore" };
 const SLOW_MS = 60_000;
 const PRACTICE = 40;
 const BAGS = 25;
+const SORTS = { mean: "Level", kills: "Beasts" };
+const keep = (key, value) => { try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch { return null; } };
+let bagSort = keep("bagSort") in SORTS ? keep("bagSort") : "mean";
 
 const items = {};
 const byName = {};
@@ -212,7 +219,7 @@ function render() {
   const ranked = realGames().filter((x) => !x.live).sort((a, b) => b.level - a.level || b.id - a.id);
   const cls = (x) => `card${x.id === g?.id ? " on" : ""}`;
   put($("podium"), ranked.slice(0, 3).map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0" title="Game ${x.id}"><img src="${face(killer(x)?.[1])}" alt=""><b>${x.level}</b><span class="dim">${x.id}</span></li>`).join(""));
-  put($("board"), [...(liveReal() ? [liveReal()] : []), ...ranked.slice(3)].map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0"><img src="${x.live ? "/assets/favicon.png" : face(killer(x)?.[1])}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span><b>${x.live ? "" : x.level}</b></li>`).join(""));
+  put($("board"), [...(liveReal() ? [liveReal()] : []), ...ranked.slice(3).sort((a, b) => b.started_at - a.started_at)].map((x) => `<li class="${cls(x)}" data-id="${x.id}" tabindex="0"><img src="${x.live ? "/assets/favicon.png" : face(killer(x)?.[1])}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span><b>${x.live ? "" : x.level}</b></li>`).join(""));
 
   const l = data.results?.[0];
   const c = data.check;
@@ -234,7 +241,8 @@ function render() {
   put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.inventory ? held.length : ""}</span></div>${b && !b.inventory ? `<span class="bad">No answer</span>` : ""}${claims.length ? `<span class="gold">${claims.length} to claim</span>` : ""}${held.length + claims.length ? `<div id="zoo" class="scroll">${[...held, ...claims].map(cell).join("")}</div>` : ""}`);
 
   const first = (text) => text.replace(/ (T\d|G\d).*$/, "");
-  put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="dim">Level</span></div><ol id="sacks" class="rows scroll">${(data.bags ?? []).slice(0, BAGS).map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><b>${round(x.mean, 1)}</b></li>`).join("")}</ol>`);
+  const sacks = [...(data.bags ?? [])].sort((a, b) => (b[bagSort] ?? -1) - (a[bagSort] ?? -1)).slice(0, BAGS);
+  put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><ol id="sacks" class="rows scroll">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>x${x.n}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>`);
 }
 
 function askHtml() {
@@ -269,6 +277,7 @@ function go(search) {
 const pick = (e) => { const row = e.target.closest("li[data-id]"); if (row) go(Number(row.dataset.id) === liveReal()?.id ? "" : `?game=${row.dataset.id}`); };
 $("games").onclick = pick;
 $("games").onkeydown = (e) => { if (e.key === "Enter") pick(e); };
+$("bags").onclick = (e) => { const b = e.target.closest("[data-sort]"); if (b) { bagSort = b.dataset.sort; keep("bagSort", bagSort); render(); } };
 $("golive").onclick = () => go("");
 $("run").onclick = () => {
   if (liveGame()) return post("/api/stop");
