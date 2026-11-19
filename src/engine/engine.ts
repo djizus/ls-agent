@@ -29,6 +29,13 @@ const reject = (reason: string): never => {
   throw new Rejected(reason);
 };
 
+export function foeOf(adventurer: Adventurer, gameId: bigint): Foe {
+  const beast = beastOf(adventurer, gameId)!;
+  const special = beast.level >= PREFIX_GREATNESS;
+  const r = special ? beastRolls(adventurer.beast_salt, gameId, adventurer.xp) : [];
+  return { level: beast.level, tier: beast.tier, type: beast.type, prefix: special ? r[4] % 69 : null, suffix: special ? r[5] % 18 : null };
+}
+
 export function fromSnapshot(s: Snapshot): Local {
   const slots = Array.from({ length: BAG_SIZE }, (_, i) => ({ ...(s.bag[i] ?? { id: 0, xp: 0 }) }));
   return { adventurer: structuredClone(s.adventurer), slots, over: s.over };
@@ -158,10 +165,7 @@ class Game {
   }
 
   foe(): Foe {
-    const beast = beastOf(this.a, this.id)!;
-    const special = beast.level >= PREFIX_GREATNESS;
-    const r = special ? beastRolls(this.a.beast_salt, this.id, this.a.xp) : [];
-    return { level: beast.level, tier: beast.tier, type: beast.type, prefix: special ? r[4] % 69 : null, suffix: special ? r[5] % 18 : null };
+    return foeOf(this.a, this.id);
   }
 
   strike(foe: Foe, location: number, critRoll: number, reduction = 0): void {

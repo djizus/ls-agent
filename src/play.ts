@@ -2,13 +2,13 @@ import { beastOf, type Beast } from "./beast.ts";
 import { STATS, type Action, type Item, type Stats } from "./codec.ts";
 import { emit } from "./events.ts";
 import { itemOf, levelOf, potionPrice, priceOf, type ItemType, type LootItem } from "./items.ts";
-import { MAX_GREATNESS, beastHit, yourHit } from "./combat.ts";
+import { MAX_GREATNESS, type Hit } from "./combat.ts";
 import { marketOf } from "./market.ts";
 import { MARKET } from "./settings.ts";
 import { BAG_STATS, SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
-import { NECK } from "./engine/damage.ts";
+import { NECK, beastHit, yourHit } from "./engine/damage.ts";
 import { actLive, liveGame } from "./live.ts";
-import { ARMOR_SLOTS, toSnapshot } from "./engine/engine.ts";
+import { ARMOR_SLOTS, foeOf, toSnapshot } from "./engine/engine.ts";
 import { act, audit, newPracticeGame, preview, revertReason, type Game, type Snapshot } from "./practice.ts";
 
 type Worn = LootItem & { greatness: number; xp: number; suffix?: string; bonus?: Partial<Stats> };
@@ -22,6 +22,7 @@ export type State = {
   xp: number;
   gold: number;
   beast: Beast | null;
+  hits: { yours: Hit; theirs: Hit[] } | null;
   statUpgradesAvailable: number;
   stats: Stats;
   baseStats: Stats;
@@ -35,11 +36,12 @@ export type State = {
   purse: { potions: number; toFull: number; deal: (Offer & { why: string }) | null };
 };
 type Stored = Pick<State, "over" | "level" | "health" | "maxHealth" | "xp" | "gold" | "beast" | "statUpgradesAvailable" | "stats" | "market"> &
-  Partial<Pick<State, "baseStats" | "potionPrice" | "happened">> & { equipment: Legacy[] | Record<string, Legacy>; bag: Legacy[] };
+  Partial<Pick<State, "baseStats" | "potionPrice" | "happened" | "hits">> & { equipment: Legacy[] | Record<string, Legacy>; bag: Legacy[] };
 type Legacy = Omit<Worn, "greatness" | "xp"> & { greatness?: number; xp?: number; level?: number };
 
 const ABBR: Record<string, string> = { strength: "STR", dexterity: "DEX", vitality: "VIT", intelligence: "INT", wisdom: "WIS", charisma: "CHA" };
 const JEWELRY = ["neck", "ring"];
+const MAX_HEALTH = 1023;
 const DOUBLE_LUCK = "Silver Ring";
 const ARMOR: string[] = [...ARMOR_SLOTS];
 const RING: Record<string, (percent: number) => string> = {
@@ -91,6 +93,7 @@ export function enrich(s: Stored): State {
     baseStats: s.baseStats ?? (Object.fromEntries(STATS.map((stat) => [stat, s.stats[stat] - granted(stat)])) as Stats),
     potionPrice: price,
     happened: s.happened ?? [],
+    hits: s.hits ?? null,
     luck,
     buys: { attack: 10 * s.stats.strength, flee: chance(s.stats.dexterity), trap: chance(s.stats.intelligence), ambush: chance(s.stats.wisdom), crit: Math.min(100, luck) },
     purse: { potions: Math.floor(s.gold / price), toFull: Math.ceil((s.maxHealth - s.health) / 10), deal: deals.sort((a, b) => a.price - b.price || a.tier - b.tier)[0] ?? null },
@@ -104,14 +107,16 @@ export function describe(s: Snapshot, id: string): State {
     const suffix = greatness >= SUFFIX_GREATNESS ? suffixOf(i.id, a.item_specials_salt, id) : undefined;
     return { ...itemOf(i.id)!, greatness, xp: i.xp, ...(suffix && { suffix, bonus: SUFFIXES[suffix] }) };
   };
+  const foe = a.beast_health > 0 ? foeOf(a, BigInt(id)) : null;
   return enrich({
     over: s.over,
     level: levelOf(a.xp),
     health: a.health,
-    maxHealth: 100 + 15 * a.stats.vitality,
+    maxHealth: Math.min(MAX_HEALTH, 100 + 15 * a.stats.vitality),
     xp: a.xp,
     gold: a.gold,
     beast: beastOf(a, BigInt(id)),
+    hits: foe && { yours: yourHit(a, a.stats.strength, foe, BigInt(id)), theirs: ARMOR_SLOTS.map((slot) => beastHit(a, foe, a.equipment[slot], BigInt(id))) },
     statUpgradesAvailable: a.stat_upgrades_available,
     stats: a.stats,
     baseStats: s.adventurer.stats,
@@ -138,11 +143,10 @@ export function render(s: State): string {
     `Equipped: ${s.equipment.map((g) => `${g.slot}: ${owned(g)}`).join("; ")}`,
     `Bag: ${s.bag.map(owned).join("; ") || "empty"}`,
   ];
-  if (s.beast) {
-    const worn = (slot: string) => s.equipment.find((g) => g.slot === slot);
-    const mine = yourHit(worn("weapon"), s.stats, s.beast);
+  if (s.beast && s.hits) {
+    const mine = s.hits.yours;
     const blows = Math.ceil(s.beast.health / mine.normal);
-    const theirs = ["chest", "head", "waist", "foot", "hand"].map((slot) => `${slot} ${beastHit(s.beast!, worn(slot)).normal}`);
+    const theirs = ARMOR_SLOTS.map((slot, i) => `${slot} ${s.hits!.theirs[i].normal}`);
     lines.push(`Beast: ${s.beast.name} level ${s.beast.level} T${s.beast.tier} ${s.beast.type}, ${s.beast.health} HP`);
     lines.push(`Your hit: ${mine.normal} damage (${mine.crit} on a crit), so ${blows} blows to kill. Its hit by slot struck: ${theirs.join(", ")} (double on a crit, ${s.level}% chance).`);
   }
