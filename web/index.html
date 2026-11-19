@@ -159,7 +159,7 @@ let bagSort = keep("bagSort") in SORTS ? keep("bagSort") : "mean";
 const items = {};
 const byName = {};
 const data = { games: [], wallet: null, beasts: null, results: null, bags: null, check: null };
-let shown = null;
+let shown;
 let move = null;
 let market = [];
 
@@ -196,7 +196,7 @@ function endHtml(g) {
 function render() {
   const g = target();
   const live = liveGame();
-  if (g?.id !== shown?.id) {
+  if (shown === undefined || g?.id !== shown?.id) {
     shown = g;
     move = null;
     market = [];

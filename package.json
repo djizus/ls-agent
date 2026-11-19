@@ -1,5 +1,6 @@
 {
   "name": "ls-agent",
+  "description": "Plays Loot Survivor 2 on Starknet with a rule policy, with a local port of the game for practice and benchmarks",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,6 +9,8 @@
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/main.ts",
     "test": "node --disable-warning=ExperimentalWarning --test 'src/**/*.test.ts'",
+    "bench": "node scripts/bench.ts",
+    "prove": "scripts/prove.sh",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
