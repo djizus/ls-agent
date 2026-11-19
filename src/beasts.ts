@@ -1,15 +1,17 @@
 import { NAMES, PREFIXES, SUFFIXES } from "./beast.ts";
 import { BEAST_NFT, DUNGEONS, GAME_API } from "./config.ts";
+import { transcript } from "./transcript.ts";
 import { provider } from "./wallet.ts";
 
 const TYPES = ["Magic", "Blade", "Bludgeon"];
 const BATCH = 8;
 const hex = (n: bigint) => "0x" + n.toString(16);
+const u256 = (n: bigint) => [hex(n & ((1n << 128n) - 1n)), hex(n >> 128n)];
 
 export type Species = { collection: string; species: number; name: string; prefix: number; suffix: number; tier: number; type: string };
 export type Beast = Species & { tokenId: string; level: number; health: number; state: "held" | "staked" | "mega"; transformsAt: number | null; queued: boolean };
-export type Claim = Species & { adventurerId: string; encounterXp: number; level: number; health: number; settled: boolean };
-type Kill = { adventurerId: string; encounterXp: number; beastId: number; prefix: number; suffix: number; level: number; health: number; gameOver: boolean; settled: boolean; claimed: boolean };
+export type Claim = Species & { adventurerId: string; encounterXp: number; level: number; health: number; settled: boolean; takenFrom: string | null };
+type Kill = { adventurerId: string; encounterXp: number; actionIndex: number; beastId: number; prefix: number; suffix: number; level: number; health: number; gameOver: boolean; settled: boolean; claimed: boolean };
 type Staked = { tokenId: string; mega: boolean; staked: boolean; transformsAt: number | null; unsafeStake: boolean };
 
 export function describe(species: number, prefix: number, suffix: number): Species {
@@ -66,14 +68,27 @@ async function batched<A, B>(items: A[], run: (item: A) => Promise<B>): Promise<
 
 const nft = (entrypoint: string, calldata: string[]) => provider.callContract({ contractAddress: BEAST_NFT, entrypoint, calldata });
 
+export function takeable(owner: string, killBlock: bigint, stake: { staker: string; block: bigint }): boolean {
+  return BigInt(stake.staker) !== BigInt(owner) && killBlock > stake.block;
+}
+
+async function staker(dungeon: string, owner: string, k: Kill & { species: number }): Promise<string | null> {
+  const token = BigInt((await nft("get_token_id_by_affixes", [String(k.species), String(k.prefix), String(k.suffix)]))[0]);
+  if (BigInt((await nft("owner_of", u256(token)))[0]) !== BigInt(dungeon)) return null;
+  const [by, , , , block] = await provider.callContract({ contractAddress: dungeon, entrypoint: "beast_stake", calldata: u256(token) });
+  const killBlock = (await transcript(k.adventurerId)).chain.blocks[k.actionIndex];
+  return takeable(owner, killBlock, { staker: by, block: BigInt(block) }) ? by : null;
+}
+
 export async function claims(owner: string, key: string, adventurer?: string): Promise<Claim[]> {
   const d = DUNGEONS[key];
   const { kills } = await api<{ kills: Kill[] }>(`/kills?owner=${owner}&dungeon=${d.address}&unclaimed=true${adventurer ? `&adventurer=${adventurer}` : ""}`);
   const open = unclaimed(kills, d.firstSpecies);
-  const minted = await batched(open, async (k) => BigInt((await nft("is_minted", [String(k.species), String(k.prefix), String(k.suffix)]))[0]) === 1n);
-  return open
-    .filter((_, i) => !minted[i])
-    .map((k) => ({ ...describe(k.species, k.prefix, k.suffix), adventurerId: k.adventurerId, encounterXp: k.encounterXp, level: k.level, health: k.health, settled: k.settled }));
+  const from = await batched(open, async (k) => (BigInt((await nft("is_minted", [String(k.species), String(k.prefix), String(k.suffix)]))[0]) === 1n ? ((await staker(d.address, owner, k)) ?? undefined) : null));
+  return open.flatMap((k, i) => {
+    const takenFrom = from[i];
+    return takenFrom === undefined ? [] : [{ ...describe(k.species, k.prefix, k.suffix), adventurerId: k.adventurerId, encounterXp: k.encounterXp, level: k.level, health: k.health, settled: k.settled, takenFrom }];
+  });
 }
 
 export async function pendingClaims(owner: string): Promise<Claim[]> {

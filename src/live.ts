@@ -6,11 +6,11 @@ import { DUNGEON, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETT
 import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
 import { randomHash, startOf, type Chain, type Game, type Snapshot } from "./practice.ts";
+import { transcript } from "./transcript.ts";
 import { account, balanceOf, keys, provider, strkBalance } from "./wallet.ts";
 
 const ONE = 10n ** 18n;
 const TRANSFER = BigInt(hash.getSelectorFromName("Transfer"));
-const COMMITTED = hash.getSelectorFromName("ActionCommitted");
 const file = `${VAR_DIR}live.json`;
 const hex = (n: bigint) => "0x" + n.toString(16);
 const u256 = (n: bigint) => [hex(n & ((1n << 128n) - 1n)), hex(n >> 128n)];
@@ -69,25 +69,6 @@ async function enter(): Promise<string> {
 }
 
 const view = (entrypoint: string, id: string) => provider.callContract({ contractAddress: GAME_CORE, entrypoint, calldata: [id] });
-
-export async function transcript(id: string): Promise<{ packets: bigint[]; chain: Chain }> {
-  const from = Number((await view("minted_at_block_number", id))[0]);
-  const packets: bigint[] = [];
-  const chain: Chain = { blocks: [], hashes: [], rolling: 0n };
-  for (let token: string | undefined, first = true; first || token; first = false) {
-    const page = await provider.getEvents({ address: GAME_CORE, keys: [[COMMITTED], [id]], from_block: { block_number: from }, to_block: "latest", chunk_size: 500, continuation_token: token });
-    for (const e of page.events) {
-      for (const packet of e.data.slice(1, 1 + Number(e.data[0]))) {
-        packets.push(BigInt(packet));
-        chain.blocks.push(BigInt(e.block_number!));
-        chain.hashes.push(e.block_hash!);
-      }
-      chain.rolling = BigInt(e.data.at(-1)!);
-    }
-    token = page.continuation_token;
-  }
-  return { packets, chain };
-}
 
 async function start(id: string): Promise<Snapshot> {
   for (let attempt = 0; ; attempt++) {

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { decodeBeast, describe, unclaimed } from "./beasts.ts";
+import { decodeBeast, describe, takeable, unclaimed } from "./beasts.ts";
 import { DUNGEONS, GAME_CORE } from "./config.ts";
 import { settleCalls } from "./live.ts";
 
 const held = ["0x35", "0x18", "0xa", "0x20", "0x1b6", "0x0", "0x0", "0x1", "0x2", "0x114f149"];
-const kill = { adventurerId: "0x1", encounterXp: 77, beastId: 19, prefix: 38, suffix: 5, level: 41, health: 442, gameOver: true, settled: false, claimed: false };
+const kill = { adventurerId: "0x1", encounterXp: 77, actionIndex: 3, beastId: 19, prefix: 38, suffix: 5, level: 41, health: 442, gameOver: true, settled: false, claimed: false };
 
 test("decodes a beast token read from the collection", () => {
   assert.deepEqual(decodeBeast("0x01a9", held), {
@@ -71,4 +71,10 @@ test("a long game folds every chunk, then replays every chunk, and claims with t
 test("a partly replayed game resumes in chunks from its checkpoint", () => {
   const txs = settleCalls(DUNGEONS.beast, "0x9", [5n, 6n, 7n], [100n, 101n, 102n], [], 2, 255n);
   assert.deepEqual(txs.map((tx) => tx.map((c) => [c.entrypoint, c.calldata])), [[["verify_actions", ["0x9", "0xff", "0x1", "0x7", "0x1", "0x66"]]], [["apply_actions", ["0x9", "0xff", "0x1", "0x7", "0x1", "0x66"]]]]);
+});
+
+test("a staked beast is taken only by another player's kill made after the stake", () => {
+  const stake = { staker: "0x0abc", block: 100n };
+  assert.deepEqual([takeable("0x1", 101n, stake), takeable("0x1", 100n, stake), takeable("0x1", 99n, stake), takeable("0xABC", 101n, stake)], [true, false, false, false]);
+  assert.equal(takeable("0x1", 18153371n, { staker: "0x2", block: 0n }), true);
 });
