@@ -22,6 +22,7 @@ node scripts/bench.ts --starts 50000 --from 1000000
 node scripts/bench.ts --starts 40000 --reach 30 --keep var/level30.json
 node scripts/bench.ts --late var/level30.json --seeds 0-10
 LS_DUNGEON=lootBag node scripts/bench.ts --ids bags.json --by-id
+LS_DUNGEON=lootBag node scripts/bench.ts --rank var/bag-ranking.json
 node scripts/search.ts --grid '{"fightRisk":[0.15,0.25,0.35],"jewelryLevel":[6,8,10]}' --level 35
 ```
 
@@ -32,7 +33,8 @@ named kills per 100 moves, and what became of the named beasts met (killed, fled
 of every game at the moment it reaches level 30; `--late file` plays those states forward on `--seeds` luck seeds each, to measure
 late-game rules on many more deep games than a run from level 1 gives. Loot Dungeon starts are
 fixed by the bag, so there it plays each game id for 500 luck seeds (`--seeds 0-500`); `--ids file.json` takes a list of game
-ids and `--by-id` adds a line per id. Each extra `--rules` overrides fields of `RULES` in `src/policy.ts` and is compared with
+ids and `--by-id` adds a line per id. `--rank file.json` takes the loot bag list the page shows (rows with a `game` id), plays every bag and rewrites
+the file with each row's level figures and named kills per game (`kills`, `killsSe`) refreshed, other fields kept. Each extra `--rules` overrides fields of `RULES` in `src/policy.ts` and is compared with
 the first on the same games: the difference in named kills, in mean level and in the 30+, 35+ and 40+ shares, each with its standard error.
 `scripts/search.ts` takes a grid of values per `RULES` field, moves one field at a time to the value that raises the chosen
 share most on one set of starts, and confirms the result on another. `--gate` fails when the mean drops 0.25 levels, the 30+ share drops 1 point or named kills per game drop 0.1 below
