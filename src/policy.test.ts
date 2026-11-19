@@ -60,3 +60,12 @@ test("a maxed ring makes way for the next one, bought only with two full heals o
   assert.deepEqual(plan(state({ equipment: [gear(GOLD_RING, 20)], bag: [gear(TITANIUM_RING, 20)] })).actions, [{ type: "equip", item: TITANIUM_RING }, { type: "explore" }]);
   assert.deepEqual(plan(state({ equipment: [gear(TITANIUM_RING, 20)], bag: [gear(GOLD_RING, 20)] })).actions, [{ type: "explore" }]);
 });
+
+test("a drop that takes vitality or charisma away is counted before healing and pricing", () => {
+  const maxed = { equipment: [gear(PLATE_MAIL, 20)], market: [offer(HOLY_CHESTPLATE, 10)] };
+  const stash = JUNK.slice(1).map((id) => gear(id, 15, { vitality: 3 }));
+  const sturdy = state({ ...maxed, maxHealth: 115, health: 105, bag: [gear(SHIRT, 15, { vitality: 1 }), ...stash] });
+  assert.deepEqual(plan(sturdy).actions, [{ type: "drop", item: SHIRT }, { type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "explore" }]);
+  const charming = state({ ...maxed, health: 60, gold: 14, bag: [gear(SHIRT, 15, { charisma: 1 }), ...stash] });
+  assert.deepEqual(plan(charming).actions, [{ type: "drop", item: SHIRT }, { type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "potions", qty: 1 }, { type: "explore" }]);
+});

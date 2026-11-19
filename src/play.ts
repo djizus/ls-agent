@@ -248,9 +248,10 @@ export function auditGame(): Promise<string | undefined> {
 export function shape(s: State, actions: Action[], reserve = 0): Action[] {
   if (s.beast) return actions;
   const ups = (stat: string) => actions.reduce((n, a) => n + (a.type === "upgrade" && a.stat === stat ? a.amount : 0), 0);
-  const charisma = s.stats.charisma + ups("charisma");
-  const maxHealth = s.maxHealth + 15 * ups("vitality");
-  const health = s.health + 15 * ups("vitality");
+  const lost = (stat: "vitality" | "charisma") => actions.reduce((n, a) => n + (a.type === "drop" ? ([...s.bag, ...s.equipment].find((g) => g.id === a.item)?.bonus?.[stat] ?? 0) : 0), 0);
+  const charisma = s.stats.charisma + ups("charisma") - lost("charisma");
+  const maxHealth = s.maxHealth + 15 * (ups("vitality") - lost("vitality"));
+  const health = Math.min(s.health, s.maxHealth - 15 * lost("vitality")) + 15 * ups("vitality");
   const gold = actions.reduce((g, a) => g - (a.type === "buy" ? priceOf(a.item, charisma) : 0), s.gold);
   const price = potionPrice(s.level, charisma);
   const wanted = actions.reduce((n, a) => n + (a.type === "potions" ? a.qty : 0), 0);
