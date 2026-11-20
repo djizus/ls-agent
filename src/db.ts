@@ -38,3 +38,4 @@ if (!columns.includes("ending")) db.exec("ALTER TABLE games ADD COLUMN ending TE
 if (!columns.includes("mismatches")) db.exec("ALTER TABLE games ADD COLUMN mismatches INTEGER NOT NULL DEFAULT 0");
 if (!columns.includes("beasts")) db.exec("ALTER TABLE games ADD COLUMN beasts INTEGER");
 if (!columns.includes("gas_strk")) db.exec("ALTER TABLE games ADD COLUMN gas_strk REAL");
+if (!columns.includes("survivor")) db.exec("ALTER TABLE games ADD COLUMN survivor REAL");

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
-import { BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
+import { BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
 import { halt, play, slain } from "./runner.ts";
@@ -9,7 +9,7 @@ import { enrich, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
 import { inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
 import { liveRow, subscribe } from "./events.ts";
-import { forSale, poolIds } from "./live.ts";
+import { forSale, poolIds, usdPrice } from "./live.ts";
 import { handleMcp } from "./mcp.ts";
 import { summary } from "./summary.ts";
 
@@ -31,8 +31,11 @@ function reply(res: ServerResponse, body: unknown): void {
 
 const PRACTICE = "practice";
 
+const PRICE_MS = 600_000;
+const price = background(PRICE_MS, () => Promise.all([usdPrice(STRK), usdPrice(SURVIVOR)]));
+
 function figures() {
-  const ended = db.prepare("SELECT mode, strategy, level, beasts, gas_strk FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; strategy: string; level: number; beasts: number | null; gas_strk: number | null }[];
+  const ended = db.prepare("SELECT mode, strategy, level, beasts, gas_strk, survivor FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; strategy: string; level: number; beasts: number | null; gas_strk: number | null; survivor: number | null }[];
   const strategy = ended.find((g) => g.mode === PRACTICE)?.strategy ?? null;
   const groups = [...Object.entries(DUNGEONS).map(([mode, d]) => ({ mode, name: d.name, strategy: null as string | null })), { mode: PRACTICE, name: "Practice", strategy }];
   const mean = (values: number[]) => (values.length ? summary(values).mean : null);
@@ -48,7 +51,7 @@ function figures() {
       best,
       reach30,
       slain: mean(games.flatMap((g) => (g.beasts === null ? [] : [g.beasts]))),
-      strk: mean(games.flatMap((g) => (g.gas_strk === null ? [] : [g.gas_strk]))),
+      usd: price() ? games.reduce((sum, g) => sum + price()![0] * (g.gas_strk ?? 0) + price()![1] * (g.survivor ?? 0), 0) : null,
     };
   });
 }
