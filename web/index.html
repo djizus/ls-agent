@@ -212,7 +212,7 @@ function render() {
   $("mode").className = g?.live ? "live good" : g ? "bad" : "dim";
   $("mode").textContent = g?.live ? "Live" : g ? "Ended" : "Idle";
   $("which").textContent = g ? `Game ${g.id}` : "";
-  put($("plan"), !g ? "" : g.live ? (move ? planHtml(move) : "") : endHtml(g));
+  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${move ? planHtml(move) : ""}` : endHtml(g));
   $("golive").hidden = !liveReal() || g?.live;
 
   const sums = data.summary ?? [];
@@ -283,6 +283,7 @@ source.onmessage = (m) => {
   const e = JSON.parse(m.data);
   if (e.kind === "status") return load();
   if (shown?.live) { onEvent(e); render(); }
+  if (e.kind === "state" && liveReal()) load();
 };
 Promise.all([get("/api/items"), load()]).then(([table]) => {
   for (const g of table ?? []) { items[g.id] = g; byName[g.name] = g; }
