@@ -19,7 +19,7 @@ const LIVE_CHECK_MOVES = 100;
 const CLAIM_DELAY_MS = 60_000;
 const PACE_MS = Number(process.env.LS_PACE_MS ?? 0);
 
-type Seat = { table: Table; row: number; rules: (p: Phase) => string; state: State; note: string; rejected: string; rejections: number; cost: number; ending?: string };
+type Seat = { table: Table; row: number; rules: (p: Phase) => string; state: State; note: string; rejected: string; rejections: number; cost: number; ending?: string; failed?: string };
 
 let stopping = false;
 let busy = false;
@@ -122,7 +122,7 @@ async function round(seats: Seat[]): Promise<void> {
       emit({ kind: "decision", phase: phase(state), options: choices, thought: decision.thought, actions, note: decision.note, reserve: decision.reserve, costUsd: decision.costUsd, row });
       moves.push({ seat, decision, actions });
     } catch (err) {
-      seat.ending = `failed: ${(err as Error).message.slice(0, 200)}`;
+      seat.failed = (err as Error).message.slice(0, 200);
     }
   }
   if (PACE_MS) await new Promise((r) => setTimeout(r, PACE_MS));
@@ -145,36 +145,65 @@ async function round(seats: Seat[]): Promise<void> {
     Object.assign(seat, { note: decision.note, rejected: "", rejections: 0 });
   }
   const checked = seats.filter((seat) => seat.table.game.chain && !seat.ending && seat.table.game.packets.length <= LIVE_CHECK_MOVES);
-  const drifts = await Promise.all(checked.map((seat) => auditGame(seat.table)));
+  const drifts = await Promise.all(checked.map((seat) => auditGame(seat.table).catch(() => undefined)));
   checked.forEach((seat, i) => drifts[i] && (seat.ending = "stopped: local state differs from the contract"));
 }
+
+const failures = new Map<string, number>();
+
+export function retry(id: string): boolean {
+  failures.set(id, (failures.get(id) ?? 0) + 1);
+  return failures.get(id)! < MAX_REJECTIONS;
+}
+
+export const cleared = (id: string): void => void failures.delete(id);
 
 export async function play(count: number, live: boolean, entry?: Entry): Promise<void> {
   if (busy) return;
   busy = true;
   stopping = false;
+  failures.clear();
   const failed = (err: unknown) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` });
   try {
     const seed = nextSeed();
     const resumed = live ? liveIds().slice(0, count) : [];
-    const queue: (() => Promise<Seat>)[] = live
-      ? [...resumed.map((id) => () => open(undefined, seed, entry, id)), ...Array.from({ length: count - resumed.length }, () => () => open(undefined, seed, entry))]
-      : DUNGEON.benchmark.slice(0, count).map((id) => () => open(id, seed));
+    const queue: { practice?: string; resumed?: string }[] = live
+      ? [...resumed.map((id) => ({ resumed: id })), ...Array.from({ length: count - resumed.length }, () => ({}))]
+      : DUNGEON.benchmark.slice(0, count).map((practice) => ({ practice }));
     const seats: Seat[] = [];
     const ended: { seat: Seat; due: number }[] = [];
+    const again = (id: string) => (retry(id) ? queue.unshift({ resumed: id }) : (queue.length = 0));
     for (;;) {
       for (const done of ended.filter((e) => e.due <= Date.now() || !seats.length)) {
         await new Promise((r) => setTimeout(r, Math.max(0, done.due - Date.now())));
         ended.splice(ended.indexOf(done), 1);
         await settle(done.seat).catch(failed);
       }
-      while (!stopping && queue.length && seats.length < (DECIDER === "rules" ? SEATS : 1)) await queue.shift()!().then((seat) => seats.push(seat), failed);
+      while (!stopping && queue.length && seats.length < (DECIDER === "rules" ? SEATS : 1)) {
+        const next = queue.shift()!;
+        await open(next.practice, seed, entry, next.resumed).then(
+          (seat) => seats.push(seat),
+          (err) => (failed(err), next.resumed && again(next.resumed)),
+        );
+      }
       if (!seats.length) break;
-      await round(seats).catch((err) => seats.forEach((seat) => (seat.ending ??= `failed: ${(err as Error).message.slice(0, 200)}`)));
-      for (const seat of seats.filter((s) => stopping || s.ending)) {
-        await close(seat);
+      await round(seats).catch((err) => seats.forEach((seat) => (seat.failed ??= (err as Error).message.slice(0, 200))));
+      for (const seat of [...seats]) {
+        const { game } = seat.table;
+        const unfinished = !!game.chain && !seat.state.over && !stopping;
+        if (!seat.failed) cleared(game.id);
+        if (!stopping && !seat.ending && !seat.failed) continue;
         seats.splice(seats.indexOf(seat), 1);
-        if (seat.table.game.chain && seat.state.over) ended.push({ seat, due: Date.now() + CLAIM_DELAY_MS });
+        if (seat.failed && unfinished && retry(game.id)) {
+          leave(seat.table);
+          queue.unshift({ resumed: game.id });
+          emit({ kind: "status", text: `game ${seat.row} resumes from the chain after: ${seat.failed}` });
+          continue;
+        }
+        if (seat.failed) seat.ending = `failed: ${seat.failed}`;
+        await close(seat);
+        if (unfinished) queue.length = 0;
+        if (game.chain && seat.state.over) ended.push({ seat, due: Date.now() + CLAIM_DELAY_MS });
       }
     }
   } finally {
