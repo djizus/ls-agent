@@ -67,6 +67,13 @@ export function heldGames(ids: string[], bag: number): string[] {
   return Array.from({ length: Number(ids[0]) }, (_, i) => pair(ids, 1 + 2 * i)).filter((id) => bagOf(id) === bag).map(gameId);
 }
 
+export function forSale<Row extends { bag: number }>(rows: Row[], ids: string[]): (Row & { n: number })[] {
+  const bags = Array.from({ length: Number(ids[0]) }, (_, i) => bagOf(pair(ids, 1 + 2 * i)));
+  return rows.map((row) => ({ ...row, n: bags.filter((bag) => bag === row.bag).length })).filter((row) => row.n);
+}
+
+export const poolIds = (pool: string): Promise<string[]> => provider.callContract({ contractAddress: pool, entrypoint: "get_all_ids", calldata: [] });
+
 export function readQuote(out: string[]): BagQuote {
   if (BigInt(out[0]) !== 0n) throw new Error(`the pool cannot price a bag (curve error ${Number(out[0])})`);
   return { price: pair(out, 3), protocolFee: pair(out, 5), royalty: pair(out, 7) };
@@ -90,7 +97,7 @@ export function bagPurchase(pool: string, held: string[], quote: BagQuote, entry
 }
 
 export async function bagMarket(pool: string, bag: number): Promise<{ held: string[]; quote: BagQuote }> {
-  const held = heldGames(await provider.callContract({ contractAddress: pool, entrypoint: "get_all_ids", calldata: [] }), bag);
+  const held = heldGames(await poolIds(pool), bag);
   const quote = readQuote(await provider.callContract({ contractAddress: pool, entrypoint: "get_buy_nft_quote", calldata: [...u256(BigInt(held[0] ?? 0)), "0x1", "0x0"] }));
   return { held, quote };
 }

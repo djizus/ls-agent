@@ -244,7 +244,7 @@ function render() {
 
   const first = (text) => text.replace(/ (T\d|G\d).*$/, "");
   const sacks = [...(data.bags ?? [])].sort((a, b) => (b[bagSort] ?? -1) - (a[bagSort] ?? -1)).slice(0, BAGS);
-  put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><ol id="sacks" class="rows scroll">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>x${x.n}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>`);
+  put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><ol id="sacks" class="rows scroll">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>${x.n ? `x${x.n}` : ""}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>`);
 }
 
 async function load() {

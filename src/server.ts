@@ -9,6 +9,7 @@ import { enrich, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
 import { inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
 import { liveRow, subscribe } from "./events.ts";
+import { forSale, poolIds } from "./live.ts";
 import { handleMcp } from "./mcp.ts";
 import { summary } from "./summary.ts";
 
@@ -94,6 +95,14 @@ const prices = background(BEASTS_MS, sellPrices, quiet);
 const claimable = background(BEASTS_MS, () => pendingClaims(keys().address), quiet);
 const collection = background(BEASTS_MS, () => inventory(BEASTS_TO ?? keys().address));
 
+const POOL_MS = 60_000;
+const pool = background(POOL_MS, () => poolIds(DUNGEONS.lootBag.pool!));
+
+function bags() {
+  const [ranked, ids] = [existsSync(BAGS) ? JSON.parse(readFileSync(BAGS, "utf8")) : [], pool()];
+  return ids ? forSale(ranked, ids) : ranked;
+}
+
 function beasts() {
   const [held, claims, sell] = [collection(), claimable() ?? [], prices() ?? {}];
   const address = BEASTS_TO ?? keys().address;
@@ -155,7 +164,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
   if (url.pathname === "/api/summary") return reply(res, figures());
   if (url.pathname === "/api/wallet") return reply(res, await wallet());
   if (url.pathname === "/api/beasts") return reply(res, await beasts());
-  if (url.pathname === "/api/bags") return reply(res, existsSync(BAGS) ? JSON.parse(readFileSync(BAGS, "utf8")) : []);
+  if (url.pathname === "/api/bags") return reply(res, bags());
   if (url.pathname === "/api/items") return reply(res, ITEMS);
   if (url.pathname === "/api/check") return reply(res, existsSync(CHECK) ? JSON.parse(readFileSync(CHECK, "utf8")) : null);
   if (url.pathname.startsWith("/assets/") && /^\/assets\/[a-z]+\/?[A-Za-z0-9_]*\.(png|svg)$/.test(url.pathname)) {
@@ -174,4 +183,5 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
 export function serve(): void {
   createServer((req, res) => void route(req, res).catch(() => res.writeHead(500).end())).listen(PORT, HOST, () => console.log(`ls-agent on http://${HOST}:${PORT}`));
   beasts();
+  pool();
 }
