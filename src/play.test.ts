@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DUNGEON } from "./config.ts";
-import { begin, commit, current, enrich, namedSlain, render, shape, type State } from "./play.ts";
+import { begin, commit, current, enrich, namedKills, namedSlain, render, shape, type State } from "./play.ts";
 import { act, newPracticeGame, preview, replay, type Snapshot } from "./practice.ts";
 
 test("market and potions are open between fights, not only at level-up", { timeout: 120_000 }, async () => {
@@ -111,5 +111,6 @@ test("a recorded game counts the named beasts it killed by attacking, not plain 
     decision("attack"), state({ beast: null, over: true }),
   ];
   assert.equal(namedSlain(recorded), 2);
+  assert.deepEqual(namedKills(recorded).map((b) => b.specialPrefix), ["Horror", "Golem"]);
   assert.equal(namedSlain([]), 0);
 });

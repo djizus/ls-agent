@@ -212,7 +212,7 @@ function render() {
   $("mode").className = g?.live ? "live good" : g ? "bad" : "dim";
   $("mode").textContent = g?.live ? "Live" : g ? "Ended" : "Idle";
   $("which").textContent = g ? `Game ${g.id}` : "";
-  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${move ? planHtml(move) : ""}` : endHtml(g));
+  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${g.claimable == null ? "" : `<span class="chip gold" title="Of those, beasts nobody minted yet or that can be taken from a stake: the ones the settlement will claim">${g.claimable} to claim</span>`}${move ? planHtml(move) : ""}` : endHtml(g));
   $("golive").hidden = !liveReal() || g?.live;
 
   const sums = data.summary ?? [];

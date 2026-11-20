@@ -79,19 +79,30 @@ export function takeable(owner: string, killBlock: bigint, stake: { staker: stri
   return BigInt(stake.staker) !== BigInt(owner) && killBlock > stake.block;
 }
 
-async function staker(dungeon: string, owner: string, k: Kill & { species: number }): Promise<string | null> {
+type Affixes = { species: number; prefix: number; suffix: number };
+const minted = async (k: Affixes) => BigInt((await nft("is_minted", [String(k.species), String(k.prefix), String(k.suffix)]))[0]) === 1n;
+
+async function staker(dungeon: string, owner: string, k: Affixes, killBlock: () => Promise<bigint>): Promise<string | null> {
   const token = BigInt((await nft("get_token_id_by_affixes", [String(k.species), String(k.prefix), String(k.suffix)]))[0]);
   if (BigInt((await nft("owner_of", u256(token)))[0]) !== BigInt(dungeon)) return null;
   const [by, , , , block] = await provider.callContract({ contractAddress: dungeon, entrypoint: "beast_stake", calldata: u256(token) });
-  const killBlock = (await transcript(k.adventurerId)).chain.blocks[k.actionIndex];
-  return takeable(owner, killBlock, { staker: by, block: BigInt(block) }) ? by : null;
+  return takeable(owner, await killBlock(), { staker: by, block: BigInt(block) }) ? by : null;
+}
+
+// A named beast slain in a game still running: claimable when nobody minted it yet, or when it is staked and can be taken.
+export async function claimableKill(key: string, owner: string, beast: { id: number; specialPrefix: string | null; specialSuffix: string | null }): Promise<boolean> {
+  const d = DUNGEONS[key];
+  const k = { species: d.firstSpecies + beast.id - 1, prefix: PREFIXES.indexOf(beast.specialPrefix!) + 1, suffix: SUFFIXES.indexOf(beast.specialSuffix!) + 1 };
+  if (!(await minted(k))) return true;
+  // shortcut: the latest block stands for the kill's block, so a stake made after the kill counts as takeable; read the transcript if that matters
+  return (await staker(d.address, owner, k, async () => BigInt(await provider.getBlockNumber()))) !== null;
 }
 
 export async function claims(owner: string, key: string, adventurer?: string): Promise<Claim[]> {
   const d = DUNGEONS[key];
   const { kills } = await api<{ kills: Kill[] }>(`/kills?owner=${owner}&dungeon=${d.address}&unclaimed=true${adventurer ? `&adventurer=${adventurer}` : ""}`);
   const open = unclaimed(kills, d.firstSpecies);
-  const from = await batched(open, async (k) => (BigInt((await nft("is_minted", [String(k.species), String(k.prefix), String(k.suffix)]))[0]) === 1n ? ((await staker(d.address, owner, k)) ?? undefined) : null));
+  const from = await batched(open, async (k) => ((await minted(k)) ? ((await staker(d.address, owner, k, async () => (await transcript(k.adventurerId)).chain.blocks[k.actionIndex])) ?? undefined) : null));
   return open.flatMap((k, i) => {
     const takenFrom = from[i];
     return takenFrom === undefined ? [] : [{ ...describe(k.species, k.prefix, k.suffix), adventurerId: k.adventurerId, encounterXp: k.encounterXp, level: k.level, health: k.health, settled: k.settled, takenFrom }];

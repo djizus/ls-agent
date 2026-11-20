@@ -5,9 +5,9 @@ import { BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK_FLOOR, SURVIVOR, TICKET,
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
 import { halt, play, slain } from "./runner.ts";
-import { enrich, snapshot } from "./play.ts";
+import { enrich, namedKills, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
-import { inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
+import { claimableKill, inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
 import { liveRow, subscribe } from "./events.ts";
 import { forSale, poolIds } from "./live.ts";
 import { handleMcp } from "./mcp.ts";
@@ -95,6 +95,26 @@ const prices = background(BEASTS_MS, sellPrices, quiet);
 const claimable = background(BEASTS_MS, () => pendingClaims(keys().address), quiet);
 const collection = background(BEASTS_MS, () => inventory(BEASTS_TO ?? keys().address));
 
+const verdicts = new Map<string, Promise<boolean>>();
+
+// Named beasts slain so far in the live game that can still be claimed; null while the chain does not answer.
+async function liveClaimable(g: { id: number; mode: string }): Promise<number | null> {
+  const events = (db.prepare("SELECT body FROM events WHERE game = ? ORDER BY rowid").all(g.id) as { body: string }[]).map((r) => JSON.parse(r.body));
+  const kills = [...new Map(namedKills(events).map((b) => [`${b.id}:${b.specialPrefix}:${b.specialSuffix}`, b])).entries()];
+  try {
+    const open = await Promise.all(
+      kills.map(([key, b]) => {
+        const id = `${g.id}:${key}`;
+        if (!verdicts.has(id)) verdicts.set(id, claimableKill(g.mode, keys().address, b).catch((err) => (verdicts.delete(id), Promise.reject(err))));
+        return verdicts.get(id)!;
+      }),
+    );
+    return open.filter(Boolean).length;
+  } catch {
+    return null;
+  }
+}
+
 const POOL_MS = 60_000;
 const pool = background(POOL_MS, () => poolIds(DUNGEONS.lootBag.pool!));
 
@@ -154,8 +174,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
   }
   if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
   if (url.pathname === "/api/games") {
-    const games = db.prepare(`${GAMES} ORDER BY onchain DESC, id DESC LIMIT 200`).all(liveRow()) as { id: number; live: number }[];
-    return reply(res, games.map((g) => (g.live ? { ...g, beasts: slain(g.id) } : g)));
+    const games = db.prepare(`${GAMES} ORDER BY onchain DESC, id DESC LIMIT 200`).all(liveRow()) as { id: number; live: number; mode: string }[];
+    return reply(res, await Promise.all(games.map(async (g) => (g.live ? { ...g, beasts: slain(g.id), claimable: await liveClaimable(g) } : g))));
   }
   const id = Number(url.pathname.match(/^\/api\/games\/(\d+)$/)?.[1]);
   if (id) {

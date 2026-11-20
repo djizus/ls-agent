@@ -40,19 +40,21 @@ export const slewNamed = (before: Pick<State, "beast">, after: Pick<State, "beas
 
 type Recorded = { kind: string; state?: Pick<State, "beast" | "over">; actions?: { type: string }[] };
 
-export function namedSlain(events: Recorded[]): number {
-  let count = 0;
+export function namedKills(events: Recorded[]): NonNullable<State["beast"]>[] {
+  const kills: NonNullable<State["beast"]>[] = [];
   let before: Recorded["state"];
   let move: string | undefined;
   for (const e of events) {
     if (e.kind === "decision") move = e.actions?.[0]?.type;
     if (e.kind !== "state" || !e.state) continue;
-    if (before && move && slewNamed(before, e.state, move)) count++;
+    if (before && move && slewNamed(before, e.state, move)) kills.push(before.beast!);
     before = e.state;
     move = undefined;
   }
-  return count;
+  return kills;
 }
+
+export const namedSlain = (events: Recorded[]): number => namedKills(events).length;
 
 type Stored = Pick<State, "over" | "level" | "health" | "maxHealth" | "xp" | "gold" | "beast" | "statUpgradesAvailable" | "stats" | "market"> &
   Partial<Pick<State, "baseStats" | "potionPrice" | "happened" | "hits">> & { equipment: Legacy[] | Record<string, Legacy>; bag: Legacy[] };
