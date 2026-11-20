@@ -157,6 +157,7 @@ const killer = (g) => (g.ending ?? "").match(/against (?:".*" )?(\w+) level (\d+
 const WATCH = "https://www.lootsurvivor.io/watch?id=";
 const MOVES = { attack: "Fight", flee: "Flee", explore: "Explore" };
 const SLOW_MS = 60_000;
+const INDEXED_MS = 10_000;
 const BAGS = 25;
 const LATEST = 20;
 const STRIP = 5;
@@ -214,7 +215,10 @@ function render() {
     shown = g;
     move = null;
     market = [];
-    spectate();
+    const wait = g?.live ? g.started_at + INDEXED_MS - Date.now() : 0;
+    if (wait > 0) setTimeout(() => { if (shown?.id === g.id && !$("stage").querySelector("iframe")) spectate(); }, wait);
+    if (wait > 0) put($("stage"), `<b>Game ${g.id} starts</b>`);
+    else spectate();
     if (g?.live) get(`/api/games/${g.id}`).then((found) => { for (const e of found?.events ?? []) onEvent(e); render(); });
   }
   $("mode").className = g?.live ? "live good" : g ? "bad" : "dim";
