@@ -1,15 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
-import { BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
+import { BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
 import { halt, play, slain } from "./runner.ts";
-import { enrich, snapshot } from "./play.ts";
+import { enrich, moveBlock, namedKills, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
-import { inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
+import { affixes, claimableKill, inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
 import { liveRow, subscribe } from "./events.ts";
-import { forSale, poolIds } from "./live.ts";
+import { forSale, poolIds, usdPrice } from "./live.ts";
 import { handleMcp } from "./mcp.ts";
 import { summary } from "./summary.ts";
 
@@ -31,8 +31,11 @@ function reply(res: ServerResponse, body: unknown): void {
 
 const PRACTICE = "practice";
 
+const PRICE_MS = 600_000;
+const price = background(PRICE_MS, () => Promise.all([usdPrice(STRK), usdPrice(SURVIVOR)]));
+
 function figures() {
-  const ended = db.prepare("SELECT mode, strategy, level, beasts, gas_strk FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; strategy: string; level: number; beasts: number | null; gas_strk: number | null }[];
+  const ended = db.prepare("SELECT mode, strategy, level, beasts, gas_strk, survivor FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; strategy: string; level: number; beasts: number | null; gas_strk: number | null; survivor: number | null }[];
   const strategy = ended.find((g) => g.mode === PRACTICE)?.strategy ?? null;
   const groups = [...Object.entries(DUNGEONS).map(([mode, d]) => ({ mode, name: d.name, strategy: null as string | null })), { mode: PRACTICE, name: "Practice", strategy }];
   const mean = (values: number[]) => (values.length ? summary(values).mean : null);
@@ -48,7 +51,7 @@ function figures() {
       best,
       reach30,
       slain: mean(games.flatMap((g) => (g.beasts === null ? [] : [g.beasts]))),
-      strk: mean(games.flatMap((g) => (g.gas_strk === null ? [] : [g.gas_strk]))),
+      usd: price() ? games.reduce((sum, g) => sum + price()![0] * (g.gas_strk ?? 0) + price()![1] * (g.survivor ?? 0), 0) : null,
     };
   });
 }
@@ -95,6 +98,23 @@ const prices = background(BEASTS_MS, sellPrices, quiet);
 const claimable = background(BEASTS_MS, () => pendingClaims(keys().address), quiet);
 const collection = background(BEASTS_MS, () => inventory(BEASTS_TO ?? keys().address));
 
+const verdicts = { game: 0, known: new Map<string, boolean | null>() };
+
+function liveClaimable(g: { id: number; mode: string }): number | null {
+  if (verdicts.game !== g.id) Object.assign(verdicts, { game: g.id, known: new Map() });
+  const { known } = verdicts;
+  const events = (db.prepare("SELECT body FROM events WHERE game = ? ORDER BY rowid").all(g.id) as { body: string }[]).map((r) => JSON.parse(r.body));
+  const kills = namedKills(events).map((b) => ({ ...affixes(g.mode, b), block: moveBlock(b.move) }));
+  for (const k of kills) {
+    const key = `${k.species}:${k.prefix}:${k.suffix}`;
+    if (known.has(key) || k.block === undefined) continue;
+    known.set(key, null);
+    claimableKill(g.mode, keys().address, k, k.block).then((open) => known.set(key, open), () => setTimeout(() => known.delete(key), RETRY_MS));
+  }
+  const answers = [...new Set(kills.map((k) => `${k.species}:${k.prefix}:${k.suffix}`))].map((key) => known.get(key));
+  return answers.every((open) => open != null) ? answers.filter(Boolean).length : null;
+}
+
 const POOL_MS = 60_000;
 const pool = background(POOL_MS, () => poolIds(DUNGEONS.lootBag.pool!));
 
@@ -122,7 +142,7 @@ function beasts() {
         tiers: [1, 2, 3, 4, 5].map((tier) => own.filter((b) => b.tier === tier).length),
         mega: count("mega"),
         staked: count("staked"),
-        strk: all.some((b) => b.strk !== null) ? all.reduce((n, b) => n + (b.strk ?? 0), 0) : null,
+        usd: price() && all.some((b) => b.strk !== null) ? price()![0] * all.reduce((n, b) => n + (b.strk ?? 0), 0) : null,
         beasts: all,
       };
     }),
@@ -154,8 +174,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
   }
   if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
   if (url.pathname === "/api/games") {
-    const games = db.prepare(`${GAMES} ORDER BY onchain DESC, id DESC LIMIT 200`).all(liveRow()) as { id: number; live: number }[];
-    return reply(res, games.map((g) => (g.live ? { ...g, beasts: slain(g.id) } : g)));
+    const games = db.prepare(`${GAMES} ORDER BY onchain DESC, id DESC LIMIT 200`).all(liveRow()) as { id: number; live: number; mode: string }[];
+    return reply(res, games.map((g) => (g.live ? { ...g, beasts: slain(g.id), claimable: liveClaimable(g), level: snapshot()?.level ?? null } : g)));
   }
   const id = Number(url.pathname.match(/^\/api\/games\/(\d+)$/)?.[1]);
   if (id) {

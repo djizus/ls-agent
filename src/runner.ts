@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
-import { BEASTS_TO, DUNGEON, DUNGEON_KEY } from "./config.ts";
+import { BEASTS_TO, DUNGEON, DUNGEON_KEY, SURVIVOR } from "./config.ts";
 import { db } from "./db.ts";
 import { collect, sendBeasts, type Entry } from "./live.ts";
-import { strkBalance } from "./wallet.ts";
+import { balanceOf, strkBalance } from "./wallet.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
 import { plan } from "./policy.ts";
@@ -50,12 +50,13 @@ async function playGame(practiceId: string | undefined, seed: number, entry?: En
   let ending = "stopped";
   const strategy = loadStrategy();
   db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(strategy.hash, strategy.text, Date.now());
-  const funds = () => (practiceId ? null : strkBalance().then(Number, () => null));
+  const funds = () => (practiceId ? null : Promise.all([strkBalance(), balanceOf(SURVIVOR)]).then((held) => held.map(Number), () => null));
   const before = await funds();
   const id = await begin(practiceId, seed, entry);
   const mode = practiceId ? "practice" : DUNGEON_KEY;
   const resumed = practiceId ? undefined : (db.prepare("SELECT id FROM games WHERE game_id = ? AND mode = ?").get(id, mode) as { id: number } | undefined);
   row = resumed?.id ?? Number(db.prepare("INSERT INTO games (mode, game_id, seed, strategy, started_at) VALUES (?, ?, ?, ?, ?)").run(mode, id, seed, strategy.hash, Date.now()).lastInsertRowid);
+  if (resumed) db.prepare("UPDATE games SET ended_at = NULL WHERE id = ?").run(row);
   emit({ kind: "status", text: `game ${row} on ${id.slice(-8)}`, row });
   try {
     ending = await playMoves(strategy.rules);
@@ -65,7 +66,7 @@ async function playGame(practiceId: string | undefined, seed: number, entry?: En
     const end = snapshot();
     db.prepare("UPDATE games SET ended_at = ?, level = ?, xp = ?, moves = ?, cost_usd = ?, ending = ?, mismatches = ?, beasts = ? WHERE id = ?").run(Date.now(), end?.level ?? 0, end?.xp ?? 0, movesMade(), cost, ending, mismatches, slain(row!), row);
     const after = await funds();
-    if (before !== null && after !== null) db.prepare("UPDATE games SET gas_strk = coalesce(gas_strk, 0) + ? WHERE id = ?").run((before - after) / 1e18, row);
+    if (before !== null && after !== null) db.prepare("UPDATE games SET gas_strk = coalesce(gas_strk, 0) + ?, survivor = coalesce(survivor, 0) + ? WHERE id = ?").run((before[0] - after[0]) / 1e18, (before[1] - after[1]) / 1e18, row);
     emit({ kind: "status", text: `game ${row} ${ending}`, row, ending });
     row = undefined;
   }

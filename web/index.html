@@ -54,7 +54,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 #podium img { width: 3.6rem; height: 3.6rem; object-fit: contain; filter: drop-shadow(0 3px 0 rgb(0 0 0 / 0.7)); }
 #podium b { font: 400 2.6rem/0.9 var(--num); color: var(--gold); }
 #games li[data-id] { cursor: pointer; }
-#board li { grid-template-columns: auto 1fr auto 2.4rem; }
+#board li { grid-template-columns: auto 1fr 3rem 2.6rem; }
 #board b { text-align: right; }
 .slain { display: flex; align-items: center; gap: 0.2rem; font-size: 1.4rem; line-height: 1; }
 #games .slain img { width: 1.2rem; height: 1.2rem; filter: none; }
@@ -212,7 +212,7 @@ function render() {
   $("mode").className = g?.live ? "live good" : g ? "bad" : "dim";
   $("mode").textContent = g?.live ? "Live" : g ? "Ended" : "Idle";
   $("which").textContent = g ? `Game ${g.id}` : "";
-  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${move ? planHtml(move) : ""}` : endHtml(g));
+  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${g.claimable == null ? "" : `<span class="chip gold" title="Of those, beasts nobody minted yet or that can be taken from a stake: the ones the settlement will claim">${g.claimable} to claim</span>`}${move ? planHtml(move) : ""}` : endHtml(g));
   $("golive").hidden = !liveReal() || g?.live;
 
   const sums = data.summary ?? [];
@@ -222,13 +222,13 @@ function render() {
   const c = data.check;
   const tile = (value, label, tone = "") => `<div class="card"><b class="${tone}">${value}</b><span class="dim">${label}</span></div>`;
   const figure = (n, digits) => (n == null ? "-" : round(n, digits));
-  put($("sum"), !sum?.games ? "" : `<div id="reach">${tile(round(sum.games), "Games")}${tile(sum.median, "Median")}${tile(figure(sum.mean, 1), "Average")}${tile(figure(sum.slain, 1), "Slain each")}${tile(sum.best, "Best")}${sum.strategy ? tile(`${Math.round(sum.reach30)}%`, "Level 30") : tile(figure(sum.strk, 1), "STRK each")}</div>${sum.strategy && c ? `<div class="head"><span></span>${c.failed ? `<span class="bad" title="${esc(c.failed)}">Check failed</span>` : `<span class="good" title="The local game matches the one on Starknet">Checked</span>`}</div>` : ""}`);
+  put($("sum"), !sum?.games ? "" : `<div id="reach">${tile(round(sum.games), "Games")}${tile(sum.median, "Median")}${tile(figure(sum.mean, 1), "Average")}${tile(figure(sum.slain, 1), "Slain each")}${tile(sum.best, "Best")}${sum.strategy ? tile(`${Math.round(sum.reach30)}%`, "Level 30") : tile(sum.usd == null ? "-" : `$${round(sum.usd, 2)}`, "Spent")}</div>${sum.strategy && c ? `<div class="head"><span></span>${c.failed ? `<span class="bad" title="${esc(c.failed)}">Check failed</span>` : `<span class="good" title="The local game matches the one on Starknet">Checked</span>`}</div>` : ""}`);
   const liveNow = data.games.find((x) => x.live);
   put($("modes"), `<h2>Games</h2><span class="seg">${sums.map((x) => `<button type="button" data-mode="${x.mode}" aria-pressed="${x.mode === mode}">${x.name.split(" ")[0]}</button>`).join("")}</span>`);
   const ranked = inMode.filter((x) => x.ended_at).sort((a, b) => b.level - a.level || b.id - a.id);
   const cls = (x) => (x.onchain ? `class="card${x.id === g?.id ? " on" : ""}" data-id="${x.id}" tabindex="0"` : `class="card"`);
   put($("podium"), ranked.slice(0, 3).map((x) => `<li ${cls(x)} title="Game ${x.id}"><img src="${portrait(x)}" alt=""><b>${x.level}</b>${slain(x)}<span class="dim">${x.id}</span></li>`).join(""));
-  put($("board"), !liveNow && !ranked.length ? `<li class="none">No games</li>` : [...(liveNow ? [liveNow] : []), ...ranked.slice().sort((a, b) => b.started_at - a.started_at).slice(0, every ? undefined : LATEST)].map((x) => `<li ${cls(x)}><img src="${x.live ? (MARK[x.mode] ?? "/assets/favicon.png") : portrait(x)}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.live ? "" : x.level}</b></li>`).join("") + (!every && ranked.length > LATEST ? `<li class="more"><button type="button" data-more>More</button></li>` : ""));
+  put($("board"), !liveNow && !ranked.length ? `<li class="none">No games</li>` : [...(liveNow ? [liveNow] : []), ...ranked.slice().sort((a, b) => b.started_at - a.started_at).slice(0, every ? undefined : LATEST)].map((x) => `<li ${cls(x)}><img src="${x.live ? (MARK[x.mode] ?? "/assets/favicon.png") : portrait(x)}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.level ?? ""}</b></li>`).join("") + (!every && ranked.length > LATEST ? `<li class="more"><button type="button" data-more>More</button></li>` : ""));
 
   const w = data.wallet;
   put($("wallet"), `<h2>Wallet</h2>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
@@ -238,7 +238,7 @@ function render() {
   const STATE = { held: "", staked: ", staked", mega: ", Mega", claim: ", to claim" };
   const cell = (x) => `<div class="card ${x.state}" title="${esc(`${x.name}: tier ${x.tier} ${x.type}, level ${x.level}${STATE[x.state]}${x.strk === null ? "" : `, sells for ${round(x.strk, 1)} STRK`}`)}"><img src="${face(x.kind)}" alt="${esc(x.name)}"><i>T${x.tier}</i><b>${x.level}</b></div>`;
   const tiers = (x) => x.tiers.map((n, i) => (n ? `<span><span class="gold">T${i + 1}</span> <span class="n">${round(n)}</span></span>` : "")).join("");
-  const group = (x) => `<div class="head"><span><span class="dim">${x.name}</span><span class="n">${round(x.held)}</span>${x.claims ? `<span class="gold">${x.claims} to claim</span>` : ""}</span>${x.strk === null ? "" : `<span title="What the pools pay for them now, one at a time"><span class="n">${round(x.strk)}</span> <span class="dim">STRK</span></span>`}</div>${x.held ? `<div class="row tally">${tiers(x)}${x.mega ? `<span><span class="n">${x.mega}</span> Mega</span>` : ""}${x.staked ? `<span><span class="n">${x.staked}</span> staked</span>` : ""}</div>` : ""}${x.beasts.length ? `<div class="cells">${x.beasts.slice(0, zooAll ? undefined : STRIP).map(cell).join("")}</div>` : ""}`;
+  const group = (x) => `<div class="head"><span><span class="dim">${x.name}</span><span class="n">${round(x.held)}</span>${x.claims ? `<span class="gold">${x.claims} to claim</span>` : ""}</span>${x.usd === null ? "" : `<span class="n" title="What the pools pay for them now, one at a time, at the STRK price Ekubo quotes">$${round(x.usd, 2)}</span>`}</div>${x.held ? `<div class="row tally">${tiers(x)}${x.mega ? `<span><span class="n">${x.mega}</span> Mega</span>` : ""}${x.staked ? `<span><span class="n">${x.staked}</span> staked</span>` : ""}</div>` : ""}${x.beasts.length ? `<div class="cells">${x.beasts.slice(0, zooAll ? undefined : STRIP).map(cell).join("")}</div>` : ""}`;
   const more = !zooAll && b?.groups?.some((x) => x.beasts.length > STRIP);
   put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.groups ? round(b.groups.reduce((n, x) => n + x.held, 0)) : ""}</span></div>${b?.failed ? `<span class="bad">No answer</span>` : ""}${b?.groups ? `<div id="zoo" class="scroll">${b.groups.map(group).join("")}${more ? `<div class="more"><button type="button" data-more>More</button></div>` : ""}</div>` : ""}`);
 
