@@ -2,13 +2,14 @@ import { fork } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { parseArgs } from "node:util";
-import { DUNGEON, DUNGEON_KEY } from "../src/config.ts";
+import { DUNGEON, DUNGEON_KEY, DUNGEONS } from "../src/config.ts";
 import { useFastLuck } from "../src/hash.ts";
 import { describe, slewNamed } from "../src/play.ts";
 import { summary } from "../src/summary.ts";
-import { RULES, plan } from "../src/policy.ts";
+import { ARMOR, NECK, RULES, plan } from "../src/policy.ts";
+import { poolIds, unranked } from "../src/live.ts";
 import { toSnapshot, type Local } from "../src/engine/engine.ts";
-import { act, newPracticeGame, syntheticGame, type Game } from "../src/practice.ts";
+import { act, newPracticeGame, startOf, syntheticGame, type Game } from "../src/practice.ts";
 
 const { values } = parseArgs({
   options: {
@@ -32,6 +33,32 @@ type Kept = { id: string; moves: number; local: Local };
 const kept: Kept[] = values.late ? JSON.parse(readFileSync(values.late, "utf8")) : [];
 const rolled = DUNGEON.rolledStart && !values.ids && !values.late && !values.rank;
 const [from, to] = (values.seeds ?? (rolled ? "0-1" : values.late ? "0-20" : "0-500")).split("-").map(Number);
+
+async function gearOf(game: string) {
+  const worn = describe(await startOf(game), game).equipment;
+  const greatness = (g: { xp: number }) => Math.min(20, Math.floor(Math.sqrt(g.xp)));
+  const label = (slot: string) => worn.filter((g) => g.slot === slot).map((g) => `${g.name}${slot === "weapon" ? ` T${g.tier} ${g.type}` : ""} G${greatness(g)}`)[0] ?? "none";
+  const armor = worn.filter((g) => ARMOR.includes(g.slot));
+  const count = (type: string) => armor.filter((g) => g.type === type).length;
+  const main = armor.map((g) => g.type).sort((a, b) => count(b) - count(a))[0];
+  const neck = label("neck");
+  return {
+    weapon: label("weapon"),
+    set: `${count(main)}/${ARMOR.length} ${main}`,
+    t1: armor.filter((g) => g.tier === 1).length,
+    armG: Math.round(armor.reduce((sum, g) => sum + greatness(g), 0) / ARMOR.length),
+    neck: neck.startsWith(`${NECK[main]} `) ? `${neck} match` : neck,
+    ring: label("ring"),
+  };
+}
+
+if (values.rank && !process.send) {
+  const rows: { bag: number; game?: string }[] = JSON.parse(readFileSync(values.rank, "utf8"));
+  const added = unranked(await poolIds(DUNGEONS.lootBag.pool!), rows.map((row) => row.bag));
+  for (const { bag, game } of added) rows.push({ bag, ...(await gearOf(game)), game });
+  if (added.length) writeFileSync(values.rank, JSON.stringify(rows));
+  console.log(`${added.length} bags added from the pool${added.length ? `: ${added.map((a) => a.bag).join(", ")}` : ""}`);
+}
 const ids: (string | number | Kept)[] = values.late
   ? kept
   : rolled

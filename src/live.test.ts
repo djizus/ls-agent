@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DUNGEONS, SURVIVOR } from "./config.ts";
-import { bagPurchase, forSale, heldGames, readQuote, units } from "./live.ts";
+import { bagPurchase, forSale, heldGames, readQuote, units, unranked } from "./live.ts";
 
 const POOL = DUNGEONS.lootBag.pool!;
 const ME = "0x123";
@@ -11,6 +11,11 @@ const RICH = 200n * 10n ** 18n;
 
 test("the ranked bags are listed with the copies the pool holds now, and a bag it no longer holds is left out", () => {
   assert.deepEqual(forSale([{ bag: 7962, mean: 26 }, { bag: 7806, mean: 24.5 }, { bag: 7941, mean: 24 }], HELD), [{ bag: 7806, mean: 24.5, n: 2 }, { bag: 7941, mean: 24, n: 1 }]);
+});
+
+test("a bag the pool holds and the ranking lacks is found with one of its games", () => {
+  assert.deepEqual(unranked(HELD, [7806]), [{ bag: 7941, game: "0x0100000000001f0500000400000000060000000001c878ba01144c53000b1e41" }]);
+  assert.deepEqual(unranked(HELD, [7806, 7941]), []);
 });
 
 test("the pool's games of one bag are found by the bag number inside the game id", () => {
