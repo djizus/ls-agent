@@ -17,7 +17,7 @@ const u256 = (n: bigint) => [hex(n & ((1n << 128n) - 1n)), hex(n >> 128n)];
 
 async function send(calls: Call[]) {
   if ((await strkBalance()) < BigInt(STRK_FLOOR) * ONE) throw new Error(`spend cap reached: balance is under ${STRK_FLOOR} STRK`);
-  const { transaction_hash } = await account().execute(calls);
+  const { transaction_hash } = await account().execute(calls, { tip: 0n });
   const receipt = await provider.waitForTransaction(transaction_hash);
   if (!receipt.isSuccess()) throw new Error(`transaction ${transaction_hash} failed`);
   return receipt.value;
