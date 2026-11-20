@@ -155,7 +155,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
   if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
   if (url.pathname === "/api/games") {
     const games = db.prepare(`${GAMES} ORDER BY onchain DESC, id DESC LIMIT 200`).all(liveRow()) as { id: number; live: number }[];
-    return reply(res, games.map((g) => (g.live ? { ...g, beasts: slain(g.id) } : g)));
+    return reply(res, games.map((g) => (g.live ? { ...g, beasts: slain(g.id), level: snapshot()?.level ?? null } : g)));
   }
   const id = Number(url.pathname.match(/^\/api\/games\/(\d+)$/)?.[1]);
   if (id) {
