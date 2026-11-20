@@ -146,7 +146,7 @@ const title = (word) => word[0].toUpperCase() + word.slice(1);
 const stat = (name) => `<i class="ic" style="--i:url(/assets/icons/${title(name)}.svg)" title="${title(name)}"></i>`;
 const pic = (name, label) => `<img class="pic" src="/assets/icons/${name}.png" alt="${label}" title="${label}">`;
 const art = (name) => `<img class="pic" src="/assets/loot/${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.png" alt="${esc(name)}" title="${esc(name)}">`;
-const slain = (g) => (g.beasts == null ? `<span></span>` : `<span class="slain" title="Named beasts slain"><img src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`);
+const slain = (g) => { const n = g.live && shown?.live ? kills : g.beasts; return n == null ? `<span></span>` : `<span class="slain" title="Named beasts slain"><img src="/assets/skull.png" alt="Named beasts slain">${n}</span>`; };
 const MARK = { lootBag: "/assets/bag.png" };
 const face = (name) => (/^[A-Za-z]+$/.test(name ?? "") ? `/assets/beasts/${name.toLowerCase()}.png` : "/assets/skull.png");
 const portrait = (g) => (killer(g) ? face(killer(g)[1]) : (MARK[g.mode] ?? "/assets/skull.png"));
@@ -170,6 +170,8 @@ const data = { games: [], wallet: null, beasts: null, summary: null, bags: null,
 let shown;
 let move = null;
 let market = [];
+let kills = 0;
+let before = null;
 
 const liveReal = () => data.games.find((g) => g.live && g.onchain);
 const realGames = () => data.games.filter((g) => g.onchain);
@@ -206,13 +208,15 @@ function render() {
     shown = g;
     move = null;
     market = [];
+    kills = 0;
+    before = null;
     put($("stage"), g ? `<iframe src="${WATCH}${BigInt(g.game_id)}" title="Game ${g.id} in the Loot Survivor spectator" allow="autoplay"></iframe>` : `<b>No real game yet</b>`);
-    if (g?.live) get(`/api/games/${g.id}`).then((found) => { for (const e of found?.events ?? []) onEvent(e); render(); });
+    if (g?.live) get(`/api/games/${g.id}`).then((found) => { kills = 0; before = null; for (const e of found?.events ?? []) onEvent(e); render(); });
   }
   $("mode").className = g?.live ? "live good" : g ? "bad" : "dim";
   $("mode").textContent = g?.live ? "Live" : g ? "Ended" : "Idle";
   $("which").textContent = g ? `Game ${g.id}` : "";
-  put($("plan"), !g ? "" : g.live ? (move ? planHtml(move) : "") : endHtml(g));
+  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${kills}</span>${move ? planHtml(move) : ""}` : endHtml(g));
   $("golive").hidden = !liveReal() || g?.live;
 
   const sums = data.summary ?? [];
@@ -261,7 +265,12 @@ async function loadSide() {
 
 function onEvent(e) {
   if (e.kind === "decision") move = e;
-  else if (e.kind === "state") market = e.state.market;
+  else if (e.kind === "state") {
+    // same rule as namedSlain in src/play.ts
+    if (before?.beast?.specialPrefix != null && !e.state.beast && !e.state.over && move?.actions?.[0]?.type === "attack") kills++;
+    before = e.state;
+    market = e.state.market;
+  }
 }
 
 function go(search) {
