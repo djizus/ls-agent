@@ -44,14 +44,14 @@ Starts the real service on port 4199, plays 2 practice games through the HTTP AP
 Real games send transactions on Starknet mainnet and spend STRK from the bot's own wallet. Read this section before you fund it.
 
 1. `node src/cli.ts wallet` prints the wallet address, creating the key if needed.
-2. Send STRK to that address. The bot refuses to send a transaction while the balance is under 100 STRK, so fund more than that.
+2. Send STRK to that address. The bot refuses to send a transaction while the balance is under 50 STRK, so fund more than that.
 3. `node src/cli.ts deploy` deploys the account (one small fee).
 4. On the same machine, `curl -X POST 127.0.0.1:4100/api/play -d '{"live":true}'` plays one game; `'{"live":true,"games":3}'` plays three.
 
 | What | Cost or risk |
 |---|---|
 | Wallet key | `var/wallet.json` holds the private key in plain text, readable only by your user. Whoever reads the file owns the funds. If you delete `var/`, the funds are lost. Back the file up. |
-| Spend floor | 100 STRK, `STRK_FLOOR` in `src/config.ts`. Under it the bot sends nothing. It is the only spending limit: above the floor the bot keeps paying for as many games as you start. |
+| Spend floor | 50 STRK, `STRK_FLOOR` in `src/config.ts`. Under it the bot sends nothing. It is the only spending limit: above the floor the bot keeps paying for as many games as you start. |
 | Tickets | A game uses one dungeon ticket. With less than one ticket left, the bot buys 10 on Ekubo and refuses if they cost more than 2 STRK. |
 | Loot Bag games | With `LS_DUNGEON=lootBag` a game starts by buying one bag from the game's pool with SURVIVOR, so the wallet needs SURVIVOR as well as STRK. Name the bag and the most you will pay: `curl -X POST 127.0.0.1:4100/api/play -d '{"live":true,"bag":7806,"maxSurvivor":90}'`. The bot refuses when the price is above `maxSurvivor`, when the pool no longer holds that bag, or when the wallet is short. The price rises a little with each bag sold: 84 SURVIVOR at the time of writing, fee and royalty included. `node src/cli.ts bag <bag number>` prints the price now, whether the pool holds the bag, and a simulated purchase, without sending anything. If a purchase fails with an unclear error, check the wallet before you retry: a retry buys another copy. |
 | A game | Each move is one transaction. 8 recorded Beast Mode games cost 0.8 to 3.9 STRK each, 2.5 at the median, about 0.04 STRK per move. Fees change with the network. |
