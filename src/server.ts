@@ -4,7 +4,7 @@ import { networkInterfaces } from "node:os";
 import { BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
-import { halt, play } from "./runner.ts";
+import { halt, play, slain } from "./runner.ts";
 import { enrich, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
 import { inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
@@ -153,7 +153,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     return res.end("ok");
   }
   if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
-  if (url.pathname === "/api/games") return reply(res, db.prepare(`${GAMES} ORDER BY onchain DESC, id DESC LIMIT 200`).all(liveRow()));
+  if (url.pathname === "/api/games") {
+    const games = db.prepare(`${GAMES} ORDER BY onchain DESC, id DESC LIMIT 200`).all(liveRow()) as { id: number; live: number }[];
+    return reply(res, games.map((g) => (g.live ? { ...g, beasts: slain(g.id) } : g)));
+  }
   const id = Number(url.pathname.match(/^\/api\/games\/(\d+)$/)?.[1]);
   if (id) {
     const game = db.prepare(`${GAMES} WHERE id = ?`).get(liveRow(), id);
