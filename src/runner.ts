@@ -57,6 +57,7 @@ async function playGame(practiceId: string | undefined, seed: number, entry?: En
   const resumed = practiceId ? undefined : (db.prepare("SELECT id FROM games WHERE game_id = ? AND mode = ?").get(id, mode) as { id: number } | undefined);
   row = resumed?.id ?? Number(db.prepare("INSERT INTO games (mode, game_id, seed, strategy, started_at) VALUES (?, ?, ?, ?, ?)").run(mode, id, seed, strategy.hash, Date.now()).lastInsertRowid);
   if (resumed) db.prepare("UPDATE games SET ended_at = NULL WHERE id = ?").run(row);
+  const played = row;
   emit({ kind: "status", text: `game ${row} on ${id.slice(-8)}`, row });
   try {
     ending = await playMoves(strategy.rules);
@@ -73,8 +74,9 @@ async function playGame(practiceId: string | undefined, seed: number, entry?: En
   if (practiceId || !snapshot()?.over) return;
   await new Promise((r) => setTimeout(r, CLAIM_DELAY_MS));
   const claimed = await collect(id);
-  emit({ kind: "status", text: claimed ? `claimed beasts from ${id.slice(-8)} in ${claimed}` : `no beast to claim from ${id.slice(-8)}` });
-  if (!claimed || !BEASTS_TO) return;
+  db.prepare("UPDATE games SET claimed = ? WHERE id = ?").run(claimed.beasts, played);
+  emit({ kind: "status", text: claimed.beasts ? `claimed ${claimed.beasts} beasts from ${id.slice(-8)} in ${claimed.transaction}` : `no beast to claim from ${id.slice(-8)}` });
+  if (!claimed.beasts || !BEASTS_TO) return;
   const sent = await sendBeasts(BEASTS_TO);
   emit({ kind: "status", text: `sent ${sent.beasts} beasts to ${BEASTS_TO.slice(0, 8)} in ${sent.transaction}` });
 }

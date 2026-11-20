@@ -8,7 +8,7 @@ const commands: Record<string, () => Promise<unknown>> = {
     return { address, deployed: await isDeployed(), strk: Number(await strkBalance()) / 1e18 };
   },
   deploy,
-  collect: async () => (await collect(process.argv[3])) ?? "nothing to claim",
+  collect: async () => (await collect(process.argv[3])).transaction ?? "nothing to claim",
   quote: () => quote(process.argv[3]),
   "send-beasts": () => sendBeasts(process.argv[3]),
   bag: () => bagReport(Number(process.argv[3]), process.argv[4] ?? keys().address),

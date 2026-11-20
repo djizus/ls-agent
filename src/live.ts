@@ -197,9 +197,9 @@ export async function claimable(id: string): Promise<number[]> {
   return (await pending(owner, key, id)).map((c) => c.encounterXp);
 }
 
-export async function collect(id: string): Promise<string | undefined> {
+export async function collect(id: string): Promise<{ beasts: number; transaction?: string }> {
   const claims = await claimable(id);
-  return claims.length ? settle(id, claims) : undefined;
+  return { beasts: claims.length, transaction: claims.length ? await settle(id, claims) : undefined };
 }
 
 type Simulated = { calls: string[]; strk: number; revert: string | null };

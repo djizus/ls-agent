@@ -39,3 +39,4 @@ if (!columns.includes("mismatches")) db.exec("ALTER TABLE games ADD COLUMN misma
 if (!columns.includes("beasts")) db.exec("ALTER TABLE games ADD COLUMN beasts INTEGER");
 if (!columns.includes("gas_strk")) db.exec("ALTER TABLE games ADD COLUMN gas_strk REAL");
 if (!columns.includes("survivor")) db.exec("ALTER TABLE games ADD COLUMN survivor REAL");
+if (!columns.includes("claimed")) db.exec("ALTER TABLE games ADD COLUMN claimed INTEGER");
