@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hash, type Call } from "starknet";
 import { claims as pending } from "./beasts.ts";
-import { BEAST_NFT, DUNGEON, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, SURVIVOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, VAR_DIR, type Dungeon } from "./config.ts";
+import { BEAST_NFT, DUNGEON, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, SURVIVOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, USDC, VAR_DIR, type Dungeon } from "./config.ts";
 import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
 import { randomHash, startOf, type Chain, type Game, type Snapshot } from "./practice.ts";
@@ -24,6 +24,12 @@ async function send(calls: Call[]) {
 }
 
 type Quote = { total_calculated: string; splits: { amount_specified: string; route: { pool_key: { token0: string; token1: string; fee: string; tick_spacing: number | string; extension: string }; sqrt_ratio_limit: string; skip_ahead: number | string }[] }[] };
+
+export async function usdPrice(token: string): Promise<number> {
+  const res = await fetch(`${EKUBO_QUOTER}/${1000n * ONE}/${token}/${USDC}`);
+  if (!res.ok) throw new Error(`dollar quote ${res.status}`);
+  return Number(((await res.json()) as Quote).total_calculated) / 1e9;
+}
 
 export async function ticketCalls(): Promise<{ calls: Call[]; maxStrk: number }> {
   const wanted = BigInt(TICKET_BATCH) * ONE;
@@ -63,12 +69,19 @@ const bagOf = (id: bigint) => Number((id >> 192n) & ((1n << 56n) - 1n));
 const pair = (list: string[], at: number) => BigInt(list[at]) + (BigInt(list[at + 1]) << 128n);
 export const units = (n: bigint) => `${n / ONE}.${(n % ONE).toString().padStart(18, "0")}`.replace(/\.?0+$/, "");
 
+const pooled = (ids: string[]) => Array.from({ length: Number(ids[0]) }, (_, i) => pair(ids, 1 + 2 * i));
+
 export function heldGames(ids: string[], bag: number): string[] {
-  return Array.from({ length: Number(ids[0]) }, (_, i) => pair(ids, 1 + 2 * i)).filter((id) => bagOf(id) === bag).map(gameId);
+  return pooled(ids).filter((id) => bagOf(id) === bag).map(gameId);
+}
+
+export function unranked(ids: string[], ranked: number[]): { bag: number; game: string }[] {
+  const first = new Map(pooled(ids).reverse().map((id) => [bagOf(id), gameId(id)]));
+  return [...first].filter(([bag]) => !ranked.includes(bag)).map(([bag, game]) => ({ bag, game }));
 }
 
 export function forSale<Row extends { bag: number }>(rows: Row[], ids: string[]): (Row & { n: number })[] {
-  const bags = Array.from({ length: Number(ids[0]) }, (_, i) => bagOf(pair(ids, 1 + 2 * i)));
+  const bags = pooled(ids).map(bagOf);
   return rows.map((row) => ({ ...row, n: bags.filter((bag) => bag === row.bag).length })).filter((row) => row.n);
 }
 

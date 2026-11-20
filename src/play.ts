@@ -40,14 +40,16 @@ export const slewNamed = (before: Pick<State, "beast">, after: Pick<State, "beas
 
 type Recorded = { kind: string; state?: Pick<State, "beast" | "over">; actions?: { type: string }[] };
 
-export function namedKills(events: Recorded[]): NonNullable<State["beast"]>[] {
-  const kills: NonNullable<State["beast"]>[] = [];
+export function namedKills(events: Recorded[]): (NonNullable<State["beast"]> & { move: number })[] {
+  const kills: (NonNullable<State["beast"]> & { move: number })[] = [];
   let before: Recorded["state"];
   let move: string | undefined;
+  let moves = 0;
   for (const e of events) {
     if (e.kind === "decision") move = e.actions?.[0]?.type;
     if (e.kind !== "state" || !e.state) continue;
-    if (before && move && slewNamed(before, e.state, move)) kills.push(before.beast!);
+    if (before && move && slewNamed(before, e.state, move)) kills.push({ ...before.beast!, move: moves });
+    if (move) moves++;
     before = e.state;
     move = undefined;
   }
@@ -301,6 +303,8 @@ export function shape(s: State, actions: Action[], reserve = 0): Action[] {
 export function snapshot(): State | undefined {
   return last && game && describe(last, game.id);
 }
+
+export const moveBlock = (move: number): bigint | undefined => game?.chain?.blocks[move];
 
 export function movesMade(): number {
   return game?.packets.length ?? 0;

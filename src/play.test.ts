@@ -111,6 +111,6 @@ test("a recorded game counts the named beasts it killed by attacking, not plain 
     decision("attack"), state({ beast: null, over: true }),
   ];
   assert.equal(namedSlain(recorded), 2);
-  assert.deepEqual(namedKills(recorded).map((b) => b.specialPrefix), ["Horror", "Golem"]);
+  assert.deepEqual(namedKills(recorded).map((b) => [b.specialPrefix, b.move]), [["Horror", 2], ["Golem", 9]]);
   assert.equal(namedSlain([]), 0);
 });

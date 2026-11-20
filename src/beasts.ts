@@ -89,13 +89,14 @@ async function staker(dungeon: string, owner: string, k: Affixes, killBlock: () 
   return takeable(owner, await killBlock(), { staker: by, block: BigInt(block) }) ? by : null;
 }
 
-// A named beast slain in a game still running: claimable when nobody minted it yet, or when it is staked and can be taken.
-export async function claimableKill(key: string, owner: string, beast: { id: number; specialPrefix: string | null; specialSuffix: string | null }): Promise<boolean> {
-  const d = DUNGEONS[key];
-  const k = { species: d.firstSpecies + beast.id - 1, prefix: PREFIXES.indexOf(beast.specialPrefix!) + 1, suffix: SUFFIXES.indexOf(beast.specialSuffix!) + 1 };
-  if (!(await minted(k))) return true;
-  // shortcut: the latest block stands for the kill's block, so a stake made after the kill counts as takeable; read the transcript if that matters
-  return (await staker(d.address, owner, k, async () => BigInt(await provider.getBlockNumber()))) !== null;
+export const affixes = (key: string, beast: { id: number; specialPrefix: string | null; specialSuffix: string | null }): Affixes => ({
+  species: DUNGEONS[key].firstSpecies + beast.id - 1,
+  prefix: PREFIXES.indexOf(beast.specialPrefix!) + 1,
+  suffix: SUFFIXES.indexOf(beast.specialSuffix!) + 1,
+});
+
+export async function claimableKill(key: string, owner: string, k: Affixes, killBlock: bigint): Promise<boolean> {
+  return !(await minted(k)) || (await staker(DUNGEONS[key].address, owner, k, async () => killBlock)) !== null;
 }
 
 export async function claims(owner: string, key: string, adventurer?: string): Promise<Claim[]> {

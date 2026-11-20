@@ -6,7 +6,7 @@ export const RULES = { potionPrice: 1, dexPerLevel: 0.9, weaponCatchUp: 5, jewel
 
 const RINGS = ["Titanium Ring", "Silver Ring", "Gold Ring", "Platinum Ring", "Bronze Ring"];
 
-const NECK: Record<string, string> = { Cloth: "Amulet", Hide: "Pendant", Metal: "Necklace" };
+export const NECK: Record<string, string> = { Cloth: "Amulet", Hide: "Pendant", Metal: "Necklace" };
 
 const MAX_GREATNESS = 20;
 const MAX_STAT = 31;
@@ -18,7 +18,7 @@ const WEAK: Record<string, string> = { Magic: "Hide", Blade: "Metal", Bludgeon: 
 const SURE = 0.999999;
 const BAG_SIZE = 15;
 const FALLBACK = ["vitality", "strength", "dexterity", "charisma", "intelligence", "wisdom"] as const;
-const ARMOR = ["chest", "head", "waist", "foot", "hand"];
+export const ARMOR = ["chest", "head", "waist", "foot", "hand"];
 const JEWELRY = ["neck", "ring"];
 
 export type Plan = { actions: Action[]; why: string };

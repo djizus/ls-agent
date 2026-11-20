@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { decodeBeast, describe, takeable, unclaimed } from "./beasts.ts";
+import { affixes, decodeBeast, describe, takeable, unclaimed } from "./beasts.ts";
 import { DUNGEONS, GAME_CORE } from "./config.ts";
 import { settleCalls } from "./live.ts";
 
@@ -79,4 +79,10 @@ test("a staked beast is taken only by another player's kill made after the stake
   const stake = { staker: "0x0abc", block: 100n };
   assert.deepEqual([takeable("0x1", 101n, stake), takeable("0x1", 100n, stake), takeable("0x1", 99n, stake), takeable("0xABC", 101n, stake)], [true, false, false, false]);
   assert.equal(takeable("0x1", 18153371n, { staker: "0x2", block: 0n }), true);
+});
+
+test("a beast named in the game events maps to the ids its collection is asked about", () => {
+  const pixie = { id: 24, specialPrefix: "Onslaught", specialSuffix: "Bane" };
+  assert.deepEqual(affixes("beast", pixie), { species: 24, prefix: 46, suffix: 1 });
+  assert.deepEqual(affixes("lootBag", pixie), { species: 101, prefix: 46, suffix: 1 });
 });
