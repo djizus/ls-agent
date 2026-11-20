@@ -7,6 +7,7 @@ import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
 import { randomHash, startOf, type Chain, type Game, type Snapshot } from "./practice.ts";
 import { transcript } from "./transcript.ts";
+import { nextHead } from "./heads.ts";
 import { account, balanceOf, keys, provider, strkBalance } from "./wallet.ts";
 
 const ONE = 10n ** 18n;
@@ -15,12 +16,24 @@ const file = `${VAR_DIR}live.json`;
 const hex = (n: bigint) => "0x" + n.toString(16);
 const u256 = (n: bigint) => [hex(n & ((1n << 128n) - 1n)), hex(n >> 128n)];
 
-async function send(calls: Call[]) {
-  if ((await strkBalance()) < BigInt(STRK_FLOOR) * ONE) throw new Error(`spend cap reached: balance is under ${STRK_FLOOR} STRK`);
-  const { transaction_hash } = await account().execute(calls, { tip: 0n });
-  const receipt = await provider.waitForTransaction(transaction_hash, { retryInterval: 1000 });
-  if (!receipt.isSuccess()) throw new Error(`transaction ${transaction_hash} failed`);
-  return receipt.value;
+async function submit(calls: Call[]) {
+  const [balance, nonce] = await Promise.all([strkBalance(), provider.getNonceForAddress(keys().address)]);
+  if (balance < BigInt(STRK_FLOOR) * ONE) throw new Error(`spend cap reached: balance is under ${STRK_FLOOR} STRK`);
+  const { transaction_hash } = await account().execute(calls, { tip: 0n, nonce });
+  for (;;) {
+    const receipt = await provider.getTransactionReceipt(transaction_hash).catch(() => undefined);
+    if (receipt?.isSuccess() && "block_hash" in receipt.value && receipt.value.block_hash) return receipt.value;
+    if (receipt && (receipt.isReverted() || receipt.isError())) throw new Error(`transaction ${transaction_hash} failed`);
+    await nextHead();
+  }
+}
+
+let turn: Promise<unknown> = Promise.resolve();
+
+function send(calls: Call[]) {
+  const mine = turn.then(() => submit(calls));
+  turn = mine.catch(() => undefined);
+  return mine;
 }
 
 type Quote = { total_calculated: string; splits: { amount_specified: string; route: { pool_key: { token0: string; token1: string; fee: string; tick_spacing: number | string; extension: string }; sqrt_ratio_limit: string; skip_ahead: number | string }[] }[] };
@@ -150,9 +163,13 @@ async function start(id: string): Promise<Snapshot> {
   }
 }
 
-export async function liveGame(entry?: Entry): Promise<Game> {
-  const id: string = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).id : await enter(entry);
-  writeFileSync(file, JSON.stringify({ id }));
+export const liveIds = (): string[] => (existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).ids : []);
+
+const keep = (ids: string[]) => (ids.length ? writeFileSync(file, JSON.stringify({ ids })) : rmSync(file, { force: true }));
+
+export async function liveGame(entry?: Entry, resumed?: string): Promise<Game> {
+  const id = resumed ?? (await enter(entry));
+  keep([...new Set([...liveIds(), id])]);
   const { packets, chain } = await transcript(id);
   const begin = await start(id);
   return { id, seed: 0, packets, start: begin, local: fromSnapshot(replayLocal(begin, id, packets, chain.hashes)), chain };
@@ -279,18 +296,51 @@ export async function quote(id: string): Promise<{ owner: string; claims: number
   return { owner, claims, strk: transactions.reduce((sum, t) => sum + t.strk, 0), transactions };
 }
 
-export async function actLive(game: Game, actions: Action[]): Promise<Snapshot> {
-  const packet = encodePacket(actions);
-  step(game.local, game.id, packet, randomHash());
-  const chain = game.chain!;
-  const receipt = await send([{ contractAddress: GAME_CORE, entrypoint: "commit_actions", calldata: [game.id, hex(game.packets.length ? chain.rolling : 0n), "0x1", hex(packet)] }]);
+export type Move = { game: Game; actions: Action[] };
+export type Moved = { snapshot: Snapshot; strk: number } | { error: unknown };
+
+export async function actLive(moves: Move[]): Promise<Moved[]> {
+  const out: Moved[] = moves.map(() => ({ error: new Error("not sent") }));
+  const first = (game: Game) => (game.packets.length ? game.chain!.rolling : 0n);
+  let ready = moves.flatMap(({ game, actions }, at) => {
+    try {
+      const packet = encodePacket(actions);
+      step(game.local, game.id, packet, randomHash());
+      return [{ at, game, packet, call: { contractAddress: GAME_CORE, entrypoint: "commit_actions", calldata: [game.id, hex(first(game)), "0x1", hex(packet)] } }];
+    } catch (error) {
+      out[at] = { error };
+      return [];
+    }
+  });
+  const refuse = (error: unknown) => ready.forEach((r) => (out[r.at] = { error }));
+  if (!ready.length) return out;
+  let receipt: Awaited<ReturnType<typeof send>>;
+  try {
+    receipt = await send(ready.map((r) => r.call));
+  } catch (error) {
+    const alone = ready.length > 1 ? await simulate(keys().address, ready.map((r) => [r.call])).catch(() => undefined) : undefined;
+    const sound = ready.filter((_, k) => alone && !alone[k].revert);
+    if (!sound.length || sound.length === ready.length) return refuse(error), out;
+    ready.forEach((r, k) => alone![k].revert && (out[r.at] = { error: new Error(alone![k].revert!) }));
+    ready = sound;
+    try {
+      receipt = await send(ready.map((r) => r.call));
+    } catch (again) {
+      return refuse(again), out;
+    }
+  }
   const block = BigInt(receipt.block_number);
-  chain.rolling = BigInt(hash.computePoseidonHashOnElements([game.packets.length ? chain.rolling : BigInt(hash.computePoseidonHashOnElements([BigInt(game.id)])), packet, block]));
-  game.packets.push(packet);
-  chain.blocks.push(block);
-  chain.hashes.push(receipt.block_hash);
-  game.local = step(game.local, game.id, packet, receipt.block_hash);
-  const snap = toSnapshot(game.local);
-  if (snap.over) rmSync(file);
-  return snap;
+  const strk = Number(BigInt(receipt.actual_fee.amount)) / 1e18 / ready.length;
+  for (const { at, game, packet } of ready) {
+    const chain = game.chain!;
+    chain.rolling = BigInt(hash.computePoseidonHashOnElements([game.packets.length ? chain.rolling : BigInt(hash.computePoseidonHashOnElements([BigInt(game.id)])), packet, block]));
+    game.packets.push(packet);
+    chain.blocks.push(block);
+    chain.hashes.push(receipt.block_hash);
+    game.local = step(game.local, game.id, packet, receipt.block_hash);
+    const snapshot = toSnapshot(game.local);
+    if (snapshot.over) keep(liveIds().filter((id) => id !== game.id));
+    out[at] = { snapshot, strk };
+  }
+  return out;
 }

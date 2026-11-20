@@ -1,4 +1,6 @@
 export const RPC_URL = process.env.LS_RPC_URL ?? "https://starknet-rpc.publicnode.com";
+export const WS_URL = RPC_URL.replace(/^http/, "ws");
+export const SEATS = Math.max(1, Number(process.env.LS_SEATS ?? 1));
 export const VAR_DIR = process.env.LS_VAR_DIR ?? new URL("../var/", import.meta.url).pathname;
 export const PORT = Number(process.env.LS_PORT ?? 4100);
 export const HOST = process.env.LS_HOST ?? "127.0.0.1";

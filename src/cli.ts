@@ -1,4 +1,5 @@
 import { inventory, pendingClaims } from "./beasts.ts";
+import { hangUp } from "./heads.ts";
 import { bagReport, collect, quote, sendBeasts } from "./live.ts";
 import { deploy, isDeployed, keys, strkBalance } from "./wallet.ts";
 
@@ -25,3 +26,4 @@ if (!run) {
   process.exit(1);
 }
 console.log(JSON.stringify(await run(), null, 2));
+hangUp();

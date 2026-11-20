@@ -5,7 +5,7 @@ import { OZ_ACCOUNT_CLASS, RPC_URL, STRK, VAR_DIR } from "./config.ts";
 type Keys = { privateKey: string; publicKey: string; address: string };
 
 const file = `${VAR_DIR}wallet.json`;
-export const provider = new RpcProvider({ nodeUrl: RPC_URL });
+export const provider = new RpcProvider({ nodeUrl: RPC_URL, batch: 0 });
 
 export function keys(): Keys {
   if (existsSync(file)) return JSON.parse(readFileSync(file, "utf8"));

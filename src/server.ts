@@ -5,10 +5,10 @@ import { BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, T
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
 import { halt, play, slain } from "./runner.ts";
-import { enrich, moveBlock, namedKills, snapshot } from "./play.ts";
+import { enrich, namedKills, seated, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
 import { affixes, claimableKill, inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
-import { liveRow, subscribe } from "./events.ts";
+import { liveRows, subscribe } from "./events.ts";
 import { forSale, poolIds, usdPrice } from "./live.ts";
 import { handleMcp } from "./mcp.ts";
 import { summary } from "./summary.ts";
@@ -16,7 +16,7 @@ import { summary } from "./summary.ts";
 const page = readFileSync(new URL("../web/index.html", import.meta.url));
 const CHECK = `${VAR_DIR}contract-check.json`;
 const BAGS = new URL("../scripts/bag-ranking.json", import.meta.url);
-const GAMES = `SELECT *, CASE mode ${Object.entries(DUNGEONS).map(([k, d]) => `WHEN '${k}' THEN '${d.name}'`).join(" ")} END AS dungeon, mode IN (${Object.keys(DUNGEONS).map((k) => `'${k}'`)}) AS onchain, id IS ? AS live FROM games`;
+const games = () => `SELECT *, CASE mode ${Object.entries(DUNGEONS).map(([k, d]) => `WHEN '${k}' THEN '${d.name}'`).join(" ")} END AS dungeon, mode IN (${Object.keys(DUNGEONS).map((k) => `'${k}'`)}) AS onchain, id IN (${liveRows().join(",") || "NULL"}) AS live FROM games`;
 
 async function json(req: IncomingMessage): Promise<unknown> {
   let raw = "";
@@ -93,18 +93,18 @@ function background<T>(ttlMs: number, load: () => Promise<T>, idle: () => boolea
 
 const BEASTS_MS = 600_000;
 const RETRY_MS = 60_000;
-const quiet = () => liveRow() === null;
+const quiet = () => !liveRows().length;
 const prices = background(BEASTS_MS, sellPrices, quiet);
 const claimable = background(BEASTS_MS, () => pendingClaims(keys().address), quiet);
 const collection = background(BEASTS_MS, () => inventory(BEASTS_TO ?? keys().address));
 
-const verdicts = { game: 0, known: new Map<string, boolean | null>() };
+const verdicts = new Map<number, Map<string, boolean | null>>();
 
-function liveClaimable(g: { id: number; mode: string }): number | null {
-  if (verdicts.game !== g.id) Object.assign(verdicts, { game: g.id, known: new Map() });
-  const { known } = verdicts;
+function openClaims(g: { id: number; mode: string }): number | null {
+  const known = verdicts.get(g.id) ?? verdicts.set(g.id, new Map()).get(g.id)!;
+  const blocks = seated(g.id)?.game.chain?.blocks ?? [];
   const events = (db.prepare("SELECT body FROM events WHERE game = ? ORDER BY rowid").all(g.id) as { body: string }[]).map((r) => JSON.parse(r.body));
-  const kills = namedKills(events).map((b) => ({ ...affixes(g.mode, b), block: moveBlock(b.move) }));
+  const kills = namedKills(events).map((b) => ({ ...affixes(g.mode, b), block: blocks[b.move] }));
   for (const k of kills) {
     const key = `${k.species}:${k.prefix}:${k.suffix}`;
     if (known.has(key) || k.block === undefined) continue;
@@ -174,12 +174,13 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
   }
   if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
   if (url.pathname === "/api/games") {
-    const games = db.prepare(`${GAMES} ORDER BY onchain DESC, id DESC LIMIT 200`).all(liveRow()) as { id: number; live: number; mode: string }[];
-    return reply(res, games.map((g) => (g.live ? { ...g, beasts: slain(g.id), claimable: liveClaimable(g), level: snapshot()?.level ?? null } : g)));
+    const rows = db.prepare(`${games()} ORDER BY onchain DESC, id DESC LIMIT 200`).all() as { id: number; live: number; mode: string; claimed: number | null }[];
+    for (const g of rows) if (!g.live && g.claimed !== null) verdicts.delete(g.id);
+    return reply(res, rows.map((g) => (g.live ? { ...g, beasts: slain(g.id), claimable: openClaims(g), level: snapshot(seated(g.id))?.level ?? null } : verdicts.has(g.id) ? { ...g, claimable: openClaims(g) } : g)));
   }
   const id = Number(url.pathname.match(/^\/api\/games\/(\d+)$/)?.[1]);
   if (id) {
-    const game = db.prepare(`${GAMES} WHERE id = ?`).get(liveRow(), id);
+    const game = db.prepare(`${games()} WHERE id = ?`).get(id);
     if (!game) return res.writeHead(404).end();
     const events = (db.prepare("SELECT body FROM events WHERE game = ? ORDER BY rowid").all(id) as { body: string }[]).map((r) => JSON.parse(r.body));
     return reply(res, { game, events: events.map((e) => (e.kind === "state" ? { ...e, state: enrich(e.state) } : e)) });

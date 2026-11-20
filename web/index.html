@@ -57,9 +57,9 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 #board li { grid-template-columns: auto 1fr 3rem 2.6rem; }
 #board b { text-align: right; }
 .slain { display: flex; align-items: center; gap: 0.2rem; font-size: 1.4rem; line-height: 1; }
-#games .slain img { width: 1.2rem; height: 1.2rem; filter: none; }
-#games .slain.won { color: var(--gold); }
-#games .slain.won img { filter: hue-rotate(-65deg) brightness(1.2); }
+#games .slain img, .bar .slain img { width: 1.2rem; height: 1.2rem; filter: none; }
+#games .slain.won, .bar .slain.won { color: var(--gold); }
+#games .slain.won img, .bar .slain.won img { filter: hue-rotate(-65deg) brightness(1.2); }
 #games li[data-id]:hover { background: #1e2619; }
 #games li.on { border-color: var(--gold); box-shadow: var(--bevel), 0 0 0 2px var(--gold), 0 3px 0 rgb(0 0 0 / 0.6); }
 #reach { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
@@ -68,9 +68,17 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 #reach b.good { color: var(--lime); } #reach b.bad { color: var(--blood); }
 
 #mid { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; min-height: 0; }
-#stage { position: relative; flex: 1; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--drop); background: #000; overflow: hidden; display: grid; place-content: center; text-align: center; }
-#stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-#stage b { font: 400 4rem/1 var(--num); color: var(--gold); }
+#stage { position: relative; flex: 1; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--drop); background: #000; overflow: hidden; display: grid; grid-auto-rows: 1fr; gap: 2px; text-align: center; }
+#stage.grid { grid-template-columns: 1fr 1fr; background: var(--edge); }
+.tile { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #000; }
+.tile .view { position: relative; flex: 1; min-height: 0; display: grid; place-content: center; }
+.tile iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.tile .bar { display: none; }
+#stage.grid .bar { display: flex; align-items: center; gap: 0.7rem; padding: 0.2rem 0.6rem; background: var(--raise); cursor: pointer; font-size: 1.4rem; white-space: nowrap; }
+#stage.grid .bar:hover { color: var(--gold); }
+.bar b { font: 400 1.8rem/1 var(--num); color: var(--gold); }
+.bar button { margin-left: auto; }
+#stage > b, .view b { font: 400 4rem/1 var(--num); color: var(--gold); align-self: center; }
 #dock { flex: none; flex-direction: row; align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; min-height: 4.6rem; }
 #mode { font: 400 1.7rem/1 var(--num); letter-spacing: 0.06em; white-space: nowrap; }
 #mode::before { content: ""; display: inline-block; width: 0.6rem; height: 0.6rem; margin-right: 0.4rem; background: currentColor; vertical-align: 0.12em; }
@@ -84,8 +92,8 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .chip.on { color: var(--gold); border-color: var(--gold); }
 .chip.off { color: var(--dim); opacity: 0.7; }
 .chip.out img { filter: grayscale(1) brightness(0.6); }
-#again { padding: 0 0.5rem; border: 2px solid var(--edge); border-radius: 3px; color: var(--dim); white-space: nowrap; }
-#again:hover { color: var(--gold); border-color: var(--gold); }
+#again, .bar button { padding: 0 0.5rem; border: 2px solid var(--edge); border-radius: 3px; color: var(--dim); white-space: nowrap; }
+#again:hover, .bar button:hover { color: var(--gold); border-color: var(--gold); }
 #golive { color: #000; background: var(--lime); border-radius: 3px; padding: 0.2rem 0.6rem; white-space: nowrap; }
 
 .big { font: 400 3.2rem/0.9 var(--num); }
@@ -118,6 +126,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
   .win { display: flex; flex-direction: column; height: auto; }
   #mid { order: -1; }
   #stage { flex: none; height: 78svh; }
+  #stage.grid { grid-template-columns: 1fr; height: auto; grid-auto-rows: 62svh; }
   #dock { flex-wrap: wrap; }
   #board, #sacks { max-height: 22rem; }
 }
@@ -150,7 +159,8 @@ const title = (word) => word[0].toUpperCase() + word.slice(1);
 const stat = (name) => `<i class="ic" style="--i:url(/assets/icons/${title(name)}.svg)" title="${title(name)}"></i>`;
 const pic = (name, label) => `<img class="pic" src="/assets/icons/${name}.png" alt="${label}" title="${label}">`;
 const art = (name) => `<img class="pic" src="/assets/loot/${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.png" alt="${esc(name)}" title="${esc(name)}">`;
-const slain = (g) => (g.beasts == null ? `<span></span>` : `<span class="slain${g.claimed ? " won" : ""}" title="Named beasts slain${g.claimed ? `, ${g.claimed} claimed` : ""}"><img src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`);
+const won = (g) => g.claimed ?? g.claimable;
+const slain = (g) => (g.beasts == null ? `<span></span>` : `<span class="slain${won(g) ? " won" : ""}" title="Named beasts slain${won(g) ? `, ${won(g)} ${g.claimed == null ? "to claim" : "claimed"}` : ""}"><img src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`);
 const MARK = { lootBag: "/assets/bag.png" };
 const face = (name) => (/^[A-Za-z]+$/.test(name ?? "") ? `/assets/beasts/${name.toLowerCase()}.png` : "/assets/skull.png");
 const portrait = (g) => (killer(g) ? face(killer(g)[1]) : (MARK[g.mode] ?? "/assets/skull.png"));
@@ -160,6 +170,7 @@ const WATCH = "https://www.lootsurvivor.io/watch?id=";
 const MOVES = { attack: "Fight", flee: "Flee", explore: "Explore" };
 const SLOW_MS = 60_000;
 const INDEXED_MS = 10_000;
+const TILES = 4;
 const BAGS = 25;
 const LATEST = 20;
 const STRIP = 5;
@@ -176,10 +187,11 @@ let shown;
 let move = null;
 let market = [];
 
-const liveReal = () => data.games.find((g) => g.live && g.onchain);
+const lives = () => data.games.filter((g) => g.live && g.onchain);
+const liveReal = () => lives()[0];
 const realGames = () => data.games.filter((g) => g.onchain);
 const picked = () => Number(new URLSearchParams(location.search).get("game")) || null;
-const target = () => realGames().find((g) => g.id === picked()) ?? liveReal() ?? realGames()[0] ?? null;
+const target = () => realGames().find((g) => g.id === picked()) ?? (lives().length > 1 ? null : (liveReal() ?? realGames()[0] ?? null));
 
 function planHtml(e) {
   const last = e.actions.at(-1)?.type;
@@ -202,33 +214,52 @@ function planHtml(e) {
 
 function endHtml(g) {
   const k = killer(g);
-  return `${g.level === null ? "" : `<span class="chip">Level ${g.level}</span>`}${k ? `<span class="chip"><img class="pic" src="${face(k[1])}" alt="">${k[1]} ${k[2]}</span>` : ""}${g.beasts == null ? "" : `<span class="chip" title="Named beasts slain"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`}${g.claimed == null ? "" : `<span class="chip gold" title="Beasts the settlement claimed for the wallet">${g.claimed} claimed</span>`}${g.gas_strk === null ? "" : `<span class="chip">${round(g.gas_strk, 1)}<small>STRK</small></span>`}<span class="dim">Click the game, then press the right arrow to replay it</span>`;
+  return `${g.level === null ? "" : `<span class="chip">Level ${g.level}</span>`}${k ? `<span class="chip"><img class="pic" src="${face(k[1])}" alt="">${k[1]} ${k[2]}</span>` : ""}${g.beasts == null ? "" : `<span class="chip" title="Named beasts slain"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`}${toClaim(g)}${g.claimed == null ? "" : `<span class="chip gold" title="Beasts the settlement claimed for the wallet">${g.claimed} claimed</span>`}${g.gas_strk === null ? "" : `<span class="chip">${round(g.gas_strk, 1)}<small>STRK</small></span>`}<span class="dim">Click the game, then press the right arrow to replay it</span>`;
 }
 
-function spectate() {
-  const g = shown;
-  $("stage").html = null;
-  put($("stage"), g ? `<iframe src="${WATCH}${BigInt(g.game_id)}" title="Game ${g.id} in the Loot Survivor spectator" allow="autoplay"></iframe>` : `<b>No real game yet</b>`);
+const CLAIM_TITLE = "Of those, beasts nobody minted yet or that can be taken from a stake: the ones the settlement will claim";
+const toClaim = (g) => (g.claimed != null || g.claimable == null ? "" : `<span class="chip gold" title="${CLAIM_TITLE}">${g.claimable} to claim</span>`);
+
+function watch(view, g, now) {
+  const frame = `<iframe src="${WATCH}${BigInt(g.game_id)}" title="Game ${g.id} in the Loot Survivor spectator" allow="autoplay"></iframe>`;
+  const wait = g.live && !now ? g.started_at + INDEXED_MS - Date.now() : 0;
+  view.innerHTML = wait > 0 ? `<b>Game ${g.id} starts</b>` : frame;
+  if (wait > 0) setTimeout(() => { if (!view.querySelector("iframe")) view.innerHTML = frame; }, wait);
+}
+
+function spectate(games) {
+  const stage = $("stage");
+  stage.className = games.length > 1 ? "grid" : "";
+  for (const el of [...stage.children]) if (!games.some((g) => String(g.id) === el.dataset.id)) el.remove();
+  if (!games.length) return void (stage.innerHTML = `<b>No real game yet</b>`);
+  for (const g of games) {
+    let tile = stage.querySelector(`[data-id="${g.id}"]`);
+    if (!tile) {
+      tile = stage.appendChild(Object.assign(document.createElement("div"), { className: "tile", innerHTML: `<div class="view"></div><div class="bar"></div>` }));
+      tile.dataset.id = g.id;
+      watch(tile.firstChild, g);
+    }
+    put(tile.lastChild, `<span>Game ${g.id}</span><b>${g.level ?? ""}</b>${slain(g)}${g.claimable == null ? "" : `<span class="gold" title="${CLAIM_TITLE}">${g.claimable} to claim</span>`}<button type="button" data-again title="Load the spectator again">Reload</button>`);
+  }
 }
 
 function render() {
   const g = target();
+  const all = g ? [g] : lives().slice(0, TILES);
+  spectate(all);
   if (shown === undefined || g?.id !== shown?.id) {
     shown = g;
     move = null;
     market = [];
-    const wait = g?.live ? g.started_at + INDEXED_MS - Date.now() : 0;
-    if (wait > 0) setTimeout(() => { if (shown?.id === g.id && !$("stage").querySelector("iframe")) spectate(); }, wait);
-    if (wait > 0) put($("stage"), `<b>Game ${g.id} starts</b>`);
-    else spectate();
     if (g?.live) get(`/api/games/${g.id}`).then((found) => { for (const e of found?.events ?? []) onEvent(e); render(); });
   }
-  $("mode").className = g?.live ? "live good" : g ? "bad" : "dim";
-  $("mode").textContent = g?.live ? "Live" : g ? "Ended" : "Idle";
-  $("which").textContent = g ? `Game ${g.id}` : "";
-  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${g.claimable == null ? "" : `<span class="chip gold" title="Of those, beasts nobody minted yet or that can be taken from a stake: the ones the settlement will claim">${g.claimable} to claim</span>`}${move ? planHtml(move) : ""}` : endHtml(g));
+  const live = all.some((x) => x.live);
+  $("mode").className = live ? "live good" : g ? "bad" : "dim";
+  $("mode").textContent = live ? "Live" : g ? "Ended" : "Idle";
+  $("which").textContent = g ? `Game ${g.id}` : all.length ? `${lives().length} games` : "";
+  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${toClaim(g)}${move ? planHtml(move) : ""}` : endHtml(g));
   $("again").hidden = !g;
-  $("golive").hidden = !liveReal() || g?.live;
+  $("golive").hidden = !liveReal() || !picked() || (g?.live && lives().length === 1);
 
   const sums = data.summary ?? [];
   const sum = sums.find((x) => x.mode === keep("dungeon")) ?? sums.find((x) => x.mode === (liveReal() ?? realGames()[0])?.mode) ?? sums[0];
@@ -238,12 +269,12 @@ function render() {
   const tile = (value, label, tone = "") => `<div class="card"><b class="${tone}">${value}</b><span class="dim">${label}</span></div>`;
   const figure = (n, digits) => (n == null ? "-" : round(n, digits));
   put($("sum"), !sum?.games ? "" : `<div id="reach">${tile(round(sum.games), "Games")}${tile(sum.median, "Median")}${tile(figure(sum.mean, 1), "Average")}${tile(figure(sum.slain, 1), "Slain each")}${tile(sum.best, "Best")}${sum.strategy ? tile(`${Math.round(sum.reach30)}%`, "Level 30") : tile(sum.usd == null ? "-" : `$${round(sum.usd, 2)}`, "Spent")}</div>${sum.strategy && c ? `<div class="head"><span></span>${c.failed ? `<span class="bad" title="${esc(c.failed)}">Check failed</span>` : `<span class="good" title="The local game matches the one on Starknet">Checked</span>`}</div>` : ""}`);
-  const liveNow = data.games.find((x) => x.live);
+  const liveNow = data.games.filter((x) => x.live);
   put($("modes"), `<h2>Games</h2><span class="seg">${sums.map((x) => `<button type="button" data-mode="${x.mode}" aria-pressed="${x.mode === mode}">${x.name.split(" ")[0]}</button>`).join("")}</span>`);
   const ranked = inMode.filter((x) => x.ended_at).sort((a, b) => b.level - a.level || b.id - a.id);
   const cls = (x) => (x.onchain ? `class="card${x.id === g?.id ? " on" : ""}" data-id="${x.id}" tabindex="0"` : `class="card"`);
   put($("podium"), ranked.slice(0, 3).map((x) => `<li ${cls(x)} title="Game ${x.id}"><img src="${portrait(x)}" alt=""><b>${x.level}</b>${slain(x)}<span class="dim">${x.id}</span></li>`).join(""));
-  put($("board"), !liveNow && !ranked.length ? `<li class="none">No games</li>` : [...(liveNow ? [liveNow] : []), ...ranked.slice().sort((a, b) => b.started_at - a.started_at).slice(0, every ? undefined : LATEST)].map((x) => `<li ${cls(x)}><img src="${x.live ? (MARK[x.mode] ?? "/assets/favicon.png") : portrait(x)}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.level ?? ""}</b></li>`).join("") + (!every && ranked.length > LATEST ? `<li class="more"><button type="button" data-more>More</button></li>` : ""));
+  put($("board"), !liveNow.length && !ranked.length ? `<li class="none">No games</li>` : [...liveNow, ...ranked.slice().sort((a, b) => b.started_at - a.started_at).slice(0, every ? undefined : LATEST)].map((x) => `<li ${cls(x)}><img src="${x.live ? (MARK[x.mode] ?? "/assets/favicon.png") : portrait(x)}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.level ?? ""}</b></li>`).join("") + (!every && ranked.length > LATEST ? `<li class="more"><button type="button" data-more>More</button></li>` : ""));
 
   const w = data.wallet;
   put($("wallet"), `<h2>Wallet</h2>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
@@ -284,12 +315,18 @@ function go(search) {
   render();
 }
 
-const pick = (e) => { const m = e.target.closest("[data-mode]"); if (m) { keep("dungeon", m.dataset.mode); every = false; return render(); } if (e.target.closest("[data-more]")) { every = true; return render(); } const row = e.target.closest("li[data-id]"); if (row) go(Number(row.dataset.id) === liveReal()?.id ? "" : `?game=${row.dataset.id}`); };
+const pick = (e) => { const m = e.target.closest("[data-mode]"); if (m) { keep("dungeon", m.dataset.mode); every = false; return render(); } if (e.target.closest("[data-more]")) { every = true; return render(); } const row = e.target.closest("li[data-id]"); if (row) go(lives().length === 1 && Number(row.dataset.id) === liveReal().id ? "" : `?game=${row.dataset.id}`); };
 $("games").onclick = pick;
 $("games").onkeydown = (e) => { if (e.key === "Enter") pick(e); };
 $("beasts").onclick = (e) => { if (e.target.closest("[data-more]")) { zooAll = true; render(); } };
 $("bags").onclick = (e) => { const b = e.target.closest("[data-sort]"); if (b) { bagSort = b.dataset.sort; keep("bagSort", bagSort); render(); } };
-$("again").onclick = spectate;
+$("again").onclick = () => watch($("stage").querySelector(".view"), shown, true);
+$("stage").onclick = (e) => {
+  const tile = e.target.closest(".tile");
+  if (!tile) return;
+  if (e.target.closest("[data-again]")) return watch(tile.firstChild, data.games.find((g) => String(g.id) === tile.dataset.id), true);
+  if (e.target.closest(".bar")) go(`?game=${tile.dataset.id}`);
+};
 $("golive").onclick = () => go("");
 addEventListener("popstate", render);
 
@@ -298,7 +335,7 @@ source.onopen = load;
 source.onmessage = (m) => {
   const e = JSON.parse(m.data);
   if (e.kind === "status") return load();
-  if (shown?.live) { onEvent(e); render(); }
+  if (shown?.live && e.row === shown.id) { onEvent(e); render(); }
   if (e.kind === "state" && liveReal()) load();
 };
 Promise.all([get("/api/items"), load()]).then(([table]) => {

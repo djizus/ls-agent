@@ -189,12 +189,13 @@ export function render(s: State): string {
 
 export type Phase = "battle" | "explore";
 
-let game: Game | undefined;
-let last: Snapshot | undefined;
+export type Table = { game: Game; last: Snapshot; row?: number };
 
-function state(): State {
-  const s = describe(last!, game!.id);
-  emit({ kind: "state", game: game!.id, state: s });
+export const tables: Table[] = [];
+
+function state(t: Table): State {
+  const s = describe(t.last, t.game.id);
+  emit({ kind: "state", game: t.game.id, state: s, row: t.row });
   return s;
 }
 
@@ -202,21 +203,32 @@ export function phase(s: State): Phase {
   return s.beast ? "battle" : "explore";
 }
 
-export async function begin(id: string | undefined, seed = 0, entry?: Entry): Promise<string> {
-  game = id ? await newPracticeGame(id, seed) : await liveGame(entry);
-  last = toSnapshot(game.local);
-  return game.id;
+export async function begin(id: string | undefined, seed = 0, entry?: Entry, resumed?: string): Promise<Table> {
+  const game = id ? await newPracticeGame(id, seed) : await liveGame(entry, resumed);
+  const table = { game, last: toSnapshot(game.local) };
+  tables.push(table);
+  return table;
 }
 
-export const current = (): State => state();
+export const leave = (t: Table): void => void tables.splice(tables.indexOf(t), 1);
 
-export async function commit(actions: Action[]): Promise<State> {
-  try {
-    last = game!.chain ? await actLive(game!, actions) : act(game!, actions);
-  } catch (err) {
-    throw new Error(revertReason(err));
-  }
-  return state();
+export const current = (t: Table): State => state(t);
+
+export type Committed = { state: State; strk: number } | { error: Error };
+
+export async function commit(moves: { table: Table; actions: Action[] }[]): Promise<Committed[]> {
+  const live = moves.filter((m) => m.table.game.chain);
+  const sent = live.length ? await actLive(live.map((m) => ({ game: m.table.game, actions: m.actions }))) : [];
+  return moves.map((m) => {
+    try {
+      const moved = m.table.game.chain ? sent[live.indexOf(m)] : { snapshot: act(m.table.game, m.actions), strk: 0 };
+      if ("error" in moved) throw moved.error;
+      m.table.last = moved.snapshot;
+      return { state: state(m.table), strk: moved.strk };
+    } catch (err) {
+      return { error: new Error(revertReason(err)) };
+    }
+  });
 }
 
 const SAMPLES = 8;
@@ -224,16 +236,16 @@ const SAMPLES = 8;
 export type Odds = { death: number; ongoing: number; hp: [number, number, number]; xp: number; gold: number };
 export type Option = { move: string; label: string } & (Odds | { error: string });
 
-export async function odds(actions: Action[], samples: number): Promise<Odds> {
-  const outcomes = preview(game!, actions, samples);
+export async function odds(t: Table, actions: Action[], samples: number): Promise<Odds> {
+  const outcomes = preview(t.game, actions, samples);
   const pick = (values: number[]) => values.sort((x, y) => x - y)[Math.floor(samples / 2)];
   const hp = outcomes.map((o) => o.adventurer.health).sort((x, y) => x - y);
   return {
     death: outcomes.filter((o) => o.adventurer.health === 0).length / samples,
     ongoing: outcomes.filter((o) => o.adventurer.beast_health > 0).length / samples,
     hp: [hp[0], hp[Math.floor(samples / 2)], hp[samples - 1]],
-    xp: pick(outcomes.map((o) => o.adventurer.xp - last!.adventurer.xp)),
-    gold: pick(outcomes.map((o) => o.adventurer.gold - last!.adventurer.gold)),
+    xp: pick(outcomes.map((o) => o.adventurer.xp - t.last.adventurer.xp)),
+    gold: pick(outcomes.map((o) => o.adventurer.gold - t.last.adventurer.gold)),
   };
 }
 
@@ -243,9 +255,10 @@ export function describeOdds(o: Odds): string {
 }
 
 export async function forecast(actions: Action[], samples: number): Promise<string> {
-  if (!game || last?.over) return "No game in progress.";
+  const [t] = tables;
+  if (!t || t.last.over) return "No game in progress.";
   try {
-    return describeOdds(await odds(actions, samples));
+    return describeOdds(await odds(t, actions, samples));
   } catch (err) {
     return `rejected: ${revertReason(err)}`;
   }
@@ -253,13 +266,13 @@ export async function forecast(actions: Action[], samples: number): Promise<stri
 
 const LABEL: Record<string, string> = { attack: "fight until it ends", flee: "flee until escaped", explore: "explore one step (after the automatic heal)" };
 
-export async function options(s: State): Promise<Option[]> {
+export async function options(t: Table, s: State): Promise<Option[]> {
   if (s.statUpgradesAvailable > 0) return [];
   const moves: Action[] = s.beast ? [{ type: "attack" }, { type: "flee" }] : [{ type: "explore" }];
   return Promise.all(
     moves.map(async (m) => {
       try {
-        return { move: m.type, label: LABEL[m.type], ...(await odds(shape(s, [m]), SAMPLES)) };
+        return { move: m.type, label: LABEL[m.type], ...(await odds(t, shape(s, [m]), SAMPLES)) };
       } catch (err) {
         return { move: m.type, label: LABEL[m.type], error: revertReason(err) };
       }
@@ -274,11 +287,7 @@ export function describeOptions(s: State, list: Option[]): string {
 
 const RANDOM = new Set(["explore", "attack", "flee"]);
 
-export const currentGame = (): Game => game!;
-
-export function auditGame(): Promise<string | undefined> {
-  return audit(game!);
-}
+export const auditGame = (t: Table): Promise<string | undefined> => audit(t.game);
 
 export function shape(s: State, actions: Action[], reserve = 0): Action[] {
   if (s.beast) return actions;
@@ -300,12 +309,6 @@ export function shape(s: State, actions: Action[], reserve = 0): Action[] {
   return [...fixed, ...(qty > 0 ? [{ type: "potions" as const, qty }] : []), ...random];
 }
 
-export function snapshot(): State | undefined {
-  return last && game && describe(last, game.id);
-}
+export const seated = (row: number): Table | undefined => tables.find((t) => t.row === row);
 
-export const moveBlock = (move: number): bigint | undefined => game?.chain?.blocks[move];
-
-export function movesMade(): number {
-  return game?.packets.length ?? 0;
-}
+export const snapshot = (t: Table | undefined = tables.at(-1)): State | undefined => t && describe(t.last, t.game.id);
