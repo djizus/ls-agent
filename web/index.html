@@ -82,6 +82,8 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .chip.on { color: var(--gold); border-color: var(--gold); }
 .chip.off { color: var(--dim); opacity: 0.7; }
 .chip.out img { filter: grayscale(1) brightness(0.6); }
+#again { padding: 0 0.5rem; border: 2px solid var(--edge); border-radius: 3px; color: var(--dim); white-space: nowrap; }
+#again:hover { color: var(--gold); border-color: var(--gold); }
 #golive { color: #000; background: var(--lime); border-radius: 3px; padding: 0.2rem 0.6rem; white-space: nowrap; }
 
 .big { font: 400 3.2rem/0.9 var(--num); }
@@ -128,7 +130,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
   </aside>
   <main id="mid">
     <div id="stage"></div>
-    <div class="panel" id="dock"><span id="mode"></span><span id="which"></span><div id="plan"></div><button type="button" id="golive" hidden>Live</button></div>
+    <div class="panel" id="dock"><span id="mode"></span><span id="which"></span><button type="button" id="again" title="Load the spectator again" hidden>Reload</button><div id="plan"></div><button type="button" id="golive" hidden>Live</button></div>
   </main>
   <aside class="panel">
     <section id="wallet"></section>
@@ -155,7 +157,6 @@ const killer = (g) => (g.ending ?? "").match(/against (?:".*" )?(\w+) level (\d+
 const WATCH = "https://www.lootsurvivor.io/watch?id=";
 const MOVES = { attack: "Fight", flee: "Flee", explore: "Explore" };
 const SLOW_MS = 60_000;
-const INDEXED_MS = 5_000;
 const BAGS = 25;
 const LATEST = 20;
 const STRIP = 5;
@@ -201,23 +202,26 @@ function endHtml(g) {
   return `${g.level === null ? "" : `<span class="chip">Level ${g.level}</span>`}${k ? `<span class="chip"><img class="pic" src="${face(k[1])}" alt="">${k[1]} ${k[2]}</span>` : ""}${g.gas_strk === null ? "" : `<span class="chip">${round(g.gas_strk, 1)}<small>STRK</small></span>`}<span class="dim">Click the game, then press the right arrow to replay it</span>`;
 }
 
+function spectate() {
+  const g = shown;
+  $("stage").html = null;
+  put($("stage"), g ? `<iframe src="${WATCH}${BigInt(g.game_id)}" title="Game ${g.id} in the Loot Survivor spectator" allow="autoplay"></iframe>` : `<b>No real game yet</b>`);
+}
+
 function render() {
   const g = target();
   if (shown === undefined || g?.id !== shown?.id) {
     shown = g;
     move = null;
     market = [];
-    const wait = g?.live ? g.started_at + INDEXED_MS - Date.now() : 0;
-    const watch = () => { if (shown?.id === g?.id) put($("stage"), `<iframe src="${WATCH}${BigInt(g.game_id)}" title="Game ${g.id} in the Loot Survivor spectator" allow="autoplay"></iframe>`); };
-    if (wait > 0) setTimeout(watch, wait);
-    put($("stage"), !g ? `<b>No real game yet</b>` : wait > 0 ? `<b>Game ${g.id} starts</b>` : "");
-    if (g && wait <= 0) watch();
+    spectate();
     if (g?.live) get(`/api/games/${g.id}`).then((found) => { for (const e of found?.events ?? []) onEvent(e); render(); });
   }
   $("mode").className = g?.live ? "live good" : g ? "bad" : "dim";
   $("mode").textContent = g?.live ? "Live" : g ? "Ended" : "Idle";
   $("which").textContent = g ? `Game ${g.id}` : "";
   put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${g.claimable == null ? "" : `<span class="chip gold" title="Of those, beasts nobody minted yet or that can be taken from a stake: the ones the settlement will claim">${g.claimable} to claim</span>`}${move ? planHtml(move) : ""}` : endHtml(g));
+  $("again").hidden = !g;
   $("golive").hidden = !liveReal() || g?.live;
 
   const sums = data.summary ?? [];
@@ -279,6 +283,7 @@ $("games").onclick = pick;
 $("games").onkeydown = (e) => { if (e.key === "Enter") pick(e); };
 $("beasts").onclick = (e) => { if (e.target.closest("[data-more]")) { zooAll = true; render(); } };
 $("bags").onclick = (e) => { const b = e.target.closest("[data-sort]"); if (b) { bagSort = b.dataset.sort; keep("bagSort", bagSort); render(); } };
+$("again").onclick = spectate;
 $("golive").onclick = () => go("");
 addEventListener("popstate", render);
 
