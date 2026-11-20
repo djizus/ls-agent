@@ -23,7 +23,7 @@ export const NAMES = "Warlock Typhon Jiangshi Anansi Basilisk Gorgon Kitsune Lic
 
 
 
-function bonus(level: number): number {
+export function levelBonus(level: number): number {
   if (level >= 50) return 80;
   if (level >= 40) return 40;
   if (level >= 30) return 20;
@@ -44,7 +44,7 @@ export function beastOf(adventurer: Adventurer, gameId: bigint): Beast | null {
   const suffixRoll = Number((rnd >> 16n) & 0xffn);
   const id = Number((kind % 15n) * 5n + ((kind / 15n) % 5n) + 1n);
   const adventurerLevel = levelOf(xp);
-  const level = 1 + (levelRoll % (adventurerLevel * 3)) + bonus(adventurerLevel);
+  const level = 1 + (levelRoll % (adventurerLevel * 3)) + levelBonus(adventurerLevel);
   const baseName = NAMES[id - 1];
   const special = level >= 19;
   const specialPrefix = special ? PREFIXES[prefixRoll % 69] : null;

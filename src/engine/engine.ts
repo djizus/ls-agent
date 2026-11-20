@@ -1,4 +1,4 @@
-import { beastOf } from "../beast.ts";
+import { beastOf, levelBonus } from "../beast.ts";
 import { SLOTS, STATS, encodePacket, type Action, type Adventurer, type Item, type Stats } from "../codec.ts";
 import { greatness } from "../combat.ts";
 import { basePrice, itemOf, levelOf, potionPrice, priceOf } from "../items.ts";
@@ -389,7 +389,6 @@ class Game {
   }
 }
 
-const levelBonus = (level: number): number => (level >= 50 ? 80 : level >= 40 ? 40 : level >= 30 ? 20 : level >= 20 ? 10 : 0);
 const healthBonus = (level: number): number => (level >= 50 ? 500 : level >= 40 ? 400 : level >= 30 ? 200 : level >= 20 ? 100 : 10);
 
 export function step(local: Local, gameId: string, packet: bigint, hash: string | bigint): Local {

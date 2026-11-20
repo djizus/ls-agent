@@ -1,8 +1,11 @@
 import type { Action } from "./codec.ts";
+import { levelBonus } from "./beast.ts";
+import { obstacleHit, reduced } from "./engine/damage.ts";
 import { potionPrice } from "./items.ts";
+import { AMBUSH_REDUCTION } from "./settings.ts";
 import { shape, type State } from "./play.ts";
 
-export const RULES = { potionPrice: 1, dexPerLevel: 0.9, weaponCatchUp: 5, jewelryLevel: 8, jewelryReserve: 2, armorReserve: 0.5, fightRisk: 0.35, swapGain: 0.05, weaponReserve: 3 };
+export const RULES = { potionPrice: 1, dexPerLevel: 0.9, weaponCatchUp: 5, jewelryLevel: 8, jewelryReserve: 2, armorReserve: 0.5, fightRisk: 0.35, swapGain: 0.05, weaponReserve: 3, healthFloor: 0.97 };
 
 const RINGS = ["Titanium Ring", "Silver Ring", "Gold Ring", "Platinum Ring", "Bronze Ring"];
 
@@ -64,6 +67,28 @@ function odds(mine: Blow[], theirs: Blow[], flee: number) {
   };
 }
 
+export function explorationHit(s: State): number {
+  const item = (slot: string) => s.equipment.find((g) => g.slot === slot) ?? { id: 0, xp: 0 };
+  const crit = Math.min(100, s.level) / 100;
+  const hits = new Map<number, number>();
+  for (const slot of ARMOR)
+    for (const type of ["Magic", "Blade", "Bludgeon"] as const)
+      for (let tier = 1; tier <= 5; tier++)
+        for (let level = 1 + levelBonus(s.level); level <= 3 * s.level + levelBonus(s.level); level++)
+          for (const critical of [false, true]) {
+            const damage = reduced(obstacleHit({ level, tier, type, prefix: null, suffix: null }, item(slot), item("neck"), critical), AMBUSH_REDUCTION);
+            hits.set(damage, (hits.get(damage) ?? 0) + (critical ? crit : 1 - crit));
+          }
+  const sorted = [...hits].sort((a, b) => a[0] - b[0]);
+  const total = sorted.reduce((n, x) => n + x[1], 0);
+  let seen = 0;
+  for (const [damage, chance] of sorted) {
+    seen += chance;
+    if (seen >= RULES.healthFloor * total - 1e-9) return damage;
+  }
+  return sorted.at(-1)![0];
+}
+
 export function plan(s: State): Plan {
   const worn = (slot: string) => s.equipment.find((g) => g.slot === slot);
   if (s.beast && s.hits) {
@@ -110,9 +135,12 @@ export function plan(s: State): Plan {
   const why: string[] = [];
   const stats = { ...s.stats };
   const base = { ...s.baseStats };
+  const floor = s.statUpgradesAvailable ? explorationHit(s) : 0;
   for (let i = 0; i < s.statUpgradesAvailable; i++) {
+    const low = s.maxHealth + 15 * (stats.vitality - s.stats.vitality) <= floor;
     const wanted = [
       ...(potionPrice(s.level, stats.charisma) > RULES.potionPrice ? ["charisma" as const] : []),
+      ...(low ? ["vitality" as const] : []),
       ...(stats.dexterity < RULES.dexPerLevel * s.level ? ["dexterity" as const] : []),
       ...FALLBACK,
     ];

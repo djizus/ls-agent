@@ -140,3 +140,13 @@ test("the weapon that wins the fight is taken up when that beats staying, the fr
   const weak = { ...hits(10, 20, 40), arms: [{ id: KATANA, hit: { normal: 8, crit: 16 } }] };
   assert.deepEqual(plan(state({ ...carried, hits: weak })).actions, [{ type: "attack", tillHealth: 299 }]);
 });
+
+test("a stat point goes to vitality before dexterity while max health is not above 97 of 100 hits an explore can deal", () => {
+  const slow = { stats: { ...stats, dexterity: 0 }, statUpgradesAvailable: 1 };
+  const spent = (over: Parameters<typeof state>[0]) => plan(state({ ...slow, ...over })).actions[0];
+  assert.deepEqual(spent({ maxHealth: 413, health: 413 }), { type: "upgrade", stat: "vitality", amount: 1 });
+  assert.deepEqual(spent({ maxHealth: 414, health: 414 }), { type: "upgrade", stat: "dexterity", amount: 1 });
+  const armored = { equipment: [PLATE_MAIL, ...REST.map((g) => g.id)].map((id) => gear(id, 20)) };
+  assert.deepEqual(spent({ ...armored, maxHealth: 257, health: 257 }), { type: "upgrade", stat: "vitality", amount: 1 });
+  assert.deepEqual(spent({ ...armored, maxHealth: 258, health: 258 }), { type: "upgrade", stat: "dexterity", amount: 1 });
+});
