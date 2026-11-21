@@ -34,6 +34,7 @@ export type State = {
   luck: number;
   buys: { attack: number; flee: number; trap: number; ambush: number; crit: number };
   purse: { potions: number; toFull: number; deal: (Offer & { why: string }) | null };
+  toLevel: number;
 };
 export const slewNamed = (before: Pick<State, "beast">, after: Pick<State, "beast" | "over">, move: string): boolean =>
   before.beast?.specialPrefix != null && !after.beast && !after.over && move === "attack";
@@ -116,6 +117,7 @@ export function enrich(s: Stored): State {
     baseStats: s.baseStats ?? (Object.fromEntries(STATS.map((stat) => [stat, s.stats[stat] - granted(stat)])) as Stats),
     potionPrice: price,
     happened: s.happened ?? [],
+    toLevel: (s.level + 1) ** 2 - s.xp,
     hits: s.hits ?? null,
     luck,
     buys: { attack: 10 * s.stats.strength, flee: chance(s.stats.dexterity), trap: chance(s.stats.intelligence), ambush: chance(s.stats.wisdom), crit: Math.min(100, luck) },
