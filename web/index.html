@@ -53,14 +53,14 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 #podium li:nth-child(2) { order: 1; } #podium li:nth-child(3) { order: 3; }
 #podium img { width: 3.6rem; height: 3.6rem; object-fit: contain; filter: drop-shadow(0 3px 0 rgb(0 0 0 / 0.7)); }
 #podium b { font: 400 2.6rem/0.9 var(--num); color: var(--gold); }
-#games li[data-id] { cursor: pointer; }
+#games li[tabindex] { cursor: pointer; }
 #board li { grid-template-columns: auto 1fr 3rem 2.6rem; }
 #board b { text-align: right; }
 .slain { display: flex; align-items: center; gap: 0.2rem; font-size: 1.4rem; line-height: 1; }
-#games .slain img, .bar .slain img { width: 1.2rem; height: 1.2rem; filter: none; }
-#games .slain.won, .bar .slain.won { color: var(--gold); }
-#games .slain.won img, .bar .slain.won img { filter: hue-rotate(-65deg) brightness(1.2); }
-#games li[data-id]:hover { background: #1e2619; }
+#games .slain img { width: 1.2rem; height: 1.2rem; filter: none; }
+#games .slain.won { color: var(--gold); }
+#games .slain.won img { filter: hue-rotate(-65deg) brightness(1.2); }
+#games li[tabindex]:hover { background: #1e2619; }
 #games li.on { border-color: var(--gold); box-shadow: var(--bevel), 0 0 0 2px var(--gold), 0 3px 0 rgb(0 0 0 / 0.6); }
 #reach { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
 #reach div { text-align: center; padding: 0.4rem 0 0.5rem; }
@@ -68,17 +68,43 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 #reach b.good { color: var(--lime); } #reach b.bad { color: var(--blood); }
 
 #mid { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; min-height: 0; }
-#stage { position: relative; flex: 1; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--drop); background: #000; overflow: hidden; display: grid; grid-auto-rows: 1fr; gap: 2px; text-align: center; }
-#stage.grid { grid-template-columns: 1fr 1fr; background: var(--edge); }
-.tile { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #000; }
-.tile .view { position: relative; flex: 1; min-height: 0; display: grid; place-content: center; }
-.tile iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.tile .bar { display: none; }
-#stage.grid .bar { display: flex; align-items: center; gap: 0.7rem; padding: 0.2rem 0.6rem; background: var(--raise); cursor: pointer; font-size: 1.4rem; white-space: nowrap; }
-#stage.grid .bar:hover { color: var(--gold); }
-.bar b { font: 400 1.8rem/1 var(--num); color: var(--gold); }
-.bar button { margin-left: auto; }
-#stage > b, .view b { font: 400 4rem/1 var(--num); color: var(--gold); align-self: center; }
+#stage { position: relative; flex: 1; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--drop); background: #000; overflow: hidden; display: grid; place-content: center; text-align: center; }
+#stage.view { place-content: stretch; }
+#stage iframe { width: 100%; height: 100%; border: 0; }
+#stage b.wait { font: 400 4rem/1 var(--num); color: var(--gold); align-self: center; }
+#stage.seats { border: 0; box-shadow: none; background: none; text-align: left; overflow-y: auto; place-content: stretch; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); grid-auto-rows: minmax(min-content, 1fr); gap: 0.6rem; }
+#stage.seats.many { font-size: 0.9em; }
+@media (min-height: 950px) { #stage.seats.few, #stage.seats.one { font-size: 1.15em; } }
+#stage.seats.one { place-content: center; grid-template-columns: minmax(0, 30rem); grid-auto-rows: auto; }
+.seat { display: flex; flex-direction: column; justify-content: space-between; gap: 0.4em; padding: 0.5em 0.7em 0.6em; min-width: 0; }
+.seat header, .seat .lvl, .seat .had { display: flex; align-items: center; gap: 0.5em; }
+.seat header { justify-content: space-between; color: var(--dim); }
+.seat button { padding: 0 0.5em; border: 2px solid var(--edge); border-radius: 3px; color: var(--bone); }
+.seat button:hover { color: var(--gold); border-color: var(--gold); }
+.seat .lvl b { font: 400 2.6em/0.8 var(--num); color: var(--gold); }
+.seat .lvl span { color: var(--dim); line-height: 1; }
+.hp { position: relative; height: 1.3em; background: #000; border: 2px solid var(--edge); border-radius: 3px; overflow: hidden; }
+.hp i { position: absolute; inset: 0 auto 0 0; background: #3f7d00; }
+.hp.low i { background: #a3261a; }
+.hp span { position: absolute; inset: 0; display: grid; place-content: center; line-height: 1; text-shadow: 0 2px 0 #000; }
+.seat .had { justify-content: space-between; }
+.seat .had span { display: inline-flex; align-items: center; gap: 0.25em; }
+.seat .had img { width: 1.2em; height: 1.2em; }
+.seat .now { display: flex; align-items: center; gap: 0.5em; min-height: 3em; line-height: 1; }
+.seat .now > img { width: 3em; height: 3em; flex: none; object-fit: contain; }
+.seat .now > span { flex: 1; min-width: 0; }
+.seat .now b { font: 400 2em/0.8 var(--num); color: var(--blood); text-align: right; }
+.seat .now small { display: block; font-size: 1em; color: var(--dim); white-space: nowrap; }
+.gear { display: grid; grid-template-columns: repeat(8, 1fr); gap: 0.3em; max-width: 24em; }
+#stage.seats.many .gear { grid-template-columns: repeat(4, 1fr); max-width: 11em; }
+.gear div { display: flex; flex-direction: column; align-items: center; padding: 0.1em 0.1em 0.15em; min-width: 0; }
+.gear .none { border-style: dashed; background: none; box-shadow: none; }
+.gear div::before { content: ""; display: block; width: 100%; aspect-ratio: 1; }
+.gear div:has(img)::before { display: none; }
+.gear img { width: 100%; height: auto; aspect-ratio: 1; }
+.gear b { font: 400 1em/1 var(--num); min-height: 1em; }
+.seat .did { display: flex; gap: 0.4em; min-height: 2.2em; }
+.seat .chip { height: 2.2em; padding: 0 0.2em; font-size: 1em; flex: 1 1 0; min-width: 0; justify-content: center; }
 #dock { flex: none; flex-direction: row; align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; min-height: 4.6rem; }
 #mode { font: 400 1.7rem/1 var(--num); letter-spacing: 0.06em; white-space: nowrap; }
 #mode::before { content: ""; display: inline-block; width: 0.6rem; height: 0.6rem; margin-right: 0.4rem; background: currentColor; vertical-align: 0.12em; }
@@ -92,8 +118,8 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .chip.on { color: var(--gold); border-color: var(--gold); }
 .chip.off { color: var(--dim); opacity: 0.7; }
 .chip.out img { filter: grayscale(1) brightness(0.6); }
-#again, .bar button { padding: 0 0.5rem; border: 2px solid var(--edge); border-radius: 3px; color: var(--dim); white-space: nowrap; }
-#again:hover, .bar button:hover { color: var(--gold); border-color: var(--gold); }
+#again { padding: 0 0.5rem; border: 2px solid var(--edge); border-radius: 3px; color: var(--dim); white-space: nowrap; }
+#again:hover { color: var(--gold); border-color: var(--gold); }
 #golive { color: #000; background: var(--lime); border-radius: 3px; padding: 0.2rem 0.6rem; white-space: nowrap; }
 
 .big { font: 400 3.2rem/0.9 var(--num); }
@@ -126,7 +152,8 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
   .win { display: flex; flex-direction: column; height: auto; }
   #mid { order: -1; }
   #stage { flex: none; height: 78svh; }
-  #stage.grid { grid-template-columns: 1fr; height: auto; grid-auto-rows: 62svh; }
+  #stage.seats, #stage.seats.one { height: auto; overflow: visible; grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; }
+  #stage.seats.many .gear { grid-template-columns: repeat(8, 1fr); max-width: 24em; }
   #dock { flex-wrap: wrap; }
   #board, #sacks { max-height: 22rem; }
 }
@@ -141,7 +168,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
   </aside>
   <main id="mid">
     <div id="stage"></div>
-    <div class="panel" id="dock"><span id="mode"></span><span id="which"></span><button type="button" id="again" title="Load the spectator again" hidden>Reload</button><div id="plan"></div><button type="button" id="golive" hidden>Live</button></div>
+    <div class="panel" id="dock"><span id="mode"></span><span id="which"></span><button type="button" id="again" title="Load the spectator again" hidden>Reload</button><div id="plan"></div><button type="button" id="golive" hidden>Back to live</button></div>
   </main>
   <aside class="panel">
     <section id="wallet"></section>
@@ -170,7 +197,7 @@ const WATCH = "https://www.lootsurvivor.io/watch?id=";
 const MOVES = { attack: "Fight", flee: "Flee", explore: "Explore" };
 const SLOW_MS = 60_000;
 const INDEXED_MS = 10_000;
-const TILES = 4;
+const ROUND_MS = 300;
 const BAGS = 25;
 const LATEST = 20;
 const STRIP = 5;
@@ -183,23 +210,25 @@ let bagSort = keep("bagSort") in SORTS ? keep("bagSort") : "mean";
 const items = {};
 const byName = {};
 const data = { games: [], wallet: null, beasts: null, summary: null, bags: null, check: null };
-let shown;
-let move = null;
-let market = [];
+const seen = new Map();
+let slots = [];
 
 const lives = () => data.games.filter((g) => g.live && g.onchain);
-const liveReal = () => lives()[0];
 const realGames = () => data.games.filter((g) => g.onchain);
 const picked = () => Number(new URLSearchParams(location.search).get("game")) || null;
-const target = () => realGames().find((g) => g.id === picked()) ?? (lives().length > 1 ? null : (liveReal() ?? realGames()[0] ?? null));
+const target = () => realGames().find((g) => g.id === picked()) ?? (lives().length ? null : (realGames()[0] ?? null));
+const plain = (text) => text.replace(/\bT(\d)/g, "tier $1");
 
-function planHtml(e) {
+function moveHtml(e) {
   const last = e.actions.at(-1)?.type;
-  if (e.phase === "battle") {
-    const odds = e.thought.match(/(\d+)% to win the fight, (\d+)% to escape/);
-    return ["attack", "flee"].map((m, i) => `<span class="chip ${m === last ? "on" : "off"}">${MOVES[m]}${odds ? ` ${odds[i + 1]}%` : ""}</span>`).join("");
-  }
-  const why = (name) => e.thought.match(new RegExp(`${name} \\(([^)]*)\\)`))?.[1].replace(/\bT(\d)/g, "tier $1") ?? "";
+  if (e.phase !== "battle") return MOVES[last] ? `<span class="chip on">${MOVES[last]}</span>` : "";
+  const odds = e.thought.match(/(\d+)% to win the fight, (\d+)% to escape/);
+  return ["attack", "flee"].map((m, i) => `<span class="chip ${m === last ? "on" : "off"}">${MOVES[m]}${odds ? ` ${odds[i + 1]}%` : ""}</span>`).join("");
+}
+
+function planHtml(e, market) {
+  if (e.phase === "battle") return moveHtml(e);
+  const why = (name) => plain(e.thought.match(new RegExp(`${name} \\(([^)]*)\\)`))?.[1] ?? "");
   return e.actions.map((a) => {
     const g = items[a.item];
     const price = market.find((m) => m.id === a.item)?.price;
@@ -208,73 +237,91 @@ function planHtml(e) {
     if (a.type === "buy" && g) return `<span class="chip">${art(g.name)}${price ? `${pic("gold", "Gold")}${price}` : ""}<small>${esc(why(g.name))}</small></span>`;
     if (a.type === "equip" && g) return `<span class="chip">${art(g.name)}<small>${esc(why(g.name))}</small></span>`;
     if (a.type === "drop" && g) return `<span class="chip out">${art(g.name)}<small>Dropped</small></span>`;
-    return MOVES[a.type] ? `<span class="chip on">${MOVES[a.type]}</span>` : "";
-  }).join("");
+    return "";
+  }).join("") + moveHtml(e);
 }
 
 function endHtml(g) {
   const k = killer(g);
-  return `${g.level === null ? "" : `<span class="chip">Level ${g.level}</span>`}${k ? `<span class="chip"><img class="pic" src="${face(k[1])}" alt="">${k[1]} ${k[2]}</span>` : ""}${g.beasts == null ? "" : `<span class="chip" title="Named beasts slain"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`}${toClaim(g)}${g.claimed == null ? "" : `<span class="chip gold" title="Beasts the settlement claimed for the wallet">${g.claimed} claimed</span>`}${g.gas_strk === null ? "" : `<span class="chip">${round(g.gas_strk, 1)}<small>STRK</small></span>`}<span class="dim">Click the game, then press the right arrow to replay it</span>`;
+  return `${g.level === null ? "" : `<span class="chip">Level ${g.level}</span>`}${k ? `<span class="chip"><img class="pic" src="${face(k[1])}" alt="">${k[1]} ${k[2]}</span>` : ""}${g.beasts == null ? "" : `<span class="chip" title="Named beasts slain"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`}${toClaim(g)}${g.claimed == null ? "" : `<span class="chip gold" title="Beasts the settlement claimed for the wallet">${g.claimed} claimed</span>`}${g.gas_strk === null ? "" : `<span class="chip">${round(g.gas_strk, 1)}<small>STRK</small></span>`}`;
 }
 
 const CLAIM_TITLE = "Of those, beasts nobody minted yet or that can be taken from a stake: the ones the settlement will claim";
 const toClaim = (g) => (g.claimed != null || g.claimable == null ? "" : `<span class="chip gold" title="${CLAIM_TITLE}">${g.claimable} to claim</span>`);
 
-function watch(view, g, now) {
+function watch(g, now) {
+  const stage = $("stage");
   const frame = `<iframe src="${WATCH}${BigInt(g.game_id)}" title="Game ${g.id} in the Loot Survivor spectator" allow="autoplay"></iframe>`;
   const wait = g.live && !now ? g.started_at + INDEXED_MS - Date.now() : 0;
-  view.innerHTML = wait > 0 ? `<b>Game ${g.id} starts</b>` : frame;
-  if (wait > 0) setTimeout(() => { if (!view.querySelector("iframe")) view.innerHTML = frame; }, wait);
+  stage.className = "view";
+  stage.dataset.id = g.id;
+  stage.innerHTML = wait > 0 ? `<b class="wait">Game ${g.id} starts</b>` : frame;
+  if (wait > 0) setTimeout(() => { if (stage.dataset.id === String(g.id) && !stage.querySelector("iframe")) stage.innerHTML = frame; }, wait);
 }
 
-function spectate(games) {
+function seatHtml(g) {
+  const { state: s, move } = seen.get(g.id) ?? {};
+  const head = `<header><span>Game ${g.id}</span><button type="button" data-details title="Open this game in the Loot Survivor spectator">Details</button></header>`;
+  if (!s) return `${head}<span class="dim">Starting</span>`;
+  const worn = Object.fromEntries(s.equipment.map((x) => [x.slot, x]));
+  const b = s.beast;
+  const last = s.happened.at(-1);
+  return `${head}
+    <div class="lvl"><b>${s.level}</b><span>Level<br>${s.toLevel} XP to ${s.level + 1}</span></div>
+    <div class="hp${s.health < 0.3 * s.maxHealth ? " low" : ""}" title="Health"><i style="width:${(100 * s.health) / s.maxHealth}%"></i><span>${s.health} / ${s.maxHealth}</span></div>
+    <div class="had"><span title="Gold">${pic("gold", "Gold")}${s.gold}</span>${slain(g)}${g.claimable ? `<span class="gold" title="${CLAIM_TITLE}">${g.claimable} to claim</span>` : ""}</div>
+    <div class="now">${b ? `<img src="${face(b.baseName)}" alt=""><span><span class="${b.specialPrefix ? "gold" : ""}">${esc(b.name)}</span><small><span class="gold">T${b.tier}</span> level ${b.level}</small></span><b title="Its health">${b.health}</b>` : `<span class="${/hits your/.test(last) ? "bad" : "dim"}">${esc(plain(last ?? ""))}</span>`}</div>
+    <div class="gear">${slots.map((slot) => (worn[slot] ? `<div class="card" title="${esc(`${worn[slot].name}, tier ${worn[slot].tier}, greatness ${worn[slot].greatness}`)}">${art(worn[slot].name)}<b>${worn[slot].greatness}</b></div>` : `<div class="card none" title="No ${slot}"><b></b></div>`)).join("")}</div>
+    <div class="did">${move ? moveHtml(move) : ""}</div>`;
+}
+
+function seats(games) {
   const stage = $("stage");
-  stage.className = games.length > 1 ? "grid" : "";
+  if (!stage.classList.contains("seats")) stage.innerHTML = "";
+  stage.className = `seats ${games.length === 1 ? "one" : games.length <= 4 ? "few" : "many"}`;
+  stage.style.setProperty("--cols", games.length <= 4 ? 2 : 4);
+  delete stage.dataset.id;
   for (const el of [...stage.children]) if (!games.some((g) => String(g.id) === el.dataset.id)) el.remove();
-  if (!games.length) return void (stage.innerHTML = `<b>No real game yet</b>`);
   for (const g of games) {
-    let tile = stage.querySelector(`[data-id="${g.id}"]`);
-    if (!tile) {
-      tile = stage.appendChild(Object.assign(document.createElement("div"), { className: "tile", innerHTML: `<div class="view"></div><div class="bar"></div>` }));
-      tile.dataset.id = g.id;
-      watch(tile.firstChild, g);
+    let seat = stage.querySelector(`[data-id="${g.id}"]`);
+    if (!seat) {
+      seat = stage.appendChild(Object.assign(document.createElement("article"), { className: "card seat" }));
+      seat.dataset.id = g.id;
     }
-    put(tile.lastChild, `<span>Game ${g.id}</span><b>${g.level ?? ""}</b>${slain(g)}${g.claimable == null ? "" : `<span class="gold" title="${CLAIM_TITLE}">${g.claimable} to claim</span>`}<button type="button" data-again title="Load the spectator again">Reload</button>`);
+    put(seat, seatHtml(g));
   }
 }
 
 function render() {
   const g = target();
-  const all = g ? [g] : lives().slice(0, TILES);
-  spectate(all);
-  if (shown === undefined || g?.id !== shown?.id) {
-    shown = g;
-    move = null;
-    market = [];
-    if (g?.live) get(`/api/games/${g.id}`).then((found) => { for (const e of found?.events ?? []) onEvent(e); render(); });
-  }
-  const live = all.some((x) => x.live);
+  const stage = $("stage");
+  if (!g && lives().length) seats(lives().sort((a, b) => a.id - b.id));
+  else if (!g) { stage.className = ""; delete stage.dataset.id; stage.innerHTML = `<b class="wait">No real game yet</b>`; }
+  else if (stage.dataset.id !== String(g.id)) watch(g);
+  const live = g ? g.live : lives().length > 0;
+  const now = g && seen.get(g.id);
   $("mode").className = live ? "live good" : g ? "bad" : "dim";
   $("mode").textContent = live ? "Live" : g ? "Ended" : "Idle";
-  $("which").textContent = g ? `Game ${g.id}` : all.length ? `${lives().length} games` : "";
-  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${toClaim(g)}${move ? planHtml(move) : ""}` : endHtml(g));
+  $("which").textContent = g ? `Game ${g.id}` : lives().length ? `${lives().length} ${lives().length === 1 ? "game" : "games"}` : "";
+  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${toClaim(g)}${now?.move ? planHtml(now.move, now.state?.market ?? []) : ""}` : endHtml(g));
   $("again").hidden = !g;
-  $("golive").hidden = !liveReal() || !picked() || (g?.live && lives().length === 1);
+  $("golive").hidden = !lives().length || !g;
 
   const sums = data.summary ?? [];
-  const sum = sums.find((x) => x.mode === keep("dungeon")) ?? sums.find((x) => x.mode === (liveReal() ?? realGames()[0])?.mode) ?? sums[0];
+  const sum = sums.find((x) => x.mode === keep("dungeon")) ?? sums.find((x) => x.mode === realGames()[0]?.mode) ?? sums[0];
   const mode = sum?.mode;
   const inMode = data.games.filter((x) => x.mode === mode && (!sum.strategy || x.strategy === sum.strategy));
   const c = data.check;
   const tile = (value, label, tone = "") => `<div class="card"><b class="${tone}">${value}</b><span class="dim">${label}</span></div>`;
   const figure = (n, digits) => (n == null ? "-" : round(n, digits));
   put($("sum"), !sum?.games ? "" : `<div id="reach">${tile(round(sum.games), "Games")}${tile(sum.median, "Median")}${tile(figure(sum.mean, 1), "Average")}${tile(figure(sum.slain, 1), "Slain each")}${tile(sum.best, "Best")}${sum.strategy ? tile(`${Math.round(sum.reach30)}%`, "Level 30") : tile(sum.usd == null ? "-" : `$${round(sum.usd, 2)}`, "Spent")}</div>${sum.strategy && c ? `<div class="head"><span></span>${c.failed ? `<span class="bad" title="${esc(c.failed)}">Check failed</span>` : `<span class="good" title="The local game matches the one on Starknet">Checked</span>`}</div>` : ""}`);
-  const liveNow = data.games.filter((x) => x.live);
+  const liveNow = data.games.filter((x) => x.live && !x.onchain);
+  const liveRow = lives().length ? `<li class="card${g ? "" : " on"}" data-live tabindex="0" title="Live games and the best level among them"><img src="/assets/favicon.png" alt=""><span>${lives().length} ${lives().length === 1 ? "game" : "games"}<span class="tag">Live</span></span><span></span><b>${Math.max(...lives().map((x) => x.level ?? 0))}</b></li>` : "";
   put($("modes"), `<h2>Games</h2><span class="seg">${sums.map((x) => `<button type="button" data-mode="${x.mode}" aria-pressed="${x.mode === mode}">${x.name.split(" ")[0]}</button>`).join("")}</span>`);
   const ranked = inMode.filter((x) => x.ended_at).sort((a, b) => b.level - a.level || b.id - a.id);
   const cls = (x) => (x.onchain ? `class="card${x.id === g?.id ? " on" : ""}" data-id="${x.id}" tabindex="0"` : `class="card"`);
   put($("podium"), ranked.slice(0, 3).map((x) => `<li ${cls(x)} title="Game ${x.id}"><img src="${portrait(x)}" alt=""><b>${x.level}</b>${slain(x)}<span class="dim">${x.id}</span></li>`).join(""));
-  put($("board"), !liveNow.length && !ranked.length ? `<li class="none">No games</li>` : [...liveNow, ...ranked.slice().sort((a, b) => b.started_at - a.started_at).slice(0, every ? undefined : LATEST)].map((x) => `<li ${cls(x)}><img src="${x.live ? (MARK[x.mode] ?? "/assets/favicon.png") : portrait(x)}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.level ?? ""}</b></li>`).join("") + (!every && ranked.length > LATEST ? `<li class="more"><button type="button" data-more>More</button></li>` : ""));
+  put($("board"), !liveRow && !liveNow.length && !ranked.length ? `<li class="none">No games</li>` : liveRow + [...liveNow, ...ranked.slice().sort((a, b) => b.started_at - a.started_at).slice(0, every ? undefined : LATEST)].map((x) => `<li ${cls(x)}><img src="${x.live ? (MARK[x.mode] ?? "/assets/favicon.png") : portrait(x)}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.level ?? ""}</b></li>`).join("") + (!every && ranked.length > LATEST ? `<li class="more"><button type="button" data-more>More</button></li>` : ""));
 
   const w = data.wallet;
   put($("wallet"), `<h2>Wallet</h2>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
@@ -293,9 +340,18 @@ function render() {
   put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><ol id="sacks" class="rows scroll">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>${x.n ? `x${x.n}` : ""}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>`);
 }
 
+let due;
+const soon = () => { clearTimeout(due); due = setTimeout(load, ROUND_MS); };
+
 async function load() {
   const [games, summary] = await Promise.all([get("/api/games"), get("/api/summary")]);
   Object.assign(data, { games: games ?? data.games, summary: summary ?? data.summary });
+  for (const id of seen.keys()) if (!lives().some((g) => g.id === id)) seen.delete(id);
+  for (const g of lives()) {
+    if (seen.has(g.id)) continue;
+    seen.set(g.id, { at: 0 });
+    get(`/api/games/${g.id}`).then((found) => { for (const e of found?.events ?? []) track(e); render(); });
+  }
   render();
 }
 
@@ -305,9 +361,12 @@ async function loadSide() {
   render();
 }
 
-function onEvent(e) {
-  if (e.kind === "decision") move = e;
-  else if (e.kind === "state") market = e.state.market;
+function track(e) {
+  const game = seen.get(e.row);
+  if (!game || e.at < game.at) return;
+  game.at = e.at;
+  if (e.kind === "decision") game.move = e;
+  else if (e.kind === "state") game.state = e.state;
 }
 
 function go(search) {
@@ -315,18 +374,13 @@ function go(search) {
   render();
 }
 
-const pick = (e) => { const m = e.target.closest("[data-mode]"); if (m) { keep("dungeon", m.dataset.mode); every = false; return render(); } if (e.target.closest("[data-more]")) { every = true; return render(); } const row = e.target.closest("li[data-id]"); if (row) go(lives().length === 1 && Number(row.dataset.id) === liveReal().id ? "" : `?game=${row.dataset.id}`); };
+const pick = (e) => { const m = e.target.closest("[data-mode]"); if (m) { keep("dungeon", m.dataset.mode); every = false; return render(); } if (e.target.closest("[data-more]")) { every = true; return render(); } if (e.target.closest("[data-live]")) return go(""); const row = e.target.closest("li[data-id]"); if (row) go(`?game=${row.dataset.id}`); };
 $("games").onclick = pick;
 $("games").onkeydown = (e) => { if (e.key === "Enter") pick(e); };
 $("beasts").onclick = (e) => { if (e.target.closest("[data-more]")) { zooAll = true; render(); } };
 $("bags").onclick = (e) => { const b = e.target.closest("[data-sort]"); if (b) { bagSort = b.dataset.sort; keep("bagSort", bagSort); render(); } };
-$("again").onclick = () => watch($("stage").querySelector(".view"), shown, true);
-$("stage").onclick = (e) => {
-  const tile = e.target.closest(".tile");
-  if (!tile) return;
-  if (e.target.closest("[data-again]")) return watch(tile.firstChild, data.games.find((g) => String(g.id) === tile.dataset.id), true);
-  if (e.target.closest(".bar")) go(`?game=${tile.dataset.id}`);
-};
+$("again").onclick = () => watch(target(), true);
+$("stage").onclick = (e) => { if (e.target.closest("[data-details]")) go(`?game=${e.target.closest(".seat").dataset.id}`); };
 $("golive").onclick = () => go("");
 addEventListener("popstate", render);
 
@@ -335,11 +389,12 @@ source.onopen = load;
 source.onmessage = (m) => {
   const e = JSON.parse(m.data);
   if (e.kind === "status") return load();
-  if (shown?.live && e.row === shown.id) { onEvent(e); render(); }
-  if (e.kind === "state" && liveReal()) load();
+  if (seen.has(e.row)) { track(e); render(); }
+  if (e.kind === "state" && lives().length) soon();
 };
 Promise.all([get("/api/items"), load()]).then(([table]) => {
   for (const g of table ?? []) { items[g.id] = g; byName[g.name] = g; }
+  slots = [...new Set((table ?? []).map((g) => g.slot))];
   loadSide();
 });
 setInterval(loadSide, SLOW_MS);

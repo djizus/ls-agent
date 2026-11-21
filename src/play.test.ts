@@ -71,7 +71,7 @@ test("potion price formula matches the contract; explores are healed first", { t
   assert.equal(one.health, Math.min(healthBefore + 10, state.maxHealth));
 });
 
-test("a stored state gains luck, chances, grants and purse, whatever its age", () => {
+test("a stored state gains luck, chances, grants, purse and the experience to the next level, whatever its age", () => {
   const worn = (id: number, name: string, slot: string, type: string, tier: number, extra: object) => ({ id, name, slot, type, tier, ...extra });
   const state = enrich({
     over: false, level: 20, health: 100, maxHealth: 250, xp: 400, gold: 30, beast: null, statUpgradesAvailable: 0,
@@ -85,6 +85,7 @@ test("a stored state gains luck, chances, grants and purse, whatever its age", (
     market: [worn(49, "Studded Leather Armor", "chest", "Hide", 3, { price: 3 }), worn(56, "Cap", "head", "Hide", 5, { price: 1 }), worn(7, "Titanium Ring", "ring", "Ring", 1, { price: 11 })],
   } as unknown as Parameters<typeof enrich>[0]);
   assert.equal(state.luck, 10 + 2 * 6 + 3);
+  assert.equal(state.toLevel, 41);
   assert.deepEqual(state.buys, { attack: 40, flee: 50, trap: 10, ambush: 25, crit: 25 });
   assert.deepEqual(state.baseStats, { strength: 4, dexterity: 10, vitality: 8, intelligence: 2, wisdom: 2, charisma: 9 });
   assert.deepEqual(state.equipment.map((g) => [g.greatness, g.toNext, g.grants]), [
