@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DUNGEONS, SURVIVOR } from "./config.ts";
-import { bagPurchase, forSale, heldGames, readQuote, units, unranked } from "./live.ts";
+import { bagPurchase, forSale, heldGames, mintedSince, readQuote, units, unranked } from "./live.ts";
 
 const POOL = DUNGEONS.lootBag.pool!;
 const ME = "0x123";
@@ -46,4 +46,10 @@ test("a bag is not bought above the cap, without a cap, when the pool lacks it, 
   assert.throws(buy(7806, NaN), /maxSurvivor/);
   assert.throws(buy(7962, 90), /holds no game of bag 7962/);
   assert.throws(buy(7806, 90, 50n * 10n ** 18n), /the wallet holds 50/);
+});
+
+test("the games an account started in a block range are read from the game token's mint events", { timeout: 60_000 }, async () => {
+  const ids = await mintedSince(18_280_650, "0x3da0ffae9f4e5ac555da643150a6af6bd34fb1959cc11f75b3b7181d0541414", 18_281_805);
+  assert.equal(ids.length, 19);
+  assert.deepEqual([ids[0], ids[18]], ["0x000000000000000000000100000000020000000001c88baa0116f0f1001f2121", "0x000000000000000000000100000000020000000001c88bc50116f4a6001d3261"]);
 });

@@ -141,6 +141,20 @@ const minted = (receipt: { events: { from_address: string; keys: string[] }[] })
     .filter((e) => BigInt(e.from_address) === BigInt(GAME_CORE) && BigInt(e.keys[0]) === TRANSFER && BigInt(e.keys[1]) === 0n)
     .map((e) => "0x" + (BigInt(e.keys[3]) + (BigInt(e.keys[4]) << 128n)).toString(16).padStart(64, "0"));
 
+export async function mintedSince(block: number, owner = keys().address, to: number | "latest" = "latest"): Promise<string[]> {
+  const events: { from_address: string; keys: string[] }[] = [];
+  for (let token: string | undefined, first = true; first || token; first = false) {
+    const page = await provider.getEvents({ address: GAME_CORE, keys: [[hex(TRANSFER)], ["0x0"], [owner]], from_block: { block_number: block }, to_block: to === "latest" ? to : { block_number: to }, chunk_size: 500, continuation_token: token });
+    events.push(...page.events);
+    token = page.continuation_token;
+  }
+  return minted({ events });
+}
+
+export const head = (): Promise<number> => provider.getBlockNumber();
+
+export const adopt = (id: string): void => keep([...new Set([...liveIds(), id])]);
+
 const entryCalls = (games: number): Call[] =>
   Array.from({ length: games }, (_, salt) => [
     { contractAddress: TICKET, entrypoint: "approve", calldata: [DUNGEON.address, ...u256(ONE)] },

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
 import { BEASTS_TO, DUNGEON, DUNGEON_KEY, SEATS, SURVIVOR } from "./config.ts";
 import { db } from "./db.ts";
-import { collect, liveIds, sendBeasts, tickets, type Entry } from "./live.ts";
+import { adopt, collect, head, liveIds, mintedSince, sendBeasts, tickets, type Entry } from "./live.ts";
 import { balanceOf, strkBalance } from "./wallet.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
@@ -185,8 +185,17 @@ export async function play(count: number, live: boolean, entry?: Entry): Promise
         .finally(() => opening.delete(done));
       opening.add(done);
     };
+    const from = rides ? await head() : 0;
+    const recorded = (id: string) => liveIds().includes(id) || !!db.prepare("SELECT 1 FROM games WHERE game_id = ? AND mode = ?").get(id, DUNGEON_KEY);
+    let lost = false;
     for (;;) {
       seats.push(...arrived.splice(0));
+      for (const id of lost ? (await mintedSince(from).catch(() => [])).filter((id) => !recorded(id)) : []) {
+        adopt(id);
+        const next = queue.findIndex((q) => !q.resumed);
+        queue.splice(Math.max(0, next), Number(next >= 0), { resumed: id });
+        emit({ kind: "status", text: `found game ${id.slice(-8)} started on chain and in no file: it takes the place of a new game` });
+      }
       for (const done of ended.filter((e) => e.due <= Date.now() || (!seats.length && !opening.size))) {
         await new Promise((r) => setTimeout(r, Math.max(0, done.due - Date.now())));
         ended.splice(ended.indexOf(done), 1);
@@ -212,10 +221,12 @@ export async function play(count: number, live: boolean, entry?: Entry): Promise
             (err: Error) => (seats.forEach((seat) => (seat.failed ??= err.message.slice(0, 200))), { started: starts ? { error: err } : [] }),
           );
       if ("error" in started) {
+        lost = true;
         failed(started.error);
         if (!retry("start")) queue.length = 0;
       } else if (starts) {
         cleared("start");
+        lost = false;
         queue.splice(0, started.length);
         for (const { id, strk } of started) join(id, strk);
       }
