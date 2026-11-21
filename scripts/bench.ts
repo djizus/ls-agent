@@ -7,7 +7,7 @@ import { useFastLuck } from "../src/hash.ts";
 import { describe, slewNamed } from "../src/play.ts";
 import { summary } from "../src/summary.ts";
 import { ARMOR, NECK, RULES, VERSION, plan } from "../src/policy.ts";
-import { outdated, poolIds, unranked } from "../src/live.ts";
+import { poolIds, shortlist, unplayed, unranked } from "../src/live.ts";
 import { toSnapshot, type Local } from "../src/engine/engine.ts";
 import { act, newPracticeGame, startOf, syntheticGame, type Game } from "../src/practice.ts";
 
@@ -27,11 +27,12 @@ const { values } = parseArgs({
     keep: { type: "string" },
     late: { type: "string" },
     rank: { type: "boolean", default: false },
+    all: { type: "boolean", default: false },
   },
 });
 type Kept = { id: string; moves: number; local: Local };
 const kept: Kept[] = values.late ? JSON.parse(readFileSync(values.late, "utf8")) : [];
-const rolled = DUNGEON.rolledStart && !values.ids && !values.late && !values.rank;
+const rolled = DUNGEON.rolledStart && !values.ids && !values.late;
 const [from, to] = (values.seeds ?? (rolled ? "0-1" : values.late ? "0-20" : "0-500")).split("-").map(Number);
 
 async function gearOf(game: string) {
@@ -60,27 +61,18 @@ function rank(rows: Ranked[]): void {
   renameSync(`${BAG_RANKING}.part`, BAG_RANKING);
 }
 
-if (values.rank && !process.send) {
-  setPriority(constants.priority.PRIORITY_LOW);
-  const [rows, pool] = [ranking(), await poolIds(DUNGEONS.lootBag.pool!)];
-  const added = unranked(pool, rows.map((row) => row.bag));
-  for (const { bag, game } of added) rows.push({ bag, ...(await gearOf(game)), game });
-  const stale = outdated(rows, pool, VERSION);
-  rank(rows);
-  console.log(`policy ${VERSION}: ${added.length} bags added from the pool${added.length ? ` (${added.map((a) => a.bag).join(", ")})` : ""}, ${stale.length} to replay`);
-  if (!stale.length) process.exit(0);
-  process.env.BENCH_RANK = JSON.stringify(stale.map((row) => row.game));
-}
 const ids: (string | number | Kept)[] = values.late
   ? kept
   : rolled
   ? Array.from({ length: Number(values.starts) }, (_, i) => Number(values.from) + i)
-  : values.rank
-    ? JSON.parse(process.env.BENCH_RANK!)
-    : values.ids
-      ? JSON.parse(readFileSync(values.ids, "utf8")).map((x: string | { game: string }) => (typeof x === "string" ? x : x.game))
-      : DUNGEON.benchmark;
-const games = ids.flatMap((id) => Array.from({ length: to - from }, (_, i) => [id, from + i] as const));
+  : values.ids
+    ? JSON.parse(readFileSync(values.ids, "utf8")).map((x: string | { game: string }) => (typeof x === "string" ? x : x.game))
+    : DUNGEON.benchmark;
+type Pair = readonly [string | number | Kept, number];
+const games: Pair[] = ids.flatMap((id) => Array.from({ length: to - from }, (_, i) => [id, from + i] as const));
+const FIRST_SEEDS = 100;
+const FULL_SEEDS = 500;
+const SHORTLIST = 30;
 const procs = Number(values.procs);
 const MEAN_SLACK = 0.25;
 const SHARE_SLACK = 1;
@@ -97,15 +89,14 @@ const defaults = { ...RULES };
 
 type Run = { rows: (number | null)[][][]; snaps: Kept[] };
 
-async function play(share: number): Promise<Run> {
+async function play(games: Pair[]): Promise<Run> {
   if (!values.exact) useFastLuck();
   const rows: (number | null)[][][] = [];
   const snaps: Kept[] = [];
   for (const [v, rules] of values.rules.entries()) {
     Object.assign(RULES, defaults, JSON.parse(rules));
     const out: (number | null)[][] = [];
-    for (const [i, [id, seed]] of games.entries()) {
-      if (i % procs !== share) continue;
+    for (const [id, seed] of games) {
       const game: Game =
         typeof id === "number" ? await syntheticGame(id, seed) : typeof id === "string" ? await newPracticeGame(id, seed) : { id: id.id, seed: seed + 1, packets: Array(id.moves).fill(0n), start: toSnapshot(id.local), local: id.local };
       let state = describe(toSnapshot(game.local), game.id);
@@ -124,10 +115,11 @@ async function play(share: number): Promise<Run> {
           snapped = true;
         }
         const before = state;
-        const move = plan(state).actions[0].type;
+        const actions = plan(before).actions;
+        const move = actions[0].type;
         last = before;
         lastMove = move;
-        state = describe(act(game, plan(before).actions), game.id);
+        state = describe(act(game, actions), game.id);
         const named = before.beast?.specialPrefix != null;
         if (!before.beast && state.beast?.specialPrefix != null) tally.met++;
         if (before.beast && !state.beast && !state.over && move === "attack") {
@@ -149,20 +141,58 @@ async function play(share: number): Promise<Run> {
 }
 
 
-if (process.send) {
-  process.send(await play(Number(process.env.BENCH_SHARE)));
-} else {
-  const started = Date.now();
+async function run(games: Pair[]): Promise<Run> {
   const shares = await Promise.all(
     Array.from({ length: procs }, (_, share) => new Promise<Run>((resolve, reject) => {
-      const child = fork(process.argv[1], process.argv.slice(2), { env: { ...process.env, BENCH_SHARE: String(share) } });
+      const child = fork(process.argv[1], process.argv.slice(2));
       child.once("message", (m) => resolve(m as Run));
       child.once("exit", (code) => code && reject(new Error(`worker ${share} exited with ${code}`)));
+      child.send(games.filter((_, i) => i % procs === share));
     })),
   );
-  const order = games.map((_, i) => [i % procs, Math.floor(i / procs)] as const);
+  return { rows: values.rules.map((_, v) => games.map((_, i) => shares[i % procs].rows[v][Math.floor(i / procs)])), snaps: shares.flatMap((s) => s.snaps) };
+}
+
+function figures(own: (number | null)[][]) {
+  const levels = own.map((g) => g[0]!).sort((a, b) => a - b);
+  const s = summary(levels);
+  const kills = summary(own.map((g) => g[NAMED]!));
+  const share = (level: number) => +((100 * levels.filter((l) => l >= level).length) / levels.length).toFixed(1);
+  return { mean: +s.mean.toFixed(1), med: s.median, p90: levels[Math.floor(levels.length * 0.9)], best: s.best, ge25: share(25), ge30: share(30), ge35: share(35), kills: kills.mean, killsSe: kills.se, games: levels.length, policy: VERSION };
+}
+
+if (process.send) {
+  process.once("message", async (games: Pair[]) => process.send!(await play(games)));
+} else if (values.rank) {
+  const started = Date.now();
+  setPriority(constants.priority.PRIORITY_LOW);
+  const [rows, pool] = [ranking(), await poolIds(DUNGEONS.lootBag.pool!)];
+  const added = unranked(pool, rows.map((row) => row.bag));
+  for (const { bag, game } of added) rows.push({ bag, ...(await gearOf(game)), game });
+  rank(rows);
+  const played = new Map<string, (number | null)[][]>();
+  const replay = async (due: Ranked[], seeds: (game: string) => number) => {
+    if (!due.length) return 0;
+    const pairs = due.flatMap((row) => Array.from({ length: seeds(row.game) }, (_, i) => [row.game, (played.get(row.game)?.length ?? 0) + i] as const));
+    const { rows } = await run(pairs);
+    pairs.forEach(([game], i) => played.set(game, [...(played.get(game) ?? []), rows[0][i]]));
+    rank(ranking().map((row) => (due.some((d) => d.game === row.game) ? { ...row, ...figures(played.get(row.game)!) } : row)));
+    return pairs.length;
+  };
+  const stale = unplayed(rows, pool, values.all ? VERSION : undefined);
+  let count = await replay(stale, () => FIRST_SEEDS);
+  let deepened = 0;
+  const best = () => shortlist(ranking(), pool, SHORTLIST, FULL_SEEDS).filter((row) => values.all || played.has(row.game));
+  for (let more = best(); more.length; more = best()) {
+    count += await replay(more, (game) => FULL_SEEDS - (played.get(game)?.length ?? 0));
+    deepened += more.length;
+  }
+  console.log(`policy ${VERSION}: ${added.length} bags added from the pool${added.length ? ` (${added.map((a) => a.bag).join(", ")})` : ""}, ${stale.length} replayed on ${FIRST_SEEDS} seeds, ${deepened} among the best ${SHORTLIST} by level or by named kills brought to ${FULL_SEEDS}; ${count} games in ${((Date.now() - started) / 1000).toFixed(1)} s on ${procs} processes`);
+} else {
+  const started = Date.now();
+  const { rows: played, snaps } = await run(games);
   values.rules.forEach((rules, v) => {
-    const games = order.map(([share, at]) => shares[share].rows[v][at]);
+    const games = played[v];
     const levels = games.map((g) => g[0]!);
     const average = (column: number) => {
       const seen = games.map((g) => g[column]).filter((x): x is number => x !== null);
@@ -182,13 +212,13 @@ if (process.send) {
       console.log(`  deaths at level ${low}-${high === 99 ? "" : high}: ${((100 * dead.length) / games.length).toFixed(1)}% of games; ${by.join(", ")}; max health ${mean(HEALTH)}; in battle: beast tier ${mean(TIER, battle)}, ${mean(GAP, battle)} levels above us`);
     }
     if (v > 0) {
-      const base = order.map(([share, at]) => shares[share].rows[0][at][0]!);
+      const base = played[0].map((g) => g[0]!);
       const d = summary(levels.map((l, i) => l - base[i]));
       const moved = DEEP.map((n) => {
         const s = summary(levels.map((l, i) => 100 * (Number(l >= n) - Number(base[i] >= n))));
         return `${n}+ ${s.mean > 0 ? "+" : ""}${s.mean} ± ${s.se}`;
       });
-      const first = order.map(([share, at]) => shares[share].rows[0][at][NAMED]!);
+      const first = played[0].map((g) => g[NAMED]!);
       const k = summary(games.map((g, i) => g[NAMED]! - first[i]));
       console.log(`  against the first: named kills ${k.mean > 0 ? "+" : ""}${k.mean} ± ${k.se}; ${d.mean > 0 ? "+" : ""}${d.mean} ± ${d.se} levels; share in points: ${moved.join(", ")}`);
     }
@@ -201,20 +231,9 @@ if (process.send) {
   });
   const baselineFile = new URL("baseline.json", import.meta.url);
   const baselines: Record<string, { mean: number; "30+": number; named?: number }> = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : {};
-  const now = summary(order.map(([share, at]) => shares[share].rows[0][at][0]!));
-  const kills = summary(order.map(([share, at]) => shares[share].rows[0][at][NAMED]!)).mean;
-  if (values.rank) {
-    const fresh = new Map(ids.map((game, n) => {
-      const own = order.slice(n * (to - from), (n + 1) * (to - from)).map(([share, at]) => shares[share].rows[0][at]);
-      const levels = own.map((g) => g[0]!).sort((a, b) => a - b);
-      const s = summary(levels);
-      const kills = summary(own.map((g) => g[NAMED]!));
-      const share = (level: number) => +((100 * levels.filter((l) => l >= level).length) / levels.length).toFixed(1);
-      return [game, { mean: +s.mean.toFixed(1), med: s.median, p90: levels[Math.floor(levels.length * 0.9)], best: s.best, ge25: share(25), ge30: share(30), ge35: share(35), kills: kills.mean, killsSe: kills.se, games: levels.length, policy: VERSION }];
-    }));
-    rank(ranking().map((row) => ({ ...row, ...fresh.get(row.game) })));
-  }
-  if (values.keep) writeFileSync(values.keep, JSON.stringify(shares.flatMap((s) => s.snaps)));
+  const now = summary(played[0].map((g) => g[0]!));
+  const kills = summary(played[0].map((g) => g[NAMED]!)).mean;
+  if (values.keep) writeFileSync(values.keep, JSON.stringify(snaps));
   if (values.save) {
     baselines[DUNGEON_KEY] = { mean: now.mean, "30+": now["30+"], named: kills };
     writeFileSync(baselineFile, JSON.stringify(baselines, null, 2) + "\n");

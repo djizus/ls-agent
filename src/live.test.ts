@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DUNGEONS, SURVIVOR } from "./config.ts";
-import { bagPurchase, forSale, heldGames, mintedSince, outdated, readQuote, units, unranked } from "./live.ts";
+import { bagPurchase, forSale, heldGames, mintedSince, readQuote, shortlist, units, unplayed, unranked } from "./live.ts";
 
 const POOL = DUNGEONS.lootBag.pool!;
 const ME = "0x123";
@@ -18,11 +18,27 @@ test("a bag the pool holds and the ranking lacks is found with one of its games"
   assert.deepEqual(unranked(HELD, [7806, 7941]), []);
 });
 
-test("a refresh replays the pool's bags whose figures come from another policy version or are missing, and no other", () => {
-  const rows = [{ bag: 7806, policy: "old" }, { bag: 7941, policy: "now" }, { bag: 7962, policy: "old" }];
-  assert.deepEqual(outdated(rows, HELD, "now"), [{ bag: 7806, policy: "old" }]);
-  assert.deepEqual(outdated([{ bag: 7806 }, { bag: 7941, policy: "now" }], HELD, "now"), [{ bag: 7806 }]);
-  assert.deepEqual(outdated([{ bag: 7806, policy: "now" }, { bag: 7941, policy: "now" }], HELD, "now"), []);
+test("a refresh replays the pool's bags that have no figures and leaves a bag ranked under an older policy alone; the full ranking replays every bag of the pool not ranked under this policy", () => {
+  const rows = [{ bag: 7806, policy: "old" }, { bag: 7941 }, { bag: 7962, policy: "old" }, { bag: 7900 }];
+  assert.deepEqual(unplayed(rows, HELD), [{ bag: 7941 }]);
+  assert.deepEqual(unplayed(rows, HELD, "now"), [{ bag: 7806, policy: "old" }, { bag: 7941 }]);
+  assert.deepEqual(unplayed([{ bag: 7806, policy: "now" }, { bag: 7941, policy: "now" }], HELD, "now"), []);
+  assert.deepEqual(unplayed([{ bag: 7806, policy: "old" }, { bag: 7941, policy: "now" }], HELD), []);
+});
+
+test("the second pass takes the pool's best bags by level and by named kills that lack the full count of games, and no other", () => {
+  const rows = [
+    { bag: 7962, mean: 26, kills: 6, games: 100 },
+    { bag: 7941, mean: 24, kills: 3, games: 100 },
+    { bag: 7806, mean: 24.5, kills: 2, games: 100 },
+    { bag: 7900, mean: 20, kills: 5, games: 100 },
+    { bag: 7901 },
+  ];
+  const pool = ["0x5", ...HELD.slice(1), "0x1c878ba01144c5600057862", "0x100000000001edc0000040000000006", "0x1c878ba01144c5600057863", "0x100000000001edd0000040000000006"];
+  assert.deepEqual(shortlist(rows, pool, 1, 500).map((row) => row.bag), [7806, 7900]);
+  assert.deepEqual(shortlist(rows, pool, 2, 500).map((row) => row.bag), [7806, 7941, 7900]);
+  assert.deepEqual(shortlist([{ ...rows[2], games: 500 }, rows[1], rows[3]], pool, 1, 500).map((row) => row.bag), [7900]);
+  assert.deepEqual(shortlist([{ ...rows[2], games: 500 }, { ...rows[3], games: 500 }, rows[1]], pool, 1, 500), []);
 });
 
 test("the pool's games of one bag are found by the bag number inside the game id", () => {

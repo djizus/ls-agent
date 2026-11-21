@@ -93,9 +93,16 @@ export function unranked(ids: string[], ranked: number[]): { bag: number; game: 
   return [...first].filter(([bag]) => !ranked.includes(bag)).map(([bag, game]) => ({ bag, game }));
 }
 
-export function outdated<Row extends { bag: number; policy?: string }>(rows: Row[], ids: string[], policy: string): Row[] {
+export function unplayed<Row extends { bag: number; policy?: string }>(rows: Row[], ids: string[], policy?: string): Row[] {
   const bags = new Set(pooled(ids).map(bagOf));
-  return rows.filter((row) => bags.has(row.bag) && row.policy !== policy);
+  return rows.filter((row) => bags.has(row.bag) && (policy ? row.policy !== policy : !row.policy));
+}
+
+export function shortlist<Row extends { bag: number; mean?: number; kills?: number; games?: number }>(rows: Row[], ids: string[], best: number, games: number): Row[] {
+  const bags = new Set(pooled(ids).map(bagOf));
+  const held = rows.filter((row) => bags.has(row.bag) && row.games);
+  const top = (by: "mean" | "kills") => [...held].sort((a, b) => b[by]! - a[by]!).slice(0, best);
+  return [...new Set([...top("mean"), ...top("kills")])].filter((row) => row.games! < games);
 }
 
 export function forSale<Row extends { bag: number }>(rows: Row[], ids: string[]): (Row & { n: number })[] {
