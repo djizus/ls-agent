@@ -136,18 +136,29 @@ async function buyBag(pool: string, entry: Entry | undefined, me: string): Promi
   return id;
 }
 
-async function enter(entry?: Entry): Promise<string> {
-  const me = keys().address;
-  if (DUNGEON.pool) return buyBag(DUNGEON.pool, entry, me);
-  const buy = (await balanceOf(TICKET)) < ONE ? (await ticketCalls()).calls : [];
-  const receipt = await send([
-    ...buy,
+const minted = (receipt: { events: { from_address: string; keys: string[] }[] }): string[] =>
+  receipt.events
+    .filter((e) => BigInt(e.from_address) === BigInt(GAME_CORE) && BigInt(e.keys[0]) === TRANSFER && BigInt(e.keys[1]) === 0n)
+    .map((e) => "0x" + (BigInt(e.keys[3]) + (BigInt(e.keys[4]) << 128n)).toString(16).padStart(64, "0"));
+
+const entryCalls = (games: number): Call[] =>
+  Array.from({ length: games }, (_, salt) => [
     { contractAddress: TICKET, entrypoint: "approve", calldata: [DUNGEON.address, ...u256(ONE)] },
-    { contractAddress: DUNGEON.address, entrypoint: "new_game", calldata: ["0", me, "0"] },
-  ]);
-  const mint = receipt.events.find((e) => BigInt(e.from_address) === BigInt(GAME_CORE) && BigInt(e.keys[0]) === TRANSFER && BigInt(e.keys[1]) === 0n);
-  if (!mint) throw new Error(`no game token minted in ${receipt.transaction_hash}`);
-  return "0x" + (BigInt(mint.keys[3]) + (BigInt(mint.keys[4]) << 128n)).toString(16).padStart(64, "0");
+    { contractAddress: DUNGEON.address, entrypoint: "new_game", calldata: ["0", keys().address, hex(BigInt(salt))] },
+  ]).flat();
+
+export async function tickets(wanted: number): Promise<number> {
+  const held = async () => Number((await balanceOf(TICKET)) / ONE);
+  if ((await held()) < wanted) await send((await ticketCalls()).calls);
+  return Math.min(wanted, await held());
+}
+
+async function enter(entry?: Entry): Promise<string> {
+  if (DUNGEON.pool) return buyBag(DUNGEON.pool, entry, keys().address);
+  if (!(await tickets(1))) throw new Error("no ticket to enter with");
+  const [id] = minted(await send(entryCalls(1)));
+  if (!id) throw new Error("no game token minted");
+  return id;
 }
 
 const view = (entrypoint: string, id: string) => provider.callContract({ contractAddress: GAME_CORE, entrypoint, calldata: [id] });
@@ -296,11 +307,14 @@ export async function quote(id: string): Promise<{ owner: string; claims: number
   return { owner, claims, strk: transactions.reduce((sum, t) => sum + t.strk, 0), transactions };
 }
 
+const START_MOVES = 8;
+
 export type Move = { game: Game; actions: Action[] };
 export type Moved = { snapshot: Snapshot; strk: number } | { error: unknown };
+export type Round = { moved: Moved[]; started: string[] | { error: unknown }; strk: number };
 
-export async function actLive(moves: Move[]): Promise<Moved[]> {
-  const out: Moved[] = moves.map(() => ({ error: new Error("not sent") }));
+export async function actLive(moves: Move[], starts = 0): Promise<Round> {
+  const moved: Moved[] = moves.map(() => ({ error: new Error("not sent") }));
   const first = (game: Game) => (game.packets.length ? game.chain!.rolling : 0n);
   let ready = moves.flatMap(({ game, actions }, at) => {
     try {
@@ -308,29 +322,36 @@ export async function actLive(moves: Move[]): Promise<Moved[]> {
       step(game.local, game.id, packet, randomHash());
       return [{ at, game, packet, call: { contractAddress: GAME_CORE, entrypoint: "commit_actions", calldata: [game.id, hex(first(game)), "0x1", hex(packet)] } }];
     } catch (error) {
-      out[at] = { error };
+      moved[at] = { error };
       return [];
     }
   });
-  const refuse = (error: unknown) => ready.forEach((r) => (out[r.at] = { error }));
-  if (!ready.length) return out;
+  let entries = entryCalls(starts);
+  const calls = () => [...ready.map((r) => r.call), ...entries];
+  const refuse = (error: unknown): Round => (ready.forEach((r) => (moved[r.at] = { error })), { moved, started: entries.length ? { error } : [], strk: 0 });
+  if (!calls().length) return { moved, started: [], strk: 0 };
   let receipt: Awaited<ReturnType<typeof send>>;
+  let refused: unknown;
   try {
-    receipt = await send(ready.map((r) => r.call));
+    receipt = await send(calls());
   } catch (error) {
-    const alone = ready.length > 1 ? await simulate(keys().address, ready.map((r) => [r.call])).catch(() => undefined) : undefined;
-    const sound = ready.filter((_, k) => alone && !alone[k].revert);
-    if (!sound.length || sound.length === ready.length) return refuse(error), out;
-    ready.forEach((r, k) => alone![k].revert && (out[r.at] = { error: new Error(alone![k].revert!) }));
-    ready = sound;
+    const groups = [...ready.map((r) => [r.call]), ...(entries.length ? [entries] : [])];
+    const alone = groups.length > 1 ? await simulate(keys().address, groups).catch(() => undefined) : undefined;
+    const bad = groups.map((_, k) => alone?.[k].revert ?? null);
+    if (!alone || bad.every((b) => b === null) || bad.every((b) => b !== null)) return refuse(error);
+    ready.forEach((r, k) => bad[k] !== null && (moved[r.at] = { error: new Error(bad[k]!) }));
+    if (entries.length && bad.at(-1) !== null) [refused, entries] = [new Error(bad.at(-1)!), []];
+    ready = ready.filter((_, k) => bad[k] === null);
     try {
-      receipt = await send(ready.map((r) => r.call));
+      receipt = await send(calls());
     } catch (again) {
-      return refuse(again), out;
+      return refuse(again);
     }
   }
+  const started = minted(receipt);
+  keep([...new Set([...liveIds(), ...started])]);
   const block = BigInt(receipt.block_number);
-  const strk = Number(BigInt(receipt.actual_fee.amount)) / 1e18 / ready.length;
+  const strk = Number(BigInt(receipt.actual_fee.amount)) / 1e18 / (ready.length + START_MOVES * started.length || 1);
   for (const { at, game, packet } of ready) {
     const chain = game.chain!;
     chain.rolling = BigInt(hash.computePoseidonHashOnElements([game.packets.length ? chain.rolling : BigInt(hash.computePoseidonHashOnElements([BigInt(game.id)])), packet, block]));
@@ -340,7 +361,7 @@ export async function actLive(moves: Move[]): Promise<Moved[]> {
     game.local = step(game.local, game.id, packet, receipt.block_hash);
     const snapshot = toSnapshot(game.local);
     if (snapshot.over) keep(liveIds().filter((id) => id !== game.id));
-    out[at] = { snapshot, strk };
+    moved[at] = { snapshot, strk };
   }
-  return out;
+  return { moved, started: refused ? { error: refused } : started, strk: START_MOVES * strk };
 }

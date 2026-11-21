@@ -6,7 +6,7 @@ import { begin, commit, current, enrich, namedKills, namedSlain, render, shape, 
 import { act, newPracticeGame, preview, replay, type Snapshot } from "./practice.ts";
 
 const move = async (table: Table, actions: Action[]): Promise<State> => {
-  const [moved] = await commit([{ table, actions }]);
+  const [moved] = (await commit([{ table, actions }])).committed;
   if ("error" in moved) throw moved.error;
   return moved.state;
 };
@@ -126,9 +126,9 @@ test("a recorded game counts the named beasts it killed by attacking, not plain 
 test("games moved in one round each advance as they would alone", { timeout: 120_000 }, async () => {
   const [a, b, alone] = [await begin(DUNGEON.benchmark[0]), await begin(DUNGEON.benchmark[1]), await begin(DUNGEON.benchmark[1])];
   const explore = (t: Table): Action[] => shape(current(t), [{ type: "upgrade", stat: "dexterity", amount: current(t).statUpgradesAvailable }, { type: "explore" }]).filter((x) => x.type !== "upgrade" || x.amount > 0);
-  const together = await commit([{ table: a, actions: explore(a) }, { table: b, actions: [{ type: "flee" }] }]);
+  const together = (await commit([{ table: a, actions: explore(a) }, { table: b, actions: [{ type: "flee" }] }])).committed;
   assert.ok("state" in together[0] && together[0].state.xp > 0);
   assert.ok("error" in together[1] && /battle/.test(together[1].error.message));
-  const [second] = await commit([{ table: b, actions: explore(b) }]);
+  const [second] = (await commit([{ table: b, actions: explore(b) }])).committed;
   assert.deepEqual("state" in second && second.state, await move(alone, explore(alone)));
 });

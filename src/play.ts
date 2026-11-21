@@ -216,12 +216,12 @@ export const current = (t: Table): State => state(t);
 
 export type Committed = { state: State; strk: number } | { error: Error };
 
-export async function commit(moves: { table: Table; actions: Action[] }[]): Promise<Committed[]> {
+export async function commit(moves: { table: Table; actions: Action[] }[], starts = 0): Promise<{ committed: Committed[]; started: string[] | { error: Error }; strk: number }> {
   const live = moves.filter((m) => m.table.game.chain);
-  const sent = live.length ? await actLive(live.map((m) => ({ game: m.table.game, actions: m.actions }))) : [];
-  return moves.map((m) => {
+  const sent = live.length || starts ? await actLive(live.map((m) => ({ game: m.table.game, actions: m.actions })), starts) : { moved: [], started: [], strk: 0 };
+  const committed = moves.map((m): Committed => {
     try {
-      const moved = m.table.game.chain ? sent[live.indexOf(m)] : { snapshot: act(m.table.game, m.actions), strk: 0 };
+      const moved = m.table.game.chain ? sent.moved[live.indexOf(m)] : { snapshot: act(m.table.game, m.actions), strk: 0 };
       if ("error" in moved) throw moved.error;
       m.table.last = moved.snapshot;
       return { state: state(m.table), strk: moved.strk };
@@ -229,6 +229,7 @@ export async function commit(moves: { table: Table; actions: Action[] }[]): Prom
       return { error: new Error(revertReason(err)) };
     }
   });
+  return { committed, started: "error" in sent.started ? { error: new Error(revertReason(sent.started.error)) } : sent.started, strk: sent.strk };
 }
 
 const SAMPLES = 8;

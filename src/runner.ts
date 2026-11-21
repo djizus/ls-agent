@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
 import { BEASTS_TO, DUNGEON, DUNGEON_KEY, SEATS, SURVIVOR } from "./config.ts";
 import { db } from "./db.ts";
-import { collect, liveIds, sendBeasts, type Entry } from "./live.ts";
+import { collect, liveIds, sendBeasts, tickets, type Entry } from "./live.ts";
 import { balanceOf, strkBalance } from "./wallet.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
@@ -45,7 +45,7 @@ export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
   return { hash, text: full, rules: (p: Phase) => [common.trim(), sections[p] ?? ""].filter(Boolean).join("\n\n") };
 }
 
-async function open(practiceId: string | undefined, seed: number, entry?: Entry, resumed?: string): Promise<Seat> {
+async function open(practiceId: string | undefined, seed: number, entry?: Entry, resumed?: string, strk = 0): Promise<Seat> {
   const strategy = loadStrategy();
   db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(strategy.hash, strategy.text, Date.now());
   const funds = () => (practiceId || resumed ? null : Promise.all([strkBalance(), balanceOf(SURVIVOR)]).then((held) => held.map(Number), () => null));
@@ -58,6 +58,7 @@ async function open(practiceId: string | undefined, seed: number, entry?: Entry,
   const row = known?.id ?? Number(db.prepare("INSERT INTO games (mode, game_id, seed, strategy, started_at) VALUES (?, ?, ?, ?, ?)").run(mode, id, seed, strategy.hash, Date.now()).lastInsertRowid);
   if (known) db.prepare("UPDATE games SET ended_at = NULL WHERE id = ?").run(row);
   if (before !== null && after !== null) db.prepare("UPDATE games SET gas_strk = coalesce(gas_strk, 0) + ?, survivor = coalesce(survivor, 0) + ? WHERE id = ?").run((before[0] - after[0]) / 1e18, (before[1] - after[1]) / 1e18, row);
+  if (strk) db.prepare("UPDATE games SET gas_strk = coalesce(gas_strk, 0) + ? WHERE id = ?").run(strk, row);
   table.row = row;
   emit({ kind: "status", text: `game ${row} on ${id.slice(-8)}`, row });
   return { table, row, rules: strategy.rules, state: current(table), note: "", rejected: "", rejections: 0, cost: 0 };
@@ -109,7 +110,7 @@ function nextSeed(): number {
 
 const DOING: Record<string, string> = { explore: "exploring", attack: "fighting", flee: "fleeing" };
 
-async function round(seats: Seat[]): Promise<void> {
+async function round(seats: Seat[], starts: number): Promise<{ started: string[] | { error: Error }; strk: number }> {
   const moves: { seat: Seat; decision: Decision; actions: Action[] }[] = [];
   for (const seat of seats) {
     const { table, row, state } = seat;
@@ -127,7 +128,7 @@ async function round(seats: Seat[]): Promise<void> {
   }
   if (PACE_MS) await new Promise((r) => setTimeout(r, PACE_MS));
   const sent = moves.filter((m) => m.actions.length);
-  const results = await commit(sent.map((m) => ({ table: m.seat.table, actions: m.actions })));
+  const { committed: results, started, strk } = await commit(sent.map((m) => ({ table: m.seat.table, actions: m.actions })), starts);
   for (const move of moves) {
     const { seat, decision, actions } = move;
     const result = sent.includes(move) ? results[sent.indexOf(move)] : { error: new Error("spend your stat points before anything else") };
@@ -147,6 +148,7 @@ async function round(seats: Seat[]): Promise<void> {
   const checked = seats.filter((seat) => seat.table.game.chain && !seat.ending && seat.table.game.packets.length <= LIVE_CHECK_MOVES);
   const drifts = await Promise.all(checked.map((seat) => auditGame(seat.table).catch(() => undefined)));
   checked.forEach((seat, i) => drifts[i] && (seat.ending = "stopped: local state differs from the contract"));
+  return { started, strk };
 }
 
 const failures = new Map<string, number>();
@@ -171,23 +173,52 @@ export async function play(count: number, live: boolean, entry?: Entry): Promise
       ? [...resumed.map((id) => ({ resumed: id })), ...Array.from({ length: count - resumed.length }, () => ({}))]
       : DUNGEON.benchmark.slice(0, count).map((practice) => ({ practice }));
     const seats: Seat[] = [];
+    const arrived: Seat[] = [];
+    const opening = new Set<Promise<void>>();
     const ended: { seat: Seat; due: number }[] = [];
     const again = (id: string) => (retry(id) ? queue.unshift({ resumed: id }) : (queue.length = 0));
+    const rides = live && !DUNGEON.pool;
+    const limit = DECIDER === "rules" ? SEATS : 1;
+    const join = (id: string, strk = 0) => {
+      const done = open(undefined, seed, entry, id, strk)
+        .then((seat) => void arrived.push(seat), (err) => (failed(err), void again(id)))
+        .finally(() => opening.delete(done));
+      opening.add(done);
+    };
     for (;;) {
-      for (const done of ended.filter((e) => e.due <= Date.now() || !seats.length)) {
+      seats.push(...arrived.splice(0));
+      for (const done of ended.filter((e) => e.due <= Date.now() || (!seats.length && !opening.size))) {
         await new Promise((r) => setTimeout(r, Math.max(0, done.due - Date.now())));
         ended.splice(ended.indexOf(done), 1);
         await settle(done.seat).catch(failed);
       }
-      while (!stopping && queue.length && seats.length < (DECIDER === "rules" ? SEATS : 1)) {
+      while (!stopping && queue.length && seats.length + opening.size < limit && (queue[0].resumed || !rides)) {
         const next = queue.shift()!;
-        await open(next.practice, seed, entry, next.resumed).then(
-          (seat) => seats.push(seat),
-          (err) => (failed(err), next.resumed && again(next.resumed)),
-        );
+        if (next.resumed) join(next.resumed);
+        else await open(next.practice, seed, entry).then((seat) => seats.push(seat), failed);
       }
-      if (!seats.length) break;
-      await round(seats).catch((err) => seats.forEach((seat) => (seat.failed ??= (err as Error).message.slice(0, 200))));
+      const free = limit - seats.length - opening.size;
+      const wanted = rides && !stopping && free > 0 && queue.length && !queue[0].resumed ? Math.min(free, queue.length) : 0;
+      const starts = wanted ? await tickets(wanted).catch((err) => (failed(err), 0)) : 0;
+      if (!seats.length && !starts) {
+        if (!opening.size) break;
+        await Promise.race(opening);
+        continue;
+      }
+      const { started } = stopping
+        ? { started: [] }
+        : await round(seats, starts).then(
+            (sent) => ({ started: "error" in sent.started ? sent.started : sent.started.map((id) => ({ id, strk: sent.strk })) }),
+            (err: Error) => (seats.forEach((seat) => (seat.failed ??= err.message.slice(0, 200))), { started: starts ? { error: err } : [] }),
+          );
+      if ("error" in started) {
+        failed(started.error);
+        if (!retry("start")) queue.length = 0;
+      } else if (starts) {
+        cleared("start");
+        queue.splice(0, started.length);
+        for (const { id, strk } of started) join(id, strk);
+      }
       for (const seat of [...seats]) {
         const { game } = seat.table;
         const unfinished = !!game.chain && !seat.state.over && !stopping;
