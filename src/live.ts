@@ -155,11 +155,10 @@ export const head = (): Promise<number> => provider.getBlockNumber();
 
 export const adopt = (id: string): void => keep([...new Set([...liveIds(), id])]);
 
-const entryCalls = (games: number): Call[] =>
-  Array.from({ length: games }, (_, salt) => [
-    { contractAddress: TICKET, entrypoint: "approve", calldata: [DUNGEON.address, ...u256(ONE)] },
-    { contractAddress: DUNGEON.address, entrypoint: "new_game", calldata: ["0", keys().address, hex(BigInt(salt))] },
-  ]).flat();
+const entryCalls = (games: number): Call[] => !games ? [] : [
+  { contractAddress: TICKET, entrypoint: "approve", calldata: [DUNGEON.address, ...u256(ONE * BigInt(games))] },
+  { contractAddress: DUNGEON.address, entrypoint: "new_game_batch", calldata: [hex(BigInt(games)), ...Array<string>(games).fill(keys().address), "0x0"] },
+];
 
 export async function tickets(wanted: number): Promise<number> {
   const held = async () => Number((await balanceOf(TICKET)) / ONE);
