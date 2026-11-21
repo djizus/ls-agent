@@ -1,13 +1,13 @@
 import { fork } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { availableParallelism } from "node:os";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { availableParallelism, constants, setPriority } from "node:os";
 import { parseArgs } from "node:util";
-import { DUNGEON, DUNGEON_KEY, DUNGEONS } from "../src/config.ts";
+import { BAG_RANKING, DUNGEON, DUNGEON_KEY, DUNGEONS, VAR_DIR } from "../src/config.ts";
 import { useFastLuck } from "../src/hash.ts";
 import { describe, slewNamed } from "../src/play.ts";
 import { summary } from "../src/summary.ts";
-import { ARMOR, NECK, RULES, plan } from "../src/policy.ts";
-import { poolIds, unranked } from "../src/live.ts";
+import { ARMOR, NECK, RULES, VERSION, plan } from "../src/policy.ts";
+import { outdated, poolIds, unranked } from "../src/live.ts";
 import { toSnapshot, type Local } from "../src/engine/engine.ts";
 import { act, newPracticeGame, startOf, syntheticGame, type Game } from "../src/practice.ts";
 
@@ -26,7 +26,7 @@ const { values } = parseArgs({
     reach: { type: "string" },
     keep: { type: "string" },
     late: { type: "string" },
-    rank: { type: "string" },
+    rank: { type: "boolean", default: false },
   },
 });
 type Kept = { id: string; moves: number; local: Local };
@@ -52,20 +52,34 @@ async function gearOf(game: string) {
   };
 }
 
+type Ranked = { bag: number; game: string; policy?: string; mean?: number };
+const ranking = (): Ranked[] => (existsSync(BAG_RANKING) ? JSON.parse(readFileSync(BAG_RANKING, "utf8")) : []);
+function rank(rows: Ranked[]): void {
+  mkdirSync(VAR_DIR, { recursive: true });
+  writeFileSync(`${BAG_RANKING}.part`, JSON.stringify(rows.sort((a, b) => (b.mean ?? 0) - (a.mean ?? 0))));
+  renameSync(`${BAG_RANKING}.part`, BAG_RANKING);
+}
+
 if (values.rank && !process.send) {
-  const rows: { bag: number; game?: string }[] = JSON.parse(readFileSync(values.rank, "utf8"));
-  const added = unranked(await poolIds(DUNGEONS.lootBag.pool!), rows.map((row) => row.bag));
+  setPriority(constants.priority.PRIORITY_LOW);
+  const [rows, pool] = [ranking(), await poolIds(DUNGEONS.lootBag.pool!)];
+  const added = unranked(pool, rows.map((row) => row.bag));
   for (const { bag, game } of added) rows.push({ bag, ...(await gearOf(game)), game });
-  if (added.length) writeFileSync(values.rank, JSON.stringify(rows));
-  console.log(`${added.length} bags added from the pool${added.length ? `: ${added.map((a) => a.bag).join(", ")}` : ""}`);
+  const stale = outdated(rows, pool, VERSION);
+  rank(rows);
+  console.log(`policy ${VERSION}: ${added.length} bags added from the pool${added.length ? ` (${added.map((a) => a.bag).join(", ")})` : ""}, ${stale.length} to replay`);
+  if (!stale.length) process.exit(0);
+  process.env.BENCH_RANK = JSON.stringify(stale.map((row) => row.game));
 }
 const ids: (string | number | Kept)[] = values.late
   ? kept
   : rolled
   ? Array.from({ length: Number(values.starts) }, (_, i) => Number(values.from) + i)
-  : values.ids ?? values.rank
-    ? JSON.parse(readFileSync((values.ids ?? values.rank)!, "utf8")).map((x: string | { game: string }) => (typeof x === "string" ? x : x.game))
-    : DUNGEON.benchmark;
+  : values.rank
+    ? JSON.parse(process.env.BENCH_RANK!)
+    : values.ids
+      ? JSON.parse(readFileSync(values.ids, "utf8")).map((x: string | { game: string }) => (typeof x === "string" ? x : x.game))
+      : DUNGEON.benchmark;
 const games = ids.flatMap((id) => Array.from({ length: to - from }, (_, i) => [id, from + i] as const));
 const procs = Number(values.procs);
 const MEAN_SLACK = 0.25;
@@ -190,16 +204,15 @@ if (process.send) {
   const now = summary(order.map(([share, at]) => shares[share].rows[0][at][0]!));
   const kills = summary(order.map(([share, at]) => shares[share].rows[0][at][NAMED]!)).mean;
   if (values.rank) {
-    const rows: Record<string, unknown>[] = JSON.parse(readFileSync(values.rank, "utf8"));
-    const fresh = rows.map((row, n) => {
+    const fresh = new Map(ids.map((game, n) => {
       const own = order.slice(n * (to - from), (n + 1) * (to - from)).map(([share, at]) => shares[share].rows[0][at]);
       const levels = own.map((g) => g[0]!).sort((a, b) => a - b);
       const s = summary(levels);
       const kills = summary(own.map((g) => g[NAMED]!));
       const share = (level: number) => +((100 * levels.filter((l) => l >= level).length) / levels.length).toFixed(1);
-      return { ...row, mean: +s.mean.toFixed(1), med: s.median, p90: levels[Math.floor(levels.length * 0.9)], best: s.best, ge25: share(25), ge30: share(30), ge35: share(35), kills: kills.mean, killsSe: kills.se, games: levels.length };
-    });
-    writeFileSync(values.rank, JSON.stringify(fresh.sort((a, b) => b.mean - a.mean)));
+      return [game, { mean: +s.mean.toFixed(1), med: s.median, p90: levels[Math.floor(levels.length * 0.9)], best: s.best, ge25: share(25), ge30: share(30), ge35: share(35), kills: kills.mean, killsSe: kills.se, games: levels.length, policy: VERSION }];
+    }));
+    rank(ranking().map((row) => ({ ...row, ...fresh.get(row.game) })));
   }
   if (values.keep) writeFileSync(values.keep, JSON.stringify(shares.flatMap((s) => s.snaps)));
   if (values.save) {

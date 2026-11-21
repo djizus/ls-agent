@@ -93,6 +93,11 @@ export function unranked(ids: string[], ranked: number[]): { bag: number; game: 
   return [...first].filter(([bag]) => !ranked.includes(bag)).map(([bag, game]) => ({ bag, game }));
 }
 
+export function outdated<Row extends { bag: number; policy?: string }>(rows: Row[], ids: string[], policy: string): Row[] {
+  const bags = new Set(pooled(ids).map(bagOf));
+  return rows.filter((row) => bags.has(row.bag) && row.policy !== policy);
+}
+
 export function forSale<Row extends { bag: number }>(rows: Row[], ids: string[]): (Row & { n: number })[] {
   const bags = pooled(ids).map(bagOf);
   return rows.map((row) => ({ ...row, n: bags.filter((bag) => bag === row.bag).length })).filter((row) => row.n);

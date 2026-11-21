@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, readFileSync } from "node:fs";
+import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { networkInterfaces } from "node:os";
-import { BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
+import { BAG_RANKING, BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
 import { halt, play, slain } from "./runner.ts";
@@ -15,7 +16,6 @@ import { summary } from "./summary.ts";
 
 const page = readFileSync(new URL("../web/index.html", import.meta.url));
 const CHECK = `${VAR_DIR}contract-check.json`;
-const BAGS = new URL("../scripts/bag-ranking.json", import.meta.url);
 const games = () => `SELECT *, CASE mode ${Object.entries(DUNGEONS).map(([k, d]) => `WHEN '${k}' THEN '${d.name}'`).join(" ")} END AS dungeon, mode IN (${Object.keys(DUNGEONS).map((k) => `'${k}'`)}) AS onchain, id IN (${liveRows().join(",") || "NULL"}) AS live FROM games`;
 
 async function json(req: IncomingMessage): Promise<unknown> {
@@ -118,9 +118,16 @@ function openClaims(g: { id: number; mode: string }): number | null {
 const POOL_MS = 60_000;
 const pool = background(POOL_MS, () => poolIds(DUNGEONS.lootBag.pool!));
 
+let ranking: ChildProcess | undefined;
+
+function rankBags(): void {
+  const done = () => (ranking = undefined);
+  ranking ??= spawn(process.execPath, [new URL("../scripts/bench.ts", import.meta.url).pathname, "--rank"], { env: { ...process.env, LS_DUNGEON: "lootBag" }, stdio: "ignore" }).once("exit", done).once("error", done);
+}
+
 function bags() {
-  const [ranked, ids] = [existsSync(BAGS) ? JSON.parse(readFileSync(BAGS, "utf8")) : [], pool()];
-  return ids ? forSale(ranked, ids) : ranked;
+  const [ranked, ids] = [existsSync(BAG_RANKING) ? JSON.parse(readFileSync(BAG_RANKING, "utf8")) : [], pool()];
+  return { rows: ids ? forSale(ranked, ids) : ranked, at: existsSync(BAG_RANKING) ? statSync(BAG_RANKING).mtimeMs : null, running: !!ranking };
 }
 
 function beasts() {
@@ -154,6 +161,10 @@ const OWN = new Set(Object.values(networkInterfaces()).flatMap((list) => (list ?
 async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown> {
   const url = new URL(req.url ?? "/", "http://x");
   const own = OWN.has((req.socket.remoteAddress ?? "").replace("::ffff:", ""));
+  if (url.pathname === "/api/bags") {
+    if (req.method === "POST") rankBags();
+    return reply(res, bags());
+  }
   if (!own && (req.method !== "GET" || url.pathname === "/mcp")) return res.writeHead(403).end();
   if (url.pathname === "/mcp") return handleMcp(req, res, req.method === "POST" ? await json(req) : undefined);
   if (url.pathname === "/events") {
@@ -188,7 +199,6 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
   if (url.pathname === "/api/summary") return reply(res, figures());
   if (url.pathname === "/api/wallet") return reply(res, await wallet());
   if (url.pathname === "/api/beasts") return reply(res, await beasts());
-  if (url.pathname === "/api/bags") return reply(res, bags());
   if (url.pathname === "/api/items") return reply(res, ITEMS);
   if (url.pathname === "/api/check") return reply(res, existsSync(CHECK) ? JSON.parse(readFileSync(CHECK, "utf8")) : null);
   if (url.pathname.startsWith("/assets/") && /^\/assets\/[a-z]+\/?[A-Za-z0-9_]*\.(png|svg)$/.test(url.pathname)) {

@@ -1,9 +1,13 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
 import { levelBonus } from "./beast.ts";
 import { obstacleHit, reduced } from "./engine/damage.ts";
 import { potionPrice } from "./items.ts";
 import { AMBUSH_REDUCTION } from "./settings.ts";
 import { shape, type State } from "./play.ts";
+
+export const VERSION = createHash("sha256").update(readFileSync(new URL(import.meta.url))).digest("hex").slice(0, 8);
 
 export const RULES = { potionPrice: 1, dexPerLevel: 0.9, weaponCatchUp: 5, jewelryLevel: 8, jewelryReserve: 2, armorReserve: 0.5, fightRisk: 0.35, swapGain: 0.05, weaponReserve: 3, healthFloor: 0.97 };
 

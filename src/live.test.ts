@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DUNGEONS, SURVIVOR } from "./config.ts";
-import { bagPurchase, forSale, heldGames, mintedSince, readQuote, units, unranked } from "./live.ts";
+import { bagPurchase, forSale, heldGames, mintedSince, outdated, readQuote, units, unranked } from "./live.ts";
 
 const POOL = DUNGEONS.lootBag.pool!;
 const ME = "0x123";
@@ -16,6 +16,13 @@ test("the ranked bags are listed with the copies the pool holds now, and a bag i
 test("a bag the pool holds and the ranking lacks is found with one of its games", () => {
   assert.deepEqual(unranked(HELD, [7806]), [{ bag: 7941, game: "0x0100000000001f0500000400000000060000000001c878ba01144c53000b1e41" }]);
   assert.deepEqual(unranked(HELD, [7806, 7941]), []);
+});
+
+test("a refresh replays the pool's bags whose figures come from another policy version or are missing, and no other", () => {
+  const rows = [{ bag: 7806, policy: "old" }, { bag: 7941, policy: "now" }, { bag: 7962, policy: "old" }];
+  assert.deepEqual(outdated(rows, HELD, "now"), [{ bag: 7806, policy: "old" }]);
+  assert.deepEqual(outdated([{ bag: 7806 }, { bag: 7941, policy: "now" }], HELD, "now"), [{ bag: 7806 }]);
+  assert.deepEqual(outdated([{ bag: 7806, policy: "now" }, { bag: 7941, policy: "now" }], HELD, "now"), []);
 });
 
 test("the pool's games of one bag are found by the bag number inside the game id", () => {
