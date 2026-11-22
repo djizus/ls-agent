@@ -234,12 +234,12 @@ if (process.send) {
       });
   });
   const baselineFile = new URL("baseline.json", import.meta.url);
-  const baselines: Record<string, { mean: number; "30+": number; named?: number }> = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : {};
+  const baselines: Record<string, { games?: number; mean: number; "30+": number; named?: number }> = existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : {};
   const now = summary(played[0].map((g) => g[0]!));
   const kills = summary(played[0].map((g) => g[NAMED]!)).mean;
   if (values.keep) writeFileSync(values.keep, JSON.stringify(snaps));
   if (values.save) {
-    baselines[DUNGEON_KEY] = { mean: now.mean, "30+": now["30+"], named: kills };
+    baselines[DUNGEON_KEY] = { games: now.games, mean: now.mean, "30+": now["30+"], named: kills };
     writeFileSync(baselineFile, JSON.stringify(baselines, null, 2) + "\n");
   }
   if (values.gate) {

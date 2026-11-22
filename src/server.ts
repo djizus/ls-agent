@@ -13,7 +13,7 @@ import { affixes, claimableKill, inventory, pendingClaims, sellPrices, worth } f
 import { liveRows, subscribe } from "./events.ts";
 import { forSale, poolIds, usdPrice } from "./live.ts";
 import { handleMcp } from "./mcp.ts";
-import { summary } from "./summary.ts";
+import { ENDED, dungeonFigures, type Ended } from "./summary.ts";
 
 const page = readFileSync(new URL("../web/index.html", import.meta.url));
 const CHECK = `${VAR_DIR}contract-check.json`;
@@ -34,22 +34,9 @@ const PRICE_MS = 600_000;
 const price = background(PRICE_MS, () => Promise.all([usdPrice(STRK), usdPrice(SURVIVOR)]));
 
 function figures() {
-  const ended = db.prepare("SELECT mode, level, beasts, claimed, gas_strk, survivor FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; level: number; beasts: number | null; claimed: number | null; gas_strk: number | null; survivor: number | null }[];
-  const mean = (values: number[]) => (values.length ? summary(values).mean : null);
-  return Object.entries(DUNGEONS).map(([mode, d]) => {
-    const games = ended.filter((g) => g.mode === mode);
-    if (!games.length) return { mode, name: d.name, games: 0 };
-    return {
-      mode,
-      name: d.name,
-      games: games.length,
-      mean: mean(games.map((g) => g.level)),
-      best: summary(games.map((g) => g.level)).best,
-      slain: mean(games.flatMap((g) => (g.beasts === null ? [] : [g.beasts]))),
-      claimed: games.reduce((sum, g) => sum + (g.claimed ?? 0), 0),
-      usd: price() ? games.reduce((sum, g) => sum + price()![0] * (g.gas_strk ?? 0) + price()![1] * (g.survivor ?? 0), 0) : null,
-    };
-  });
+  const ended = db.prepare(ENDED).all() as Ended[];
+  const usd = (mode: string) => (price() ? ended.filter((g) => g.mode === mode).reduce((sum, g) => sum + price()![0] * (g.gas_strk ?? 0) + price()![1] * (g.survivor ?? 0), 0) : null);
+  return dungeonFigures(ended, DUNGEONS).map((f) => (f.games ? { ...f, usd: usd(f.mode) } : f));
 }
 
 const tokens = (n: bigint) => Number(n) / 1e18;

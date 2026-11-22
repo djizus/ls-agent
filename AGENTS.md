@@ -48,6 +48,7 @@ When a game ends, its seat takes the next game. A minute later the bot settles t
 | `npm run contract` | The same tests against the live contract, one file at a time. `scripts/check.sh` runs it daily and writes `var/contract-check.json` for the page. |
 | `npm run record` | Records the contract answers again into `src/tape.json` (about 40 seconds). Two runs give the same file. |
 | `npm run prove -- 2` | Starts the real service on port 4199, plays 2 practice games through the API, and leaves the database, log, event stream and game list in `var/evidence/<time>/`. `-- 2 lootBag` plays Loot Dungeon starts; `-- loop` starts the loop on an empty wallet and stops it once it waits for STRK. |
+| `npm run stats` | Rewrites the Results section of `README.md` from `scripts/baseline.json` and `var/ls.sqlite` (opened read-only), and nothing else in the file. Run it with `LS_VAR_DIR` on a copy of the production database. |
 | `npm run bench` | Plays the policy on 10,000 fixed Beast Mode starts: mean level and spread, share reaching levels 26 to 40, named kills, causes of death. A difference under two standard errors is noise. |
 
 For a page change, run the server on a free port with its own `LS_VAR_DIR` holding a copy of a real `ls.sqlite`, and look at it at 1920x1080 and 390x844.
@@ -100,7 +101,7 @@ Environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env`.
 | Play saved games forward on several luck seeds, to measure late-game rules | `npm run bench -- --late var/level30.json --seeds 0-10` |
 | Use the contract's luck hash in place of the fast one (same distribution, 30 times slower) | `npm run bench -- --exact` |
 | Play given Loot Dungeon games on 500 luck seeds each, one line per game | `npm run bench -- --dungeon lootBag --ids games.json --by-id` (a JSON list of game ids) |
-| Fail when the policy gets worse than `scripts/baseline.json` | `npm run bench -- --gate` (`--save` rewrites it) |
+| Fail when the policy gets worse than `scripts/baseline.json` | `npm run bench -- --gate` (`--save` rewrites it, with the number of games) |
 | Search one policy field at a time | `node scripts/search.ts --grid '{"fightRisk":[0.15,0.25,0.35]}' --level 35` |
 | Explain how a game died, move by move | `node scripts/autopsy.ts var/ls.sqlite <row id>...` |
 | Import human games for study | `node scripts/import.ts <dir>...` |
