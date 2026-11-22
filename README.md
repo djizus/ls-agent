@@ -13,7 +13,7 @@ npm test
 npm start
 ```
 
-`npm test` compares the local port of the game with the contract, through a public Starknet node. `npm start` serves the page on http://127.0.0.1:4100.
+`npm test` compares the local port of the game with the contract's answers recorded in `src/tape.json`, without the network: a test that reaches it fails. `npm start` serves the page on http://127.0.0.1:4100.
 
 In a second terminal, play 20 practice games (about three minutes):
 
@@ -119,6 +119,8 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 | A loot bag's price now, whether the pool holds it, and a simulated purchase (read-only) | `node src/cli.ts bag <bag number> [address]` |
 | Beasts an address holds or has staked, and its unclaimed kills (read-only) | `node src/cli.ts beasts [address]` |
 | Send every beast the wallet holds to another account (spends STRK; refuses an address with no account, and a transfer that would fail) | `node src/cli.ts send-beasts <address>` |
+| Compare the local port with the live contract | `npm run contract` runs the tests one file at a time against the public node and writes nothing (the flow kind `contract`, run on demand with `build.sh contract`, never in a landing). |
+| Record the contract's answers again | `npm run record` runs the same tests against the public node one file at a time and rewrites `src/tape.json`: 926 answers, about 40 seconds. Run it after a change to a test that calls the contract, or when `npm run contract` finds that the contract changed. Two runs give the same file. |
 | Import human games for study | `node scripts/import.ts <dir>...` |
 | Explain how a game died | `node scripts/autopsy.ts <file> <game>...` |
 
@@ -128,6 +130,7 @@ Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-
 |---|---|
 | Action shapes and packet encoding | `src/codec.ts` |
 | Game rules | The contract. `src/engine/` is the local port, and `src/mechanics.test.ts` and `src/engine/engine.test.ts` compare it with the contract. |
+| The contract's recorded answers that `npm test` replays | `src/tape.json`, written by `npm run record` |
 | Rule policy | `src/policy.ts` |
 | Rules told to a model decider | `src/mechanics.ts` |
 | Strategy text for model deciders | `strategy/prompt.md` |

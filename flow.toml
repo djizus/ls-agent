@@ -7,6 +7,9 @@ cmd = "npx tsc --noEmit -p ."
 [kind.test]
 cmd = "npm test"
 
+[kind.contract]
+cmd = "npm run contract"
+
 [land]
 kinds = "test"
 forbid = "co-authored-by|generated with|claude|anthropic"

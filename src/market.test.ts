@@ -60,7 +60,7 @@ for (const levelUps of [1, 2, 3]) {
     const owned = new Set([...Object.values(a.equipment), ...state.bag].map((i) => i.id));
     const offers = marketOf(a, game.id, settingsOf(game.id).market).filter((o) => !owned.has(o.id));
     const listed = new Set(offers.map((o) => o.id));
-    const unlisted = ITEMS.map((i) => i.id).filter((id) => !listed.has(id) && !owned.has(id)).sort(() => Math.random() - 0.5).slice(0, 12);
+    const unlisted = ITEMS.map((i) => i.id).filter((id) => !listed.has(id) && !owned.has(id)).sort((x, y) => ((x * 7919 + levelUps) % 101) - ((y * 7919 + levelUps) % 101)).slice(0, 12);
     assert.ok(offers.length > 5);
 
     const bought = await inBatches(offers, (o) => tryBuy(game, state, o.id));
