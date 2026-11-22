@@ -35,22 +35,22 @@ const PRICE_MS = 600_000;
 const price = background(PRICE_MS, () => Promise.all([usdPrice(STRK), usdPrice(SURVIVOR)]));
 
 function figures() {
-  const ended = db.prepare("SELECT mode, strategy, level, beasts, gas_strk, survivor FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; strategy: string; level: number; beasts: number | null; gas_strk: number | null; survivor: number | null }[];
+  const ended = db.prepare("SELECT mode, strategy, level, beasts, claimed, gas_strk, survivor FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; strategy: string; level: number; beasts: number | null; claimed: number | null; gas_strk: number | null; survivor: number | null }[];
   const strategy = ended.find((g) => g.mode === PRACTICE)?.strategy ?? null;
   const groups = [...Object.entries(DUNGEONS).map(([mode, d]) => ({ mode, name: d.name, strategy: null as string | null })), { mode: PRACTICE, name: "Practice", strategy }];
   const mean = (values: number[]) => (values.length ? summary(values).mean : null);
   return groups.map((group) => {
     const games = ended.filter((g) => g.mode === group.mode && (!group.strategy || g.strategy === group.strategy));
     if (!games.length) return { ...group, games: 0 };
-    const { median, best, "30+": reach30 } = summary(games.map((g) => g.level));
+    const { best, "30+": reach30 } = summary(games.map((g) => g.level));
     return {
       ...group,
       games: games.length,
-      median,
       mean: mean(games.map((g) => g.level)),
       best,
       reach30,
       slain: mean(games.flatMap((g) => (g.beasts === null ? [] : [g.beasts]))),
+      claimed: games.reduce((sum, g) => sum + (g.claimed ?? 0), 0),
       usd: price() ? games.reduce((sum, g) => sum + price()![0] * (g.gas_strk ?? 0) + price()![1] * (g.survivor ?? 0), 0) : null,
     };
   });
