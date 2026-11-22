@@ -33,15 +33,7 @@ async function limited<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-async function call(request: Parameters<typeof provider.callContract>[0], attempt = 0): Promise<string[]> {
-  try {
-    return await limited(() => provider.callContract(request));
-  } catch (err) {
-    if (attempt >= 5 || !/rate limit|429|-32005/i.test(String((err as Error).message))) throw err;
-    await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
-    return call(request, attempt + 1);
-  }
-}
+const call = (request: Parameters<typeof provider.callContract>[0]): Promise<string[]> => limited(() => provider.callContract(request));
 
 export async function replay(game: { id: string; seed?: number; packets: bigint[]; chain?: Chain }, packets = game.packets, luckHashes = hashes(game)): Promise<Snapshot> {
   const blocks = packets.map((_, i) => (game.chain?.blocks[i] ?? FAR_BLOCK + BigInt(i)).toString());
