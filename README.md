@@ -14,7 +14,7 @@ You watch it on a page that runs on your own machine: `npm start`, then open htt
   STRK ≥ 30 ? ──no──► wait 5 min, check again ────────────┤
       │ yes                                               │
       ▼                                                   │
-  80 Beast Mode games                                     │
+  40 Beast Mode games                                     │
       │                                                   │
       ▼                                                   │
   the best loot bag costs ≤ 100 SURVIVOR                  │

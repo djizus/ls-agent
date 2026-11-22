@@ -12,13 +12,13 @@ const { STRK_FLOOR } = await import("./config.ts");
 const HELD = ["0x3", "0x1c878b901144c4a000161c1", "0x100000000001e7e0000040000000006", "0x1c878ba01144c53000b1e41", "0x100000000001f050000040000000006", "0x1c878ba01144c5600057861", "0x100000000001e7e0000040000000006"];
 const SURVIVOR = (n: number) => BigInt(n * 1e6) * 10n ** 12n;
 
-test("the loop waits under the floor plus a round's reserve, plays the Beast Mode games left to 80, then one Loot Dungeon game, and resumes an unfinished one first", () => {
-  assert.equal(LOOP.beastGames, 80);
+test("the loop waits under the floor plus a round's reserve, plays the Beast Mode games left to 40, then one Loot Dungeon game, and resumes an unfinished one first", () => {
+  assert.equal(LOOP.beastGames, 40);
   assert.deepEqual(nextStep(29.9, 0, false), { kind: "wait", need: 30 });
-  assert.deepEqual(nextStep(10, 80, true), { kind: "wait", need: 30 });
-  assert.deepEqual(nextStep(30, 0, false), { kind: "beast", games: 80 });
-  assert.deepEqual(nextStep(30, 79, false), { kind: "beast", games: 1 });
-  assert.deepEqual(nextStep(30, 80, false), { kind: "loot" });
+  assert.deepEqual(nextStep(10, 40, true), { kind: "wait", need: 30 });
+  assert.deepEqual(nextStep(30, 0, false), { kind: "beast", games: 40 });
+  assert.deepEqual(nextStep(30, 39, false), { kind: "beast", games: 1 });
+  assert.deepEqual(nextStep(30, 40, false), { kind: "loot" });
   assert.deepEqual(nextStep(30, 3, true), { kind: "loot" });
 });
 
@@ -48,12 +48,12 @@ test("README.md and AGENTS.md state the loop's numbers and the spend floor as th
   for (const [file, lines] of Object.entries(said)) for (const line of lines) assert.ok(read(file).includes(line), `${file}: ${line}`);
 });
 
-test("a fresh loop counts the Beast Mode games started after the last Loot Dungeon game in the database, so 80 played by hand go straight to the Loot step", () => {
+test("a fresh loop counts the Beast Mode games started after the last Loot Dungeon game in the database, so 40 played by hand go straight to the Loot step", () => {
   const add = (mode: string, at: number) => db.prepare("INSERT INTO games (mode, game_id, strategy, started_at) VALUES (?, ?, 's', ?)").run(mode, `0x${at}`, at);
   for (let at = 1; at <= 5; at++) add("beast", at);
   add("lootBag", 10);
-  for (let at = 11; at <= 90; at++) add("beast", at);
+  for (let at = 11; at <= 50; at++) add("beast", at);
   add("practice", 95);
-  assert.equal(beastSince(), 80);
+  assert.equal(beastSince(), 40);
   assert.deepEqual(nextStep(100, beastSince(), false), { kind: "loot" });
 });

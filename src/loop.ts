@@ -6,7 +6,7 @@ import { bagMarket, bagRefusal, forSale, liveIds, poolIds, units } from "./live.
 import { halt, play, running } from "./runner.ts";
 import { balanceOf, strkBalance } from "./wallet.ts";
 
-export const LOOP = { beastGames: 80, bagCapSurvivor: 100, reserveStrk: 10, recheckMs: 300_000 };
+export const LOOP = { beastGames: 40, bagCapSurvivor: 100, reserveStrk: 10, recheckMs: 300_000 };
 
 const file = `${VAR_DIR}loop.json`;
 
