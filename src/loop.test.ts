@@ -37,8 +37,12 @@ test("the loop skips the bag with the purchase's own refusal when its price is o
   assert.equal(bagRefusal([], quote(84), entry, SURVIVOR(200)), "the pool holds no game of bag 7806");
 });
 
-test("the README states the loop's numbers and the spend floor as the code has them", () => {
-  const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+test("README.md and AGENTS.md state the loop's numbers and the spend floor as the code has them", () => {
+  const read = (name: string) => readFileSync(new URL(`../${name}`, import.meta.url), "utf8");
   const need = STRK_FLOOR + LOOP.reserveStrk;
-  for (const said of [`STRK ≥ ${need} ?`, `wait ${LOOP.recheckMs / 60_000} min`, `${LOOP.beastGames} Beast Mode games`, `costs ≤ ${LOOP.bagCapSurvivor} SURVIVOR`, `${need} STRK is the ${STRK_FLOOR} STRK spend floor plus ${LOOP.reserveStrk}`, `Under ${STRK_FLOOR} STRK (\`STRK_FLOOR\``]) assert.ok(readme.includes(said), said);
+  const said = {
+    "README.md": [`STRK ≥ ${need} ?`, `wait ${LOOP.recheckMs / 60_000} min`, `${LOOP.beastGames} Beast Mode games`, `costs ≤ ${LOOP.bagCapSurvivor} SURVIVOR`, `never spends its last ${STRK_FLOOR} STRK`, `less than ${need} STRK: the ${STRK_FLOOR} it keeps, plus ${LOOP.reserveStrk}`, `pays at most ${LOOP.bagCapSurvivor}`],
+    "AGENTS.md": [`${need} STRK is the ${STRK_FLOOR} STRK spend floor plus ${LOOP.reserveStrk}`, `Under ${STRK_FLOOR} STRK (\`STRK_FLOOR\``],
+  };
+  for (const [file, lines] of Object.entries(said)) for (const line of lines) assert.ok(read(file).includes(line), `${file}: ${line}`);
 });
