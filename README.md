@@ -40,7 +40,7 @@ The loop survives a restart: `var/loop.json` keeps it on, and unfinished games i
 ## Watch it
 
 `npm start` serves the page on http://127.0.0.1:4100. In the middle, one card per live game: level, health, gold, the beast it fights, its gear, and the last decision with its odds. On the left are the games of each dungeon with their figures. On the right are the wallet, the beasts won and the loot bag ranking.
-The page is read-only: it sends only GET requests, and the server refuses anything else from another machine.
+The page sends GET requests, plus `POST /api/bags` when someone presses the loot bag "Refresh", which ranks new bags, spends nothing and runs one at a time. The server refuses any other request that is not a GET from another machine.
 
 ## Run it
 
