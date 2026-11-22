@@ -101,7 +101,7 @@ Environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env`.
 | Play saved games forward on several luck seeds, to measure late-game rules | `npm run bench -- --late var/level30.json --seeds 0-10` |
 | Use the contract's luck hash in place of the fast one (same distribution, 30 times slower) | `npm run bench -- --exact` |
 | Play given Loot Dungeon games on 500 luck seeds each, one line per game | `npm run bench -- --dungeon lootBag --ids games.json --by-id` (a JSON list of game ids) |
-| What a Greed Run game returns per STRK wagered, cashing out at fixed levels or when rollouts of the policy say the next level is worth less than cashing now | `node scripts/greed.ts --starts 10000 --rollouts 32`: reads the payout curve from the Greed Run contract and prints the levels and gas it assumes with the returns |
+| What a Greed Run game returns in STRK, cashing out at a fixed level or when rollouts of the policy say the next levels are worth less than cashing now, with exits and policy variants compared on the same starts and luck | `node scripts/greed.ts --starts 10000 --exit '{"rollouts":64,"horizon":6}' --exit '{"rollouts":128,"horizon":3,"rules":{"fightRisk":0.25}}'`: reads the payout curve from the Greed Run contract and prints the gas it assumes with the returns |
 | Fail when the policy gets worse than `scripts/baseline.json` | `npm run bench -- --gate` (`--save` rewrites it, with the number of games) |
 | Search one policy field at a time | `node scripts/search.ts --grid '{"fightRisk":[0.15,0.25,0.35]}' --level 35` |
 | Explain how a game died, move by move | `node scripts/autopsy.ts var/ls.sqlite <row id>...` |

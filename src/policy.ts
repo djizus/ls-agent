@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
 import { levelBonus } from "./beast.ts";
 import { obstacleHit, reduced } from "./engine/damage.ts";
+import { cached } from "./cache.ts";
+import { greatness } from "./combat.ts";
 import { potionPrice } from "./items.ts";
 import { shape, type State } from "./play.ts";
 
@@ -35,23 +37,30 @@ const maxed = (g: Gear) => g.greatness >= MAX_GREATNESS;
 
 type Blow = { damage: number; chance: number };
 
-function odds(mine: Blow[], theirs: Blow[], flee: number) {
+const memo = { won: new Float64Array(0), stamp: new Int32Array(0), round: 0 };
+
+function odds(mine: Blow[], theirs: Blow[], flee: number, health: number, beast: number) {
   const merged = new Map<number, number>();
   for (const x of theirs) merged.set(x.damage, (merged.get(x.damage) ?? 0) + x.chance);
   const strikes = [...merged].map(([damage, chance]) => ({ damage, chance }));
   const reach = Math.max(...mine.map((m) => m.damage)) * MAX_ROUNDS;
-  const won = new Map<number, number>();
+  const size = (health + 1) * (beast + 1);
+  if (memo.won.length < size) Object.assign(memo, { won: new Float64Array(size), stamp: new Int32Array(size), round: 0 });
+  const { won, stamp } = memo;
+  const round = ++memo.round;
+  const hurt = strikes.map((x) => x.damage);
+  const chances = strikes.map((x) => x.chance);
   const fight = (h: number, b: number, left: number): number => {
     if (left === 0) return 0;
-    const key = h * 2048 + b;
-    const known = won.get(key);
-    if (known !== undefined) return known;
+    const key = h * (beast + 1) + b;
+    if (stamp[key] === round) return won[key];
     let win = 0;
     for (const m of mine) {
       if (m.damage >= b) win += m.chance;
-      else for (const x of strikes) if (x.damage < h) win += m.chance * x.chance * fight(h - x.damage, b - m.damage, left - 1);
+      else for (let i = 0; i < hurt.length; i++) if (hurt[i] < h) win += m.chance * chances[i] * fight(h - hurt[i], b - m.damage, left - 1);
     }
-    won.set(key, win);
+    won[key] = win;
+    stamp[key] = round;
     return win;
   };
   const fled = new Map<number, number>();
@@ -65,31 +74,34 @@ function odds(mine: Blow[], theirs: Blow[], flee: number) {
   };
   return {
     strikes,
-    win: (health: number, beast: number) => (reach < beast ? 0 : fight(health, beast, MAX_ROUNDS)),
+    win: (h: number, b: number) => (reach < b ? 0 : fight(h, b, MAX_ROUNDS)),
     escape: (health: number) => (flee <= 0 || flee >= 1 ? Math.max(0, Math.min(1, flee)) : run(health)),
   };
 }
 
 function explorationHit(s: State): number {
   const item = (slot: string) => s.equipment.find((g) => g.slot === slot) ?? { id: 0, xp: 0 };
-  const crit = Math.min(100, s.level) / 100;
-  const hits = new Map<number, number>();
-  for (const slot of ARMOR)
-    for (const type of ["Magic", "Blade", "Bludgeon"] as const)
-      for (let tier = 1; tier <= 5; tier++)
-        for (let level = 1 + levelBonus(s.level); level <= 3 * s.level + levelBonus(s.level); level++)
-          for (const critical of [false, true]) {
-            const damage = reduced(obstacleHit({ level, tier, type, prefix: null, suffix: null }, item(slot), item("neck"), critical), s.ambush);
-            hits.set(damage, (hits.get(damage) ?? 0) + (critical ? crit : 1 - crit));
-          }
-  const sorted = [...hits].sort((a, b) => a[0] - b[0]);
-  const total = sorted.reduce((n, x) => n + x[1], 0);
-  let seen = 0;
-  for (const [damage, chance] of sorted) {
-    seen += chance;
-    if (seen >= RULES.healthFloor * total - 1e-9) return damage;
-  }
-  return sorted.at(-1)![0];
+  const key = [...ARMOR, "neck"].map((slot) => `${item(slot).id}.${greatness(item(slot))}`).join();
+  return cached(`explorationHit:${s.level}:${s.ambush}:${RULES.healthFloor}:${key}`, () => {
+    const crit = Math.min(100, s.level) / 100;
+    const hits = new Map<number, number>();
+    for (const slot of ARMOR)
+      for (const type of ["Magic", "Blade", "Bludgeon"] as const)
+        for (let tier = 1; tier <= 5; tier++)
+          for (let level = 1 + levelBonus(s.level); level <= 3 * s.level + levelBonus(s.level); level++)
+            for (const critical of [false, true]) {
+              const damage = reduced(obstacleHit({ level, tier, type, prefix: null, suffix: null }, item(slot), item("neck"), critical), s.ambush);
+              hits.set(damage, (hits.get(damage) ?? 0) + (critical ? crit : 1 - crit));
+            }
+    const sorted = [...hits].sort((a, b) => a[0] - b[0]);
+    const total = sorted.reduce((n, x) => n + x[1], 0);
+    let seen = 0;
+    for (const [damage, chance] of sorted) {
+      seen += chance;
+      if (seen >= RULES.healthFloor * total - 1e-9) return damage;
+    }
+    return sorted.at(-1)![0];
+  });
 }
 
 export function plan(s: State): Plan {
@@ -101,7 +113,7 @@ export function plan(s: State): Plan {
     const blows = (hits: { normal: number; crit: number }[]) => hits.flatMap((h) => [{ damage: h.normal, chance: (1 - crit) / ARMOR.length }, { damage: h.crit, chance: crit / ARMOR.length }]);
     const theirs = blows(s.hits.theirs);
     const flee = s.stats.dexterity >= s.level ? 1 : s.stats.dexterity / s.level;
-    const asWorn = odds(mine, theirs, flee);
+    const asWorn = odds(mine, theirs, flee, s.health, s.beast.health);
     const win = asWorn.win(s.health, s.beast.health);
     const escape = asWorn.escape(s.health);
     const fight = win + RULES.fightRisk >= escape;
@@ -125,7 +137,7 @@ export function plan(s: State): Plan {
         .flatMap((blade) => sets.map((set) => ({ gear: [...blade.gear, ...set.gear], blade: blade.hits, set: set.hits })))
         .filter((o) => o.gear.length)
         .map((o) => {
-          const after = odds(o.blade, o.set, flee);
+          const after = odds(o.blade, o.set, flee, s.health, s.beast!.health);
           return { gear: o.gear, value: after.strikes.reduce((sum, x) => sum + (x.damage < s.health ? x.chance * Math.max(after.win(s.health - x.damage, s.beast!.health) + RULES.fightRisk, after.escape(s.health - x.damage)) : 0), 0) };
         })
         .sort((a, b) => b.value - a.value);

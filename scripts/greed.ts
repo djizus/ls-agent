@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { parseArgs } from "node:util";
-import { encodePacket } from "../src/codec.ts";
+import { encodePacket, type Action } from "../src/codec.ts";
 import { GREED } from "../src/config.ts";
 import { step, toSnapshot, type Local } from "../src/engine/engine.ts";
 import { useFastLuck } from "../src/hash.ts";
-import { describe } from "../src/play.ts";
+import { describe, type State } from "../src/play.ts";
 import { RULES, plan } from "../src/policy.ts";
 import { act, syntheticGame } from "../src/practice.ts";
 import { provider } from "../src/wallet.ts";
@@ -15,107 +15,150 @@ const { values } = parseArgs({
     starts: { type: "string", default: "10000" },
     from: { type: "string", default: "0" },
     procs: { type: "string", default: PROCS },
-    rules: { type: "string", default: "{}" },
-    rollouts: { type: "string", default: "0" },
-    wagers: { type: "string", default: "10,25,50,87" },
+    exit: { type: "string", multiple: true, default: ['{"rollouts":64,"horizon":6}'] },
+    baseline: { type: "string", default: "10" },
   },
 });
 
-const EXITS = [8, 9, 10, 11, 12, 13, 14];
 const TOP_LEVEL = 40;
 const MOVE_STRK = 0.02;
 const ENTRY_STRK = 0.45;
-const CLAIM_STRK = 0.3;
-const FIRST_CHECK = 6;
-const ROLLOUT_MOVES = 80;
+const CASH_STRK = 0.3;
+const LEVEL_MOVES = 40;
+const MIN_ROLLOUTS = 8;
 const ONE = 10n ** 18n;
+const DEFAULT_RULES = { ...RULES };
 
-type Outcome = { pay: number; moves: number };
-type Played = { fixed: Outcome[]; state?: Outcome };
+type Exit = { rollouts: number; horizon: number; margin: number; floor: number; clear: number; rules: Partial<typeof RULES> };
+type Outcome = { back: number; moves: number; cashed: boolean };
+type Played = { baseline: Outcome; foresight: Outcome; exits: Outcome[]; rollouts: number; decisions: number };
+type Setup = { pay: number[]; wager: number };
 
-async function payTable(): Promise<number[]> {
-  const call = (entrypoint: string, calldata: string[]) => provider.callContract({ contractAddress: GREED.address, entrypoint, calldata });
-  const [value] = await call("txsh_value", [String(ONE), "0"]);
-  const levels = Array.from({ length: TOP_LEVEL + 1 }, (_, l) => l);
-  const quotes = await Promise.all(levels.map(async (l) => (l ? BigInt((await call("quote_reward_txsh", [String(ONE), String(l)]))[0]) : 0n)));
-  return quotes.map((q) => Number((q * BigInt(value)) / ONE) / 1e18);
+const exits: Exit[] = values.exit.map((e) => ({ rollouts: 64, horizon: 6, margin: 0, floor: 6, clear: 3, rules: {}, ...JSON.parse(e) }));
+
+async function setup(): Promise<Setup> {
+  const call = async (entrypoint: string, calldata: string[] = []) => BigInt((await provider.callContract({ contractAddress: GREED.address, entrypoint, calldata }))[0]);
+  const value = await call("txsh_value", [String(ONE), "0"]);
+  const quotes = await Promise.all(Array.from({ length: TOP_LEVEL + 1 }, (_, l) => (l ? call("quote_reward_txsh", [String(ONE), String(l)]) : 0n)));
+  return { pay: quotes.map((q) => Number((q * value) / ONE) / 1e18), wager: Number((await call("max_wager")) / 10n ** 15n) / 1000 };
 }
 
-function luck(id: string, seed: number, move: number, rollout: number): string {
-  return "0x" + createHash("sha256").update(`${id}:${seed}:${move}:${rollout}`).digest("hex").slice(0, 62);
-}
+const luck = (id: string, seed: number, move: number, rollout: number) => "0x" + createHash("sha256").update(`${id}:${seed}:${move}:${rollout}`).digest("hex").slice(0, 62);
+const explores = (actions: Action[]) => actions.some((a) => a.type === "explore");
+const back = ({ pay, wager }: Setup, level: number) => pay[Math.min(level, TOP_LEVEL)] * wager;
 
-function cashNow(local: Local, id: string, seed: number, move: number, pay: number[], wager: number, rollouts: number): boolean {
-  const level = describe(toSnapshot(local), id).level;
-  if (level >= TOP_LEVEL) return true;
-  let gained = 0;
-  let spent = 0;
-  for (let r = 0; r < rollouts; r++) {
+function cashNow(local: Local, s: State, id: string, seed: number, move: number, setup: Setup, exit: Exit, count: { rollouts: number }): boolean {
+  if (s.level >= TOP_LEVEL) return true;
+  const cash = (l: number) => back(setup, l) - CASH_STRK;
+  const now = cash(s.level) + exit.margin * setup.wager;
+  const sum = Array.from({ length: exit.horizon }, () => 0);
+  const squares = Array.from({ length: exit.horizon }, () => 0);
+  for (let r = 0; r < exit.rollouts; r++) {
+    const later = Array.from({ length: exit.horizon }, () => 0);
     let l = local;
-    for (let m = 0; m < ROLLOUT_MOVES; m++) {
-      const s = describe(toSnapshot(l), id);
-      if (s.over) break;
-      if (s.level > level) {
-        gained += pay[Math.min(s.level, TOP_LEVEL)];
-        break;
-      }
-      l = step(l, id, encodePacket(plan(s).actions), luck(id, seed, move + m, r + 1));
-      spent++;
+    let moves = 0;
+    let reached = 0;
+    while (reached < exit.horizon && moves < LEVEL_MOVES * exit.horizon) {
+      const t = describe(toSnapshot(l), id);
+      if (t.over) break;
+      for (; reached < exit.horizon && t.level >= s.level + reached + 1; reached++) later[reached] = cash(t.level) - MOVE_STRK * moves;
+      if (reached === exit.horizon) break;
+      l = step(l, id, encodePacket(plan(t).actions), luck(id, seed, move + moves, r + 1));
+      moves++;
     }
+    for (let h = reached; h < exit.horizon; h++) later[h] = -MOVE_STRK * moves;
+    for (let h = 0; h < exit.horizon; h++) {
+      sum[h] += later[h];
+      squares[h] += later[h] ** 2;
+    }
+    count.rollouts++;
+    const n = r + 1;
+    if (n < MIN_ROLLOUTS || n === exit.rollouts) continue;
+    const bounds = sum.map((x, h) => {
+      const mean = x / n;
+      const se = Math.sqrt(Math.max(0, squares[h] / n - mean ** 2) / (n - 1));
+      return [mean - exit.clear * se, mean + exit.clear * se];
+    });
+    if (bounds.some(([low]) => low > now)) return false;
+    if (bounds.every(([, high]) => high < now)) return true;
   }
-  return pay[level] >= (gained - (MOVE_STRK * spent) / wager) / rollouts;
+  return now >= Math.max(...sum) / exit.rollouts;
 }
 
-async function playOne(index: number, pay: number[], wager: number, rollouts: number): Promise<Played> {
+async function play(index: number, stop: (game: Awaited<ReturnType<typeof syntheticGame>>, s: State) => boolean, setup: Setup): Promise<Outcome> {
   const game = await syntheticGame(index, 1, GREED.settingsId);
-  let s = describe(game.start, game.id);
-  const fixed: (Outcome | undefined)[] = EXITS.map(() => undefined);
-  while (!s.over && fixed.some((f) => !f)) {
-    EXITS.forEach((e, k) => (fixed[k] ??= s.level >= e ? { pay: pay[Math.min(s.level, TOP_LEVEL)], moves: game.packets.length } : undefined));
-    if (fixed.every((f) => f)) break;
-    s = describe(act(game, plan(s).actions), game.id);
+  for (let s = describe(game.start, game.id); !s.over; ) {
+    const { actions } = plan(s);
+    if (explores(actions) && stop(game, s)) return { back: back(setup, s.level), moves: game.packets.length, cashed: true };
+    s = describe(act(game, actions), game.id);
   }
-  const played: Played = { fixed: fixed.map((f) => f ?? { pay: 0, moves: game.packets.length }) };
-  if (!rollouts) return played;
-  const again = await syntheticGame(index, 1, GREED.settingsId);
-  let t = describe(again.start, again.id);
-  while (!t.over) {
-    if (t.level >= FIRST_CHECK && cashNow(again.local, again.id, again.seed, again.packets.length, pay, wager, rollouts)) return { ...played, state: { pay: pay[Math.min(t.level, TOP_LEVEL)], moves: again.packets.length } };
-    t = describe(act(again, plan(t).actions), again.id);
-  }
-  return { ...played, state: { pay: 0, moves: again.packets.length } };
+  return { back: 0, moves: game.packets.length, cashed: false };
 }
 
-const wagers = values.wagers.split(",").map(Number);
-const rollouts = Number(values.rollouts);
+async function playOne(index: number, setup: Setup, baseline: number): Promise<Played> {
+  Object.assign(RULES, DEFAULT_RULES);
+  const worth = (o: Outcome) => o.back - MOVE_STRK * o.moves - (o.cashed ? CASH_STRK : 0);
+  let foresight: Outcome = { back: 0, moves: 0, cashed: false };
+  const end = await play(index, (game, s) => {
+    const now = { back: back(setup, s.level), moves: game.packets.length, cashed: true };
+    if (worth(now) > worth(foresight)) foresight = now;
+    return false;
+  }, setup);
+  if (!foresight.cashed) foresight = end;
+  const played: Played = { foresight, baseline: await play(index, (_, s) => s.level >= baseline, setup), exits: [], rollouts: 0, decisions: 0 };
+  for (const exit of exits) {
+    Object.assign(RULES, DEFAULT_RULES, exit.rules);
+    played.exits.push(await play(index, (game, s) => s.level >= exit.floor && (played.decisions++, cashNow(game.local, s, game.id, game.seed, game.packets.length, setup, exit, played)), setup));
+  }
+  Object.assign(RULES, DEFAULT_RULES);
+  return played;
+}
 
 if (process.send) {
-  serve(async ({ starts, pay }: { starts: number[]; pay: number[] }) => {
+  serve(async ({ starts, setup }: { starts: number[]; setup: Setup }) => {
     useFastLuck();
-    Object.assign(RULES, JSON.parse(values.rules));
     const out: Played[] = [];
-    for (const i of starts) out.push(await playOne(i, pay, Math.max(...wagers), rollouts));
+    for (const i of starts) out.push(await playOne(i, setup, Number(values.baseline)));
     return out;
   });
 } else {
   const started = Date.now();
-  const pay = await payTable();
+  const s = await setup();
   const procs = Number(values.procs);
   const starts = Array.from({ length: Number(values.starts) }, (_, i) => Number(values.from) + i);
-  const shares = await spread<number, Played[]>(starts, procs, (share) => ({ starts: share, pay }));
-  const played = shares.flat();
-  console.log(`rules ${values.rules}; pays per STRK wagered: ${EXITS.map((e) => `L${e} ${pay[e].toFixed(2)}`).join(", ")}; gas ${MOVE_STRK} a move, ${ENTRY_STRK} to enter, ${CLAIM_STRK} to cash out`);
-  const report = (name: string, outcomes: Outcome[]) => {
-    const cashed = outcomes.filter((o) => o.pay > 0);
-    const columns = wagers.map((w) => {
-      const r = outcomes.map((o) => o.pay - (MOVE_STRK * o.moves + ENTRY_STRK + (o.pay > 0 ? CLAIM_STRK : 0)) / w);
-      const mean = r.reduce((a, b) => a + b, 0) / r.length;
-      const sd = Math.sqrt(r.reduce((a, b) => a + (b - mean) ** 2, 0) / (r.length - 1));
-      return `${w} STRK: ${mean.toFixed(3)} ± ${(sd / Math.sqrt(r.length)).toFixed(3)} (sd ${sd.toFixed(2)})`;
-    });
-    console.log(`${name.padEnd(10)} cashed ${((100 * cashed.length) / outcomes.length).toFixed(1)}%, moves ${(outcomes.reduce((a, o) => a + o.moves, 0) / outcomes.length).toFixed(0)}; return per STRK wagered at ${columns.join(", ")}`);
+  const played = (await spread<number, Played[]>(starts, procs, (share) => ({ starts: share, setup: s }))).flat();
+  const n = played.length;
+  const round = (x: number) => x.toFixed(1);
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const se = (xs: number[]) => {
+    const m = mean(xs);
+    return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / (xs.length - 1) / xs.length);
   };
-  EXITS.forEach((e, k) => report(`exit L${e}`, played.map((p) => p.fixed[k])));
-  if (rollouts) report(`state ${rollouts}`, played.map((p) => p.state!));
-  console.log(`${played.length} starts in ${((Date.now() - started) / 1000).toFixed(1)} s on ${procs} processes, fast luck`);
+  const net = (o: Outcome) => o.back - s.wager - ENTRY_STRK - MOVE_STRK * o.moves - (o.cashed ? CASH_STRK : 0);
+  console.log(`wager ${s.wager} STRK; gas ${ENTRY_STRK} to enter, ${MOVE_STRK} a move, ${CASH_STRK} to cash out; all figures in STRK per game; differences are paired on the same starts and luck`);
+  console.log("exit | move gas | cash gas | back | net mean ± se | vs fixed ± se | vs first ± se | median | died | cashed at a loss | cashed at a profit | p10 | p90 | best | net over 100 games");
+  const fixed = played.map((p) => p.baseline);
+  const report = (name: string, outcomes: Outcome[], first?: Outcome[]) => {
+    const nets = outcomes.map(net);
+    const sorted = [...nets].sort((a, b) => a - b);
+    const sd = se(nets) * Math.sqrt(n);
+    const paired = (other?: Outcome[]) => {
+      if (!other || other === outcomes) return "-";
+      const d = nets.map((x, i) => x - net(other[i]));
+      return `${round(mean(d))} ± ${round(se(d))}`;
+    };
+    const share = (keep: (o: Outcome, i: number) => boolean) => `${((100 * outcomes.filter(keep).length) / n).toFixed(1)}%`;
+    console.log(
+      [name, mean(outcomes.map((o) => MOVE_STRK * o.moves)).toFixed(2), mean(outcomes.map((o) => (o.cashed ? CASH_STRK : 0))).toFixed(2), round(mean(outcomes.map((o) => o.back))),
+        `${round(mean(nets))} ± ${round(se(nets))}`, paired(fixed), paired(first), round(sorted[n >> 1]), share((o) => !o.cashed),
+        share((o, i) => o.cashed && nets[i] < 0), share((o, i) => o.cashed && nets[i] >= 0), round(sorted[Math.floor(n * 0.1)]), round(sorted[Math.floor(n * 0.9)]), round(sorted[n - 1]),
+        `${Math.round(100 * mean(nets))} ± ${Math.round(10 * sd)}`].join(" | "),
+    );
+  };
+  report(`fixed L${values.baseline}`, fixed);
+  const first = played.map((p) => p.exits[0]);
+  exits.forEach((e, i) => report(`state ${JSON.stringify(e)}`, played.map((p) => p.exits[i]), first));
+  report("foresight", played.map((p) => p.foresight));
+  const seconds = (Date.now() - started) / 1000;
+  console.log(`${n} starts in ${seconds.toFixed(0)} s on ${procs} processes (${((1000 * seconds) / n).toFixed(0)} s per 1k starts), ${round(mean(played.map((p) => p.decisions)))} decisions and ${Math.round(mean(played.map((p) => p.rollouts)))} rollouts a game, fast luck`);
 }
