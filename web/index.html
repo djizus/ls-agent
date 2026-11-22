@@ -67,6 +67,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 #reach b { display: block; font: 400 2rem/1 var(--num); color: var(--gold); }
 #reach b.good { color: var(--lime); } #reach b.bad { color: var(--blood); }
 
+#warn { font-size: 1.5rem; }
 #mid { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; min-height: 0; }
 #stage { position: relative; flex: 1; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; box-shadow: var(--drop); background: #000; overflow: hidden; display: grid; place-content: center; text-align: center; }
 #stage.view { place-content: stretch; }
@@ -168,6 +169,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
     <section id="games"><div class="head" id="modes"></div><div id="sum"></div><ol id="podium"></ol><ol id="board" class="rows scroll"></ol></section>
   </aside>
   <main id="mid">
+    <p id="warn" class="bad" hidden></p>
     <div id="stage"></div>
     <div class="panel" id="dock"><span id="mode"></span><span id="which"></span><button type="button" id="again" title="Load the spectator again" hidden>Reload</button><div id="plan"></div><button type="button" id="golive" hidden>Back to live</button></div>
   </main>
@@ -200,6 +202,7 @@ const SLOW_MS = 60_000;
 const RANKING_MS = 3_000;
 const INDEXED_MS = 10_000;
 const ROUND_MS = 300;
+const CHECK_STALE_MS = 2 * 86_400_000;
 const BAGS = 25;
 const LATEST = 20;
 const STRIP = 5;
@@ -215,10 +218,9 @@ const data = { games: [], wallet: null, beasts: null, summary: null, bags: null,
 const seen = new Map();
 let slots = [];
 
-const lives = () => data.games.filter((g) => g.live && g.onchain);
-const realGames = () => data.games.filter((g) => g.onchain);
+const lives = () => data.games.filter((g) => g.live);
 const picked = () => Number(new URLSearchParams(location.search).get("game")) || null;
-const target = () => realGames().find((g) => g.id === picked()) ?? (lives().length ? null : (realGames()[0] ?? null));
+const target = () => data.games.find((g) => g.id === picked()) ?? (lives().length ? null : (data.games[0] ?? null));
 const plain = (text) => text.replace(/\bT(\d)/g, "tier $1");
 
 function moveHtml(e) {
@@ -310,20 +312,25 @@ function render() {
   $("golive").hidden = !lives().length || !g;
 
   const sums = data.summary ?? [];
-  const sum = sums.find((x) => x.mode === keep("dungeon")) ?? sums.find((x) => x.mode === realGames()[0]?.mode) ?? sums[0];
+  const sum = sums.find((x) => x.mode === keep("dungeon")) ?? sums.find((x) => x.mode === data.games[0]?.mode) ?? sums[0];
   const mode = sum?.mode;
-  const inMode = data.games.filter((x) => x.mode === mode && (!sum.strategy || x.strategy === sum.strategy));
-  const c = data.check;
+  const inMode = data.games.filter((x) => x.mode === mode);
   const tile = (value, label, tone = "") => `<div class="card"><b class="${tone}">${value}</b><span class="dim">${label}</span></div>`;
   const figure = (n, digits) => (n == null ? "-" : round(n, digits));
-  put($("sum"), !sum?.games ? "" : `<div id="reach">${tile(round(sum.games), "Games")}${tile(figure(sum.mean, 1), "Avg level")}${tile(figure(sum.slain, 1), "Slain each")}${tile(sum.usd == null ? "-" : `$${round(sum.usd, 2)}`, "Spent")}${tile(sum.best, "Best level")}${sum.strategy ? tile(`${Math.round(sum.reach30)}%`, "Level 30") : tile(round(sum.claimed), "Claimed")}</div>${sum.strategy && c ? `<div class="head"><span></span>${c.failed ? `<span class="bad" title="${esc(c.failed)}">Check failed</span>` : `<span class="good" title="The local game matches the one on Starknet">Checked</span>`}</div>` : ""}`);
-  const liveNow = data.games.filter((x) => x.live && !x.onchain);
+  put($("sum"), !sum?.games ? "" : `<div id="reach">${tile(round(sum.games), "Games")}${tile(figure(sum.mean, 1), "Avg level")}${tile(figure(sum.slain, 1), "Slain each")}${tile(sum.usd == null ? "-" : `$${round(sum.usd, 2)}`, "Spent")}${tile(sum.best, "Best level")}${tile(round(sum.claimed), "Claimed")}</div>`);
   const liveRow = lives().length ? `<li class="card${g ? "" : " on"}" data-live tabindex="0" title="Live games and the best level among them"><img src="/assets/favicon.png" alt=""><span>${lives().length} ${lives().length === 1 ? "game" : "games"}<span class="tag">Live</span></span><span></span><b>${Math.max(...lives().map((x) => x.level ?? 0))}</b></li>` : "";
   put($("modes"), `<h2>Games</h2><span class="seg">${sums.map((x) => `<button type="button" data-mode="${x.mode}" aria-pressed="${x.mode === mode}">${x.name.split(" ")[0]}</button>`).join("")}</span>`);
   const ranked = inMode.filter((x) => x.ended_at).sort((a, b) => b.level - a.level || b.id - a.id);
-  const cls = (x) => (x.onchain ? `class="card${x.id === g?.id ? " on" : ""}" data-id="${x.id}" tabindex="0"` : `class="card"`);
+  const cls = (x) => `class="card${x.id === g?.id ? " on" : ""}" data-id="${x.id}" tabindex="0"`;
   put($("podium"), ranked.slice(0, 3).map((x) => `<li ${cls(x)} title="Game ${x.id}"><img src="${portrait(x)}" alt=""><b>${x.level}</b>${slain(x)}<span class="dim">${x.id}</span></li>`).join(""));
-  put($("board"), !liveRow && !liveNow.length && !ranked.length ? `<li class="none">No games</li>` : liveRow + [...liveNow, ...ranked.slice().sort((a, b) => b.started_at - a.started_at).slice(0, every ? undefined : LATEST)].map((x) => `<li ${cls(x)}><img src="${x.live ? (MARK[x.mode] ?? "/assets/favicon.png") : portrait(x)}" alt=""><span>Game ${x.id}${x.live ? `<span class="tag">Live</span>` : ""}</span>${slain(x)}<b>${x.level ?? ""}</b></li>`).join("") + (!every && ranked.length > LATEST ? `<li class="more"><button type="button" data-more>More</button></li>` : ""));
+  put($("board"), !liveRow && !ranked.length ? `<li class="none">No games</li>` : liveRow + [...ranked.slice().sort((a, b) => b.started_at - a.started_at).slice(0, every ? undefined : LATEST)].map((x) => `<li ${cls(x)}><img src="${portrait(x)}" alt=""><span>Game ${x.id}</span>${slain(x)}<b>${x.level}</b></li>`).join("") + (!every && ranked.length > LATEST ? `<li class="more"><button type="button" data-more>More</button></li>` : ""));
+
+  const c = data.check;
+  const day = (ms) => new Date(ms).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" });
+  const warn = !c ? "" : c.failed ? `The engine no longer matches the contract since ${day(c.since ?? c.at)}` : Date.now() - c.at > CHECK_STALE_MS ? `The engine was last checked against the contract on ${day(c.at)}` : "";
+  $("warn").hidden = !warn;
+  $("warn").textContent = warn;
+  $("warn").title = c?.failures?.join("\n") ?? "";
 
   const w = data.wallet;
   put($("wallet"), `<h2>Wallet</h2>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
@@ -361,7 +368,7 @@ async function load() {
 
 async function loadSide() {
   const [w, b, c, bags] = await Promise.all(["wallet", "beasts", "check", "bags"].map((p) => get(`/api/${p}`)));
-  Object.assign(data, { wallet: w ?? data.wallet, beasts: b ?? data.beasts, check: c, bags: bags ?? data.bags });
+  Object.assign(data, { wallet: w ?? data.wallet, beasts: b ?? data.beasts, check: c ?? data.check, bags: bags ?? data.bags });
   render();
   if (data.bags?.running) setTimeout(loadSide, RANKING_MS);
 }

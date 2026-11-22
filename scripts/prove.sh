@@ -17,7 +17,10 @@ stream=$!
 curl -sf -XPOST "127.0.0.1:$port/api/play" -d "{\"games\":$games}" > /dev/null
 timeout "${LS_PROVE_TIMEOUT:-3600}" bash -c "until grep -q '\"text\":\"batch done\"' '$out/events.jsonl'; do sleep 2; done" || echo "timed out" >> "$out/service.log"
 kill $stream 2>/dev/null || true
-curl -sf "127.0.0.1:$port/api/games" > "$out/games.json"
+node --disable-warning=ExperimentalWarning -e '
+const { DatabaseSync } = require("node:sqlite");
+console.log(JSON.stringify(new DatabaseSync(process.argv[1], { readOnly: true }).prepare("SELECT * FROM games ORDER BY id DESC").all()));
+' "$out/ls.sqlite" > "$out/games.json"
 
 node -e '
 const g = require(process.argv[1]);

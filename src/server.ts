@@ -29,26 +29,21 @@ function reply(res: ServerResponse, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-const PRACTICE = "practice";
-
 const PRICE_MS = 600_000;
 const price = background(PRICE_MS, () => Promise.all([usdPrice(STRK), usdPrice(SURVIVOR)]));
 
 function figures() {
-  const ended = db.prepare("SELECT mode, strategy, level, beasts, claimed, gas_strk, survivor FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; strategy: string; level: number; beasts: number | null; claimed: number | null; gas_strk: number | null; survivor: number | null }[];
-  const strategy = ended.find((g) => g.mode === PRACTICE)?.strategy ?? null;
-  const groups = [...Object.entries(DUNGEONS).map(([mode, d]) => ({ mode, name: d.name, strategy: null as string | null })), { mode: PRACTICE, name: "Practice", strategy }];
+  const ended = db.prepare("SELECT mode, level, beasts, claimed, gas_strk, survivor FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC").all() as { mode: string; level: number; beasts: number | null; claimed: number | null; gas_strk: number | null; survivor: number | null }[];
   const mean = (values: number[]) => (values.length ? summary(values).mean : null);
-  return groups.map((group) => {
-    const games = ended.filter((g) => g.mode === group.mode && (!group.strategy || g.strategy === group.strategy));
-    if (!games.length) return { ...group, games: 0 };
-    const { best, "30+": reach30 } = summary(games.map((g) => g.level));
+  return Object.entries(DUNGEONS).map(([mode, d]) => {
+    const games = ended.filter((g) => g.mode === mode);
+    if (!games.length) return { mode, name: d.name, games: 0 };
     return {
-      ...group,
+      mode,
+      name: d.name,
       games: games.length,
       mean: mean(games.map((g) => g.level)),
-      best,
-      reach30,
+      best: summary(games.map((g) => g.level)).best,
       slain: mean(games.flatMap((g) => (g.beasts === null ? [] : [g.beasts]))),
       claimed: games.reduce((sum, g) => sum + (g.claimed ?? 0), 0),
       usd: price() ? games.reduce((sum, g) => sum + price()![0] * (g.gas_strk ?? 0) + price()![1] * (g.survivor ?? 0), 0) : null,
@@ -187,7 +182,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
   }
   if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
   if (url.pathname === "/api/games") {
-    const rows = db.prepare(`SELECT * FROM (${games()}) WHERE onchain OR id IN (SELECT id FROM games WHERE mode = 'practice' ORDER BY id DESC LIMIT 200) ORDER BY onchain DESC, id DESC`).all() as { id: number; live: number; mode: string; claimed: number | null }[];
+    const rows = db.prepare(`SELECT * FROM (${games()}) WHERE onchain ORDER BY id DESC`).all() as { id: number; live: number; mode: string; claimed: number | null }[];
     for (const g of rows) if (!g.live && g.claimed !== null) verdicts.delete(g.id);
     return reply(res, rows.map((g) => (g.live ? { ...g, beasts: slain(g.id), claimable: openClaims(g), level: snapshot(seated(g.id))?.level ?? null } : verdicts.has(g.id) ? { ...g, claimable: openClaims(g) } : g)));
   }

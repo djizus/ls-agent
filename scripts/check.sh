@@ -3,10 +3,22 @@ set -uo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/var/contract-check.json"
 mkdir -p "$root/var"
-log="$(cd "$root" && npm test 2>&1)"
-passed=$(grep -m1 '^# pass' <<<"$log" | awk '{print $3}')
-failed=$(grep -m1 '^# fail' <<<"$log" | awk '{print $3}')
-failures=$(grep '^not ok' <<<"$log" | sed 's/^not ok [0-9]* - //' | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.stringify(s.split("\n").filter(Boolean))))')
-printf '{"at":%s,"passed":%s,"failed":%s,"failures":%s}\n' "$(date +%s000)" "${passed:-0}" "${failed:-1}" "$failures" > "$out.tmp" && mv "$out.tmp" "$out"
-cat "$out"
-[[ "${failed:-1}" == 0 ]]
+cd "$root" && npm run contract 2>&1 | node -e '
+const fs = require("fs");
+const [out] = process.argv.slice(1);
+let log = "";
+process.stdin.on("data", (d) => (log += d)).on("end", () => {
+  const count = (name) => Number(log.match(new RegExp(`^# ${name} (\\d+)`, "m"))?.[1] ?? NaN);
+  const passed = count("pass") || 0;
+  const failed = Number.isNaN(count("fail")) ? 1 : count("fail");
+  const failures = [...log.matchAll(/^not ok \d+ - (.*)$/gm)].map((m) => m[1]);
+  let before = null;
+  try { before = JSON.parse(fs.readFileSync(out, "utf8")); } catch {}
+  const at = Date.now();
+  const since = failed ? (before?.failed && before.since ? before.since : at) : null;
+  fs.writeFileSync(out + ".tmp", JSON.stringify({ at, passed, failed, since, failures }) + "\n");
+  fs.renameSync(out + ".tmp", out);
+  console.log(fs.readFileSync(out, "utf8"));
+  process.exit(failed ? 1 : 0);
+});
+' "$out"
