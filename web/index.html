@@ -193,7 +193,8 @@ const won = (g) => g.claimed ?? g.claimable;
 const slain = (g) => (g.beasts == null ? `<span></span>` : `<span class="slain${won(g) ? " won" : ""}" title="Named beasts slain${won(g) ? `, ${won(g)} ${g.claimed == null ? "to claim" : "claimed"}` : ""}"><img src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`);
 const MARK = { lootBag: "/assets/bag.png" };
 const face = (name) => (/^[A-Za-z]+$/.test(name ?? "") ? `/assets/beasts/${name.toLowerCase()}.png` : "/assets/skull.png");
-const portrait = (g) => (killer(g) ? face(killer(g)[1]) : (MARK[g.mode] ?? "/assets/skull.png"));
+const mark = (games) => MARK[games.map((g) => g.mode).find((m) => MARK[m])] ?? "/assets/skull.png";
+const portrait = (g) => (killer(g) ? face(killer(g)[1]) : mark([g]));
 const killer = (g) => (g.ending ?? "").match(/against (?:".*" )?(\w+) level (\d+)$/);
 
 const WATCH = "https://www.lootsurvivor.io/watch?id=";
@@ -318,7 +319,7 @@ function render() {
   const tile = (value, label, tone = "") => `<div class="card"><b class="${tone}">${value}</b><span class="dim">${label}</span></div>`;
   const figure = (n, digits) => (n == null ? "-" : round(n, digits));
   put($("sum"), !sum?.games ? "" : `<div id="reach">${tile(round(sum.games), "Games")}${tile(figure(sum.mean, 1), "Avg level")}${tile(figure(sum.slain, 1), "Slain each")}${tile(sum.usd == null ? "-" : `$${round(sum.usd, 2)}`, "Spent")}${tile(sum.best, "Best level")}${tile(round(sum.claimed), "Claimed")}</div>`);
-  const liveRow = lives().length ? `<li class="card${g ? "" : " on"}" data-live tabindex="0" title="Live games and the best level among them"><img src="/assets/favicon.png" alt=""><span>${lives().length} ${lives().length === 1 ? "game" : "games"}<span class="tag">Live</span></span><span></span><b>${Math.max(...lives().map((x) => x.level ?? 0))}</b></li>` : "";
+  const liveRow = lives().length ? `<li class="card${g ? "" : " on"}" data-live tabindex="0" title="Live games and the best level among them"><img src="${mark(lives())}" alt=""><span>${lives().length} ${lives().length === 1 ? "game" : "games"}<span class="tag">Live</span></span><span></span><b>${Math.max(...lives().map((x) => x.level ?? 0))}</b></li>` : "";
   put($("modes"), `<h2>Games</h2><span class="seg">${sums.map((x) => `<button type="button" data-mode="${x.mode}" aria-pressed="${x.mode === mode}">${x.name.split(" ")[0]}</button>`).join("")}</span>`);
   const ranked = inMode.filter((x) => x.ended_at).sort((a, b) => b.level - a.level || b.id - a.id);
   const cls = (x) => `class="card${x.id === g?.id ? " on" : ""}" data-id="${x.id}" tabindex="0"`;
