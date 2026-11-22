@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
-import { AMBUSH_REDUCTION } from "./settings.ts";
+import { settingsOf } from "./settings.ts";
 import { hash } from "starknet";
 import { beastOf } from "./beast.ts";
 import { decodeAdventurer, decodeBag, encodePacket, type Action, type Adventurer, type Item, type Stats } from "./codec.ts";
 import { ambushHit, beastHit, yourHit, type Hit } from "./combat.ts";
-import { DUNGEON, GAME_CORE } from "./config.ts";
+import { DUNGEONS, GAME_CORE } from "./config.ts";
 import type { Slot } from "./items.ts";
 import { newPracticeGame, replay } from "./practice.ts";
 import { effectiveStats } from "./specials.ts";
@@ -115,7 +115,7 @@ test("your hit and the beast's counter match the contract exactly in every combi
 });
 
 test("an ambush on arrival takes the Beast Mode base reduction off the beast's hit", { timeout: 300_000 }, async () => {
-  const reduction = AMBUSH_REDUCTION;
+  const reduction = settingsOf(GAME).ambush;
   assert.equal(reduction, 35);
   const start = (await play([LEVEL_UP])).adventurer.health;
   const arrivals = await inBatches(Object.keys(BEASTS) as (keyof typeof BEASTS)[], async (b) => (await play(levelTwo([], b))).adventurer);

@@ -4,10 +4,11 @@ import { emit } from "./events.ts";
 import { itemOf, levelOf, potionPrice, priceOf, type ItemType, type LootItem } from "./items.ts";
 import { MAX_GREATNESS, type Hit } from "./combat.ts";
 import { marketOf } from "./market.ts";
-import { MARKET } from "./settings.ts";
+import { settingsOf } from "./settings.ts";
 import { BAG_STATS, SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
 import { NECK, beastHit, yourHit } from "./engine/damage.ts";
-import { actLive, liveGame, type Entry } from "./live.ts";
+import { actLive, liveGame, type Entry, type Starts } from "./live.ts";
+import type { Dungeon } from "./config.ts";
 import { ARMOR_SLOTS, foeOf, toSnapshot } from "./engine/engine.ts";
 import { act, audit, newPracticeGame, preview, revertReason, type Game, type Snapshot } from "./practice.ts";
 
@@ -35,6 +36,7 @@ export type State = {
   buys: { attack: number; flee: number; trap: number; ambush: number; crit: number };
   purse: { potions: number; toFull: number; deal: (Offer & { why: string }) | null };
   toLevel: number;
+  ambush: number;
 };
 export const slewNamed = (before: Pick<State, "beast">, after: Pick<State, "beast" | "over">, move: string): boolean =>
   before.beast?.specialPrefix != null && !after.beast && !after.over && move === "attack";
@@ -59,7 +61,7 @@ export function namedKills(events: Recorded[]): (NonNullable<State["beast"]> & {
 
 export const namedSlain = (events: Recorded[]): number => namedKills(events).length;
 
-type Stored = Pick<State, "over" | "level" | "health" | "maxHealth" | "xp" | "gold" | "beast" | "statUpgradesAvailable" | "stats" | "market"> &
+type Stored = Pick<State, "over" | "level" | "health" | "maxHealth" | "xp" | "gold" | "beast" | "statUpgradesAvailable" | "stats" | "market" | "ambush"> &
   Partial<Pick<State, "baseStats" | "potionPrice" | "happened" | "hits">> & { equipment: Legacy[] | Record<string, Legacy>; bag: Legacy[] };
 type Legacy = Omit<Worn, "greatness" | "xp"> & { greatness?: number; xp?: number; level?: number };
 
@@ -158,7 +160,8 @@ export function describe(s: Snapshot, id: string): State {
     bag: s.bag.map(gear),
     potionPrice: potionPrice(levelOf(a.xp), a.stats.charisma),
     happened: s.log ?? [],
-    market: a.beast_health === 0 ? marketOf(a, id, MARKET).map((o) => ({ ...itemOf(o.id)!, price: o.price })) : [],
+    ambush: settingsOf(id).ambush,
+    market: a.beast_health === 0 ? marketOf(a, id, settingsOf(id).market).map((o) => ({ ...itemOf(o.id)!, price: o.price })) : [],
   });
 }
 
@@ -205,8 +208,8 @@ export function phase(s: State): Phase {
   return s.beast ? "battle" : "explore";
 }
 
-export async function begin(id: string | undefined, seed = 0, entry?: Entry, resumed?: string): Promise<Table> {
-  const game = id ? await newPracticeGame(id, seed) : await liveGame(entry, resumed);
+export async function begin(id: string | undefined, seed = 0, dungeon?: Dungeon, entry?: Entry, resumed?: string): Promise<Table> {
+  const game = id ? await newPracticeGame(id, seed) : await liveGame(dungeon!, entry, resumed);
   const table = { game, last: toSnapshot(game.local) };
   tables.push(table);
   return table;
@@ -218,9 +221,9 @@ export const current = (t: Table): State => state(t);
 
 export type Committed = { state: State; strk: number } | { error: Error };
 
-export async function commit(moves: { table: Table; actions: Action[] }[], starts = 0): Promise<{ committed: Committed[]; started: string[] | { error: Error }; strk: number }> {
+export async function commit(moves: { table: Table; actions: Action[] }[], starts?: Starts): Promise<{ committed: Committed[]; started: string[] | { error: Error }; strk: number }> {
   const live = moves.filter((m) => m.table.game.chain);
-  const sent = live.length || starts ? await actLive(live.map((m) => ({ game: m.table.game, actions: m.actions })), starts) : { moved: [], started: [], strk: 0 };
+  const sent = live.length || starts?.games ? await actLive(live.map((m) => ({ game: m.table.game, actions: m.actions })), starts) : { moved: [], started: [], strk: 0 };
   const committed = moves.map((m): Committed => {
     try {
       const moved = m.table.game.chain ? sent.moved[live.indexOf(m)] : { snapshot: act(m.table.game, m.actions), strk: 0 };

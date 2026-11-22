@@ -4,7 +4,7 @@ import { greatness } from "../combat.ts";
 import { basePrice, itemOf, levelOf, potionPrice, priceOf } from "../items.ts";
 import { marketOf } from "../market.ts";
 import type { Snapshot } from "../practice.ts";
-import { AMBUSH_REDUCTION, MARKET } from "../settings.ts";
+import { settingsOf } from "../settings.ts";
 import { SUFFIX_GREATNESS, SUFFIXES, effectiveStats, pinned, suffixOf } from "../specials.ts";
 import { beastHit, goldReward, obstacleHit, reduced, xpReward, yourHit, type Foe } from "./damage.ts";
 import { beastRolls, crit, dodged, kindOf, rolls, round, salt, seeds, poseidon, type Seeds } from "./rolls.ts";
@@ -208,13 +208,13 @@ class Game {
       this.a.beast_salt = salt(s.action, 131071n);
       const b = beastRolls(this.a.beast_salt, this.id, this.a.xp);
       this.a.beast_health = Math.min(1023, 1 + (b[2] % (start * 20)) + healthBonus(start));
-      if (!dodged(stats.wisdom, start, r[6])) this.strike(this.foe(), r[4], r[5], AMBUSH_REDUCTION);
+      if (!dodged(stats.wisdom, start, r[6])) this.strike(this.foe(), r[4], r[5], settingsOf(this.id).ambush);
       else this.log.push("Avoided the ambush");
     } else if (r[7] % 3 === 1) {
       const id = kindOf(r[0]);
       const foe: Foe = { level: 1 + (r[3] % (start * 3)) + levelBonus(start), tier: Math.floor(((id - 1) % 25) / 5) + 1, type: id < 26 ? "Magic" : id < 51 ? "Blade" : "Bludgeon", prefix: null, suffix: null };
       const armor = this.a.equipment[ARMOR_SLOTS[r[4] % 5]];
-      const damage = reduced(obstacleHit(foe, armor, this.a.equipment.neck, crit(Math.min(start, 100), r[5])), AMBUSH_REDUCTION);
+      const damage = reduced(obstacleHit(foe, armor, this.a.equipment.neck, crit(Math.min(start, 100), r[5])), settingsOf(this.id).ambush);
       const trap = `${foe.type} trap, level ${foe.level} T${foe.tier}`;
       if (dodged(stats.intelligence, start, r[6])) this.log.push(`Dodged a ${trap}`);
       else {
@@ -308,7 +308,7 @@ class Game {
     if (this.a.stat_upgrades_available > 0) reject("market closed");
     const charisma = this.stats().charisma;
     const buys = group.filter((a) => a.type === "buy");
-    const open = buys.length ? new Set(marketOf(this.a, this.id, MARKET).map((o) => o.id)) : new Set<number>();
+    const open = buys.length ? new Set(marketOf(this.a, this.id, settingsOf(this.id).market).map((o) => o.id)) : new Set<number>();
     const pay = (price: number) => {
       if (this.a.gold < price) reject("not enough gold");
       this.a.gold -= price;

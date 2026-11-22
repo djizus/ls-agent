@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { networkInterfaces } from "node:os";
-import { BAG_RANKING, BEASTS_TO, DUNGEON, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
+import { BAG_RANKING, BEASTS_TO, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
 import { halt, play, slain } from "./runner.ts";
@@ -122,7 +122,7 @@ let ranking: ChildProcess | undefined;
 
 function rankBags(): void {
   const done = () => (ranking = undefined);
-  ranking ??= spawn(process.execPath, [new URL("../scripts/bench.ts", import.meta.url).pathname, "--rank"], { env: { ...process.env, LS_DUNGEON: "lootBag" }, stdio: "ignore" }).once("exit", done).once("error", done);
+  ranking ??= spawn(process.execPath, [new URL("../scripts/bench.ts", import.meta.url).pathname, "--rank", "--dungeon", "lootBag"], { stdio: "ignore" }).once("exit", done).once("error", done);
 }
 
 function bags() {
@@ -175,8 +175,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     return;
   }
   if (url.pathname === "/api/play" && req.method === "POST") {
-    const body = (await json(req)) as { games?: number; live?: boolean; bag?: number; maxSurvivor?: number } | undefined;
-    play(Number(body?.games) || (body?.live ? 1 : DUNGEON.benchmark.length), body?.live === true, body?.bag ? { bag: Number(body.bag), maxSurvivor: Number(body.maxSurvivor) } : undefined);
+    const body = (await json(req)) as { games?: number; live?: boolean; dungeon?: string; bag?: number; maxSurvivor?: number } | undefined;
+    const dungeon = body?.dungeon ?? "beast";
+    if (!DUNGEONS[dungeon]) return res.writeHead(400).end(`dungeon is one of ${Object.keys(DUNGEONS).join(", ")}`);
+    play(Number(body?.games) || (body?.live ? 1 : DUNGEONS[dungeon].benchmark.length), body?.live === true, dungeon, body?.bag ? { bag: Number(body.bag), maxSurvivor: Number(body.maxSurvivor) } : undefined);
     return res.end("ok");
   }
   if (url.pathname === "/api/stop" && req.method === "POST") {

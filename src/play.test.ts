@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Action } from "./codec.ts";
-import { DUNGEON } from "./config.ts";
+import { DUNGEONS } from "./config.ts";
 import { begin, commit, current, enrich, namedKills, namedSlain, render, shape, type State, type Table } from "./play.ts";
 import { act, newPracticeGame, preview, replay, type Snapshot } from "./practice.ts";
 
@@ -12,7 +12,7 @@ const move = async (table: Table, actions: Action[]): Promise<State> => {
 };
 
 test("market and potions are open between fights, not only at level-up", { timeout: 120_000 }, async () => {
-  const table = await begin(DUNGEON.benchmark[0]);
+  const table = await begin(DUNGEONS.beast.benchmark[0]);
   let state = current(table);
   while (state.beast || state.statUpgradesAvailable > 0 || state.health === state.maxHealth) {
     const points = state.statUpgradesAvailable;
@@ -26,7 +26,7 @@ test("market and potions are open between fights, not only at level-up", { timeo
 });
 
 test("attack and flee without a threshold run until the fight ends; tillHealth stops early", { timeout: 120_000 }, async () => {
-  const game = await newPracticeGame(DUNGEON.benchmark[4]);
+  const game = await newPracticeGame(DUNGEONS.beast.benchmark[4]);
   let snap = await replay(game);
   while (snap.adventurer.beast_health === 0) {
     const points = snap.adventurer.stat_upgrades_available;
@@ -55,7 +55,7 @@ test("potion price formula matches the contract; explores are healed first", { t
     return state;
   };
   let state: State | undefined;
-  for (const id of DUNGEON.benchmark) if ((state = await hurtWithGold(id))) break;
+  for (const id of DUNGEONS.beast.benchmark) if ((state = await hurtWithGold(id))) break;
   assert.ok(state, "no benchmark adventurer reached a hurt state with gold");
   const goldBefore = state.gold;
   const healthBefore = state.health;
@@ -125,7 +125,7 @@ test("a recorded game counts the named beasts it killed by attacking, not plain 
 });
 
 test("games moved in one round each advance as they would alone", { timeout: 120_000 }, async () => {
-  const [a, b, alone] = [await begin(DUNGEON.benchmark[0]), await begin(DUNGEON.benchmark[1]), await begin(DUNGEON.benchmark[1])];
+  const [a, b, alone] = [await begin(DUNGEONS.beast.benchmark[0]), await begin(DUNGEONS.beast.benchmark[1]), await begin(DUNGEONS.beast.benchmark[1])];
   const explore = (t: Table): Action[] => shape(current(t), [{ type: "upgrade", stat: "dexterity", amount: current(t).statUpgradesAvailable }, { type: "explore" }]).filter((x) => x.type !== "upgrade" || x.amount > 0);
   const together = (await commit([{ table: a, actions: explore(a) }, { table: b, actions: [{ type: "flee" }] }])).committed;
   assert.ok("state" in together[0] && together[0].state.xp > 0);

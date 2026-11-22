@@ -4,7 +4,6 @@ import type { Action } from "./codec.ts";
 import { levelBonus } from "./beast.ts";
 import { obstacleHit, reduced } from "./engine/damage.ts";
 import { potionPrice } from "./items.ts";
-import { AMBUSH_REDUCTION } from "./settings.ts";
 import { shape, type State } from "./play.ts";
 
 export const VERSION = createHash("sha256").update(readFileSync(new URL(import.meta.url))).digest("hex").slice(0, 8);
@@ -80,7 +79,7 @@ export function explorationHit(s: State): number {
       for (let tier = 1; tier <= 5; tier++)
         for (let level = 1 + levelBonus(s.level); level <= 3 * s.level + levelBonus(s.level); level++)
           for (const critical of [false, true]) {
-            const damage = reduced(obstacleHit({ level, tier, type, prefix: null, suffix: null }, item(slot), item("neck"), critical), AMBUSH_REDUCTION);
+            const damage = reduced(obstacleHit({ level, tier, type, prefix: null, suffix: null }, item(slot), item("neck"), critical), s.ambush);
             hits.set(damage, (hits.get(damage) ?? 0) + (critical ? crit : 1 - crit));
           }
   const sorted = [...hits].sort((a, b) => a[0] - b[0]);

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { SLOTS, encodePacket, type Action } from "./codec.ts";
-import { DUNGEON } from "./config.ts";
+import { DUNGEONS } from "./config.ts";
 import { ITEMS, itemName, priceOf } from "./items.ts";
 import { marketOf } from "./market.ts";
-import { MARKET } from "./settings.ts";
+import { settingsOf } from "./settings.ts";
 import { act, hashes, newPracticeGame, replay, revertReason, type Game, type Snapshot } from "./practice.ts";
 
 const NOT_ON_MARKET = "item does not exist";
@@ -17,7 +17,7 @@ async function inBatches<T, R>(items: T[], run: (item: T) => Promise<R>): Promis
 }
 
 async function reachLevelUp(levelUps: number): Promise<{ game: Game; state: Snapshot }> {
-  for (const id of DUNGEON.benchmark) {
+  for (const id of DUNGEONS.beast.benchmark) {
     const game = await newPracticeGame(id);
     let state = await replay(game);
     let seen = 0;
@@ -58,7 +58,7 @@ for (const levelUps of [1, 2, 3]) {
     const { game, state } = await reachLevelUp(levelUps);
     const a = state.adventurer;
     const owned = new Set([...Object.values(a.equipment), ...state.bag].map((i) => i.id));
-    const offers = marketOf(a, game.id, MARKET).filter((o) => !owned.has(o.id));
+    const offers = marketOf(a, game.id, settingsOf(game.id).market).filter((o) => !owned.has(o.id));
     const listed = new Set(offers.map((o) => o.id));
     const unlisted = ITEMS.map((i) => i.id).filter((id) => !listed.has(id) && !owned.has(id)).sort(() => Math.random() - 0.5).slice(0, 12);
     assert.ok(offers.length > 5);

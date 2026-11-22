@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
-import { BEASTS_TO, DUNGEON, DUNGEON_KEY, DUNGEONS, SEATS, SURVIVOR } from "./config.ts";
+import { BEASTS_TO, DUNGEONS, SEATS, SURVIVOR, dungeonOf } from "./config.ts";
 import { db } from "./db.ts";
-import { adopt, collect, head, liveIds, mintedSince, sendBeasts, tickets, type Entry } from "./live.ts";
+import { adopt, collect, head, liveIds, mintedSince, sendBeasts, tickets, type Entry, type Starts } from "./live.ts";
 import { balanceOf, strkBalance } from "./wallet.ts";
 import { EFFORT, MODEL, PREAMBLE, cancel, decide, type Decision } from "./decide.ts";
 import { JEV_MODEL, jevDecide } from "./jev.ts";
@@ -45,15 +45,15 @@ export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
   return { hash, text: full, rules: (p: Phase) => [common.trim(), sections[p] ?? ""].filter(Boolean).join("\n\n") };
 }
 
-async function open(practiceId: string | undefined, seed: number, entry?: Entry, resumed?: string, strk = 0): Promise<Seat> {
+async function open(practiceId: string | undefined, seed: number, dungeon: string, entry?: Entry, resumed?: string, strk = 0): Promise<Seat> {
   const strategy = loadStrategy();
   db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(strategy.hash, strategy.text, Date.now());
   const funds = () => (practiceId || resumed ? null : Promise.all([strkBalance(), balanceOf(SURVIVOR)]).then((held) => held.map(Number), () => null));
   const before = await funds();
-  const table = await begin(practiceId, seed, entry, resumed);
+  const table = await begin(practiceId, seed, DUNGEONS[dungeon], entry, resumed);
   const after = await funds();
   const id = table.game.id;
-  const mode = practiceId ? "practice" : DUNGEON_KEY;
+  const mode = practiceId ? "practice" : dungeon;
   const known = practiceId ? undefined : (db.prepare("SELECT id FROM games WHERE game_id = ? AND mode = ?").get(id, mode) as { id: number } | undefined);
   const row = known?.id ?? Number(db.prepare("INSERT INTO games (mode, game_id, seed, strategy, started_at) VALUES (?, ?, ?, ?, ?)").run(mode, id, seed, strategy.hash, Date.now()).lastInsertRowid);
   if (known) db.prepare("UPDATE games SET ended_at = NULL WHERE id = ?").run(row);
@@ -104,10 +104,10 @@ async function decideWithRetry(row: number, state: State, rules: string, prompt:
   }
 }
 
-function nextSeed(): number {
+function nextSeed(benchmark: string[]): number {
   const { hash } = loadStrategy();
   const played = db.prepare("SELECT seed, count(*) AS n FROM games WHERE strategy = ? AND ended_at IS NOT NULL GROUP BY seed ORDER BY seed").all(hash) as { seed: number; n: number }[];
-  const complete = played.filter((p) => p.n >= DUNGEON.benchmark.length).map((p) => p.seed);
+  const complete = played.filter((p) => p.n >= benchmark.length).map((p) => p.seed);
   let seed = 0;
   while (complete.includes(seed)) seed++;
   return seed;
@@ -115,7 +115,7 @@ function nextSeed(): number {
 
 const DOING: Record<string, string> = { explore: "exploring", attack: "fighting", flee: "fleeing" };
 
-async function round(seats: Seat[], starts: number): Promise<{ started: string[] | { error: Error }; strk: number }> {
+async function round(seats: Seat[], starts: Starts | undefined): Promise<{ started: string[] | { error: Error }; strk: number }> {
   const moves: { seat: Seat; decision: Decision; actions: Action[] }[] = [];
   for (const seat of seats) {
     const { table, row, state } = seat;
@@ -165,7 +165,7 @@ export function retry(id: string): boolean {
 
 export const cleared = (id: string): void => void failures.delete(id);
 
-export async function play(count: number, live: boolean, entry?: Entry): Promise<void> {
+export async function play(count: number, live: boolean, dungeon: string, entry?: Entry): Promise<void> {
   if (busy) return;
   busy = true;
   stopping = false;
@@ -173,26 +173,27 @@ export async function play(count: number, live: boolean, entry?: Entry): Promise
   const failed = (err: unknown) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` });
   const sweep = live ? (async () => { for (const g of unsettled()) await new Promise((r) => setTimeout(r, Math.max(0, g.due - Date.now()))).then(() => settle(g.id, g.row)).catch(failed); })().catch(failed) : undefined;
   try {
-    const seed = nextSeed();
-    const resumed = live ? liveIds().slice(0, count) : [];
+    const d = DUNGEONS[dungeon];
+    const seed = nextSeed(d.benchmark);
+    const resumed = live ? liveIds().filter((id) => dungeonOf(id) === dungeon).slice(0, count) : [];
     const queue: { practice?: string; resumed?: string }[] = live
       ? [...resumed.map((id) => ({ resumed: id })), ...Array.from({ length: count - resumed.length }, () => ({}))]
-      : DUNGEON.benchmark.slice(0, count).map((practice) => ({ practice }));
+      : d.benchmark.slice(0, count).map((practice) => ({ practice }));
     const seats: Seat[] = [];
     const arrived: Seat[] = [];
     const opening = new Set<Promise<void>>();
     const ended: { seat: Seat; due: number }[] = [];
     const again = (id: string) => (retry(id) ? queue.unshift({ resumed: id }) : (queue.length = 0));
-    const rides = live && !DUNGEON.pool;
+    const rides = live && !d.pool;
     const limit = DECIDER === "rules" ? SEATS : 1;
     const join = (id: string, strk = 0) => {
-      const done = open(undefined, seed, entry, id, strk)
+      const done = open(undefined, seed, dungeon, entry, id, strk)
         .then((seat) => void arrived.push(seat), (err) => (failed(err), void again(id)))
         .finally(() => opening.delete(done));
       opening.add(done);
     };
     const from = rides ? await head() : 0;
-    const recorded = (id: string) => liveIds().includes(id) || !!db.prepare("SELECT 1 FROM games WHERE game_id = ? AND mode = ?").get(id, DUNGEON_KEY);
+    const recorded = (id: string) => liveIds().includes(id) || !!db.prepare("SELECT 1 FROM games WHERE game_id = ? AND mode = ?").get(id, dungeon);
     let lost = false;
     for (;;) {
       seats.push(...arrived.splice(0));
@@ -210,7 +211,7 @@ export async function play(count: number, live: boolean, entry?: Entry): Promise
       while (!stopping && queue.length && seats.length + opening.size < limit && (queue[0].resumed || !rides)) {
         const next = queue.shift()!;
         if (next.resumed) join(next.resumed);
-        else await open(next.practice, seed, entry).then((seat) => seats.push(seat), failed);
+        else await open(next.practice, seed, dungeon, entry).then((seat) => seats.push(seat), failed);
       }
       const free = limit - seats.length - opening.size;
       const wanted = rides && !stopping && free > 0 && queue.length && !queue[0].resumed ? Math.min(free, queue.length) : 0;
@@ -222,7 +223,7 @@ export async function play(count: number, live: boolean, entry?: Entry): Promise
       }
       const { started } = stopping
         ? { started: [] }
-        : await round(seats, starts).then(
+        : await round(seats, starts ? { dungeon: d, games: starts } : undefined).then(
             (sent) => ({ started: "error" in sent.started ? sent.started : sent.started.map((id) => ({ id, strk: sent.strk })) }),
             (err: Error) => (seats.forEach((seat) => (seat.failed ??= err.message.slice(0, 200))), { started: starts ? { error: err } : [] }),
           );

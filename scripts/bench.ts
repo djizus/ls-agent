@@ -2,7 +2,7 @@ import { fork } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { availableParallelism, constants, setPriority } from "node:os";
 import { parseArgs } from "node:util";
-import { BAG_RANKING, DUNGEON, DUNGEON_KEY, DUNGEONS, VAR_DIR } from "../src/config.ts";
+import { BAG_RANKING, DUNGEONS, VAR_DIR } from "../src/config.ts";
 import { useFastLuck } from "../src/hash.ts";
 import { describe, slewNamed } from "../src/play.ts";
 import { summary } from "../src/summary.ts";
@@ -28,8 +28,12 @@ const { values } = parseArgs({
     late: { type: "string" },
     rank: { type: "boolean", default: false },
     all: { type: "boolean", default: false },
+    dungeon: { type: "string", default: "beast" },
   },
 });
+const DUNGEON_KEY = values.dungeon;
+const DUNGEON = DUNGEONS[DUNGEON_KEY];
+if (!DUNGEON) throw new Error(`--dungeon is one of ${Object.keys(DUNGEONS).join(", ")}`);
 type Kept = { id: string; moves: number; local: Local };
 const kept: Kept[] = values.late ? JSON.parse(readFileSync(values.late, "utf8")) : [];
 const rolled = DUNGEON.rolledStart && !values.ids && !values.late;

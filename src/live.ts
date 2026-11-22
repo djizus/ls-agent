@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hash, type Call } from "starknet";
 import { claims as pending } from "./beasts.ts";
-import { BEAST_NFT, DUNGEON, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, SURVIVOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, USDC, VAR_DIR, type Dungeon } from "./config.ts";
+import { BEAST_NFT, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, SURVIVOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, USDC, VAR_DIR, type Dungeon, dungeonOf } from "./config.ts";
 import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
 import { randomHash, startOf, type Chain, type Game, type Snapshot } from "./practice.ts";
@@ -135,11 +135,15 @@ export async function bagMarket(pool: string, bag: number): Promise<{ held: stri
   return { held, quote };
 }
 
-async function buyBag(pool: string, entry: Entry | undefined, me: string): Promise<string> {
-  if (!entry) throw new Error(`${DUNGEON.name} starts from a bought bag: give bag and maxSurvivor`);
-  const [{ held, quote }, survivor] = await Promise.all([bagMarket(pool, entry.bag), balanceOf(SURVIVOR)]);
-  const { id, calls } = bagPurchase(pool, held, quote, entry, me, survivor);
-  await send(calls);
+async function buyBag(d: Dungeon, entry: Entry | undefined, me: string): Promise<string> {
+  if (!entry) throw new Error(`${d.name} starts from a bought bag: give bag and maxSurvivor`);
+  const [{ held, quote }, survivor] = await Promise.all([bagMarket(d.pool!, entry.bag), balanceOf(SURVIVOR)]);
+  const { id, calls } = bagPurchase(d.pool!, held, quote, entry, me, survivor);
+  try {
+    await send(calls);
+  } catch (err) {
+    if (BigInt(await ownerOf(id)) !== BigInt(me)) throw err;
+  }
   return id;
 }
 
@@ -162,9 +166,9 @@ export const head = (): Promise<number> => provider.getBlockNumber();
 
 export const adopt = (id: string): void => keep([...new Set([...liveIds(), id])]);
 
-const entryCalls = (games: number): Call[] => !games ? [] : [
-  { contractAddress: TICKET, entrypoint: "approve", calldata: [DUNGEON.address, ...u256(ONE * BigInt(games))] },
-  { contractAddress: DUNGEON.address, entrypoint: "new_game_batch", calldata: [hex(BigInt(games)), ...Array<string>(games).fill(keys().address), "0x0"] },
+const entryCalls = (d: Dungeon, games: number): Call[] => !games ? [] : [
+  { contractAddress: TICKET, entrypoint: "approve", calldata: [d.address, ...u256(ONE * BigInt(games))] },
+  { contractAddress: d.address, entrypoint: "new_game_batch", calldata: [hex(BigInt(games)), ...Array<string>(games).fill(keys().address), "0x0"] },
 ];
 
 export async function tickets(wanted: number): Promise<number> {
@@ -173,10 +177,10 @@ export async function tickets(wanted: number): Promise<number> {
   return Math.min(wanted, await held());
 }
 
-async function enter(entry?: Entry): Promise<string> {
-  if (DUNGEON.pool) return buyBag(DUNGEON.pool, entry, keys().address);
+async function enter(d: Dungeon, entry?: Entry): Promise<string> {
+  if (d.pool) return buyBag(d, entry, keys().address);
   if (!(await tickets(1))) throw new Error("no ticket to enter with");
-  const [id] = minted(await send(entryCalls(1)));
+  const [id] = minted(await send(entryCalls(d, 1)));
   if (!id) throw new Error("no game token minted");
   return id;
 }
@@ -198,20 +202,13 @@ export const liveIds = (): string[] => (existsSync(file) ? JSON.parse(readFileSy
 
 const keep = (ids: string[]) => (ids.length ? writeFileSync(file, JSON.stringify({ ids })) : rmSync(file, { force: true }));
 
-export async function liveGame(entry?: Entry, resumed?: string): Promise<Game> {
-  const id = resumed ?? (await enter(entry));
+export async function liveGame(d: Dungeon, entry?: Entry, resumed?: string): Promise<Game> {
+  const id = resumed ?? (await enter(d, entry));
   keep([...new Set([...liveIds(), id])]);
   const { packets, chain } = await transcript(id);
   const begin = await start(id);
   return { id, seed: 0, packets, start: begin, local: fromSnapshot(replayLocal(begin, id, packets, chain.hashes)), chain };
 }
-
-const dungeonOf = async (id: string): Promise<[string, Dungeon]> => {
-  const minter = Number((await view("minted_by", id))[0]);
-  const found = Object.entries(DUNGEONS).find(([, d]) => d.minterId === minter);
-  if (!found) throw new Error(`game ${id} belongs to no known dungeon (minter ${minter})`);
-  return found;
-};
 
 const ownerOf = async (id: string) => (await provider.callContract({ contractAddress: GAME_CORE, entrypoint: "owner_of", calldata: u256(BigInt(id)) }))[0];
 
@@ -229,7 +226,8 @@ export function settleCalls(dungeon: Dungeon, id: string, packets: bigint[], blo
 }
 
 export async function settlement(id: string, claims: number[]): Promise<Call[][]> {
-  const [{ packets, chain }, verified, checkpoint, [, dungeon]] = await Promise.all([transcript(id), view("is_verified", id), view("get_replay_checkpoint", id), dungeonOf(id)]);
+  const [{ packets, chain }, verified, checkpoint] = await Promise.all([transcript(id), view("is_verified", id), view("get_replay_checkpoint", id)]);
+  const dungeon = DUNGEONS[dungeonOf(id)];
   const done = BigInt(verified[0]) === 1n ? packets.length : Number(checkpoint[3]);
   return settleCalls(dungeon, id, packets, chain.blocks, claims, done, BigInt("0x" + randomBytes(8).toString("hex")));
 }
@@ -241,8 +239,7 @@ export async function settle(id: string, claims: number[]): Promise<string | und
 }
 
 export async function claimable(id: string): Promise<number[]> {
-  const [owner, [key]] = await Promise.all([ownerOf(id), dungeonOf(id)]);
-  return (await pending(owner, key, id)).map((c) => c.encounterXp);
+  return (await pending(await ownerOf(id), dungeonOf(id), id)).map((c) => c.encounterXp);
 }
 
 export async function collect(id: string): Promise<{ beasts: number; transaction?: string }> {
@@ -333,7 +330,9 @@ export type Move = { game: Game; actions: Action[] };
 export type Moved = { snapshot: Snapshot; strk: number } | { error: unknown };
 export type Round = { moved: Moved[]; started: string[] | { error: unknown }; strk: number };
 
-export async function actLive(moves: Move[], starts = 0): Promise<Round> {
+export type Starts = { dungeon: Dungeon; games: number };
+
+export async function actLive(moves: Move[], starts?: Starts): Promise<Round> {
   const moved: Moved[] = moves.map(() => ({ error: new Error("not sent") }));
   const first = (game: Game) => (game.packets.length ? game.chain!.rolling : 0n);
   let ready = moves.flatMap(({ game, actions }, at) => {
@@ -346,7 +345,7 @@ export async function actLive(moves: Move[], starts = 0): Promise<Round> {
       return [];
     }
   });
-  let entries = entryCalls(starts);
+  let entries = starts ? entryCalls(starts.dungeon, starts.games) : [];
   const calls = () => [...ready.map((r) => r.call), ...entries];
   const refuse = (error: unknown): Round => (ready.forEach((r) => (moved[r.at] = { error })), { moved, started: entries.length ? { error } : [], strk: 0 });
   if (!calls().length) return { moved, started: [], strk: 0 };

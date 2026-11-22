@@ -14,7 +14,7 @@ const offer = (id: number, price: number) => ({ ...itemOf(id)!, price });
 const stats = { strength: 0, dexterity: 20, vitality: 0, intelligence: 0, wisdom: 0, charisma: 10 };
 
 const state = (over: Partial<Parameters<typeof enrich>[0]>): State =>
-  enrich({ over: false, level: 20, health: 100, maxHealth: 100, xp: 400, gold: 50, beast: null, statUpgradesAvailable: 0, stats, equipment: [], bag: [], market: [], ...over });
+  enrich({ over: false, level: 20, health: 100, maxHealth: 100, xp: 400, gold: 50, beast: null, statUpgradesAvailable: 0, stats, equipment: [], bag: [], market: [], ambush: 35, ...over });
 
 const REST = [22, 27, 32, 37].map((id) => gear(id, 20));
 

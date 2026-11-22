@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { DUNGEON, GAME_CORE, VAR_DIR } from "./config.ts";
+import { DUNGEONS, GAME_CORE, SYNTHETIC, VAR_DIR } from "./config.ts";
 import { STATS, decodeAdventurer, decodeBag, encodePacket, type Action, type Adventurer, type Item } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot, type Local } from "./engine/engine.ts";
 import { pinSpecials } from "./specials.ts";
@@ -63,10 +63,8 @@ export async function newPracticeGame(id: string, seed = 0): Promise<Game> {
   return { id, seed, packets: [], start, local: fromSnapshot(start) };
 }
 
-const SYNTHETIC = 5n << 244n;
-
 export async function syntheticGame(index: number, seed = 0): Promise<Game> {
-  const template = await startOf(DUNGEON.benchmark[0]);
+  const template = await startOf(DUNGEONS.beast.benchmark[0]);
   const roll = createHash("sha256").update(`start:${index}`).digest();
   const stats = Object.fromEntries(STATS.map((s) => [s, 0])) as Adventurer["stats"];
   const points = STATS.reduce((n, s) => n + template.adventurer.stats[s], 0);

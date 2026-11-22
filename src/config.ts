@@ -22,13 +22,12 @@ export const GAME_CORE = "0x03cafe867e9f5dc7ccf73471b98c1d6d6d54804744cef9626acc
 export const BEAST_NFT = "0x00f739e402e52830a736335a0f47d58ec78ba067443c9c6930da182eab2ff8b0";
 export const SETTLE_MAX_PACKETS = 469;
 export const SETTLE_CHUNK = 117;
-export type Dungeon = { name: string; address: string; minterId: number; settingsId: number; claim: string; rolledStart: boolean; pool?: string; sell?: { normal: string[]; mega: string[] }; firstSpecies: number; speciesCount: number; benchmark: string[] };
+export type Dungeon = { name: string; address: string; settingsId: number; claim: string; rolledStart: boolean; pool?: string; sell?: { normal: string[]; mega: string[] }; firstSpecies: number; speciesCount: number; benchmark: string[] };
 
 export const DUNGEONS: Record<string, Dungeon> = {
   beast: {
     name: "Beast Mode",
     address: "0x075ca042091b8e1418d0510b8d6519a89222ef5f7bbceb0ff760bb3c62c98174",
-    minterId: 1,
     settingsId: 2,
     rolledStart: true,
     claim: "claim_beast",
@@ -60,7 +59,6 @@ export const DUNGEONS: Record<string, Dungeon> = {
   lootBag: {
     name: "Loot Bag",
     address: "0x03921001b64ad6af2bae27b95c27c465fc8921d9c537f4821eb3023b5889622f",
-    minterId: 4,
     settingsId: 6,
     rolledStart: false,
     pool: "0x0127d3c4e2f5b651257a1b6ec52e1168b3b7150d0323a4e616dd65b08854a12c",
@@ -108,7 +106,14 @@ export const DUNGEONS: Record<string, Dungeon> = {
   },
 };
 
-export const DUNGEON_KEY = process.env.LS_DUNGEON ?? "beast";
-export const DUNGEON = DUNGEONS[DUNGEON_KEY];
+export const SYNTHETIC = 5n << 244n;
+
+export function dungeonOf(id: string | bigint): string {
+  const n = BigInt(id);
+  const settings = n >> 244n === SYNTHETIC >> 244n ? DUNGEONS.beast.settingsId : Number((n >> 128n) & 0xffffffffn);
+  const key = Object.keys(DUNGEONS).find((k) => DUNGEONS[k].settingsId === settings);
+  if (!key) throw new Error(`game ${n.toString(16)} belongs to no known dungeon (settings ${settings})`);
+  return key;
+}
 export const SURVIVOR = "0x042dd777885ad2c116be96d4d634abc90a26a790ffb5871e037dd5ae7d2ec86b";
 export const TICKET = "0x0452810188C4Cb3AEbD63711a3b445755BC0D6C4f27B923fDd99B1A118858136";

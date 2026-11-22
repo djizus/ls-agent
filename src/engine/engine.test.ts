@@ -3,11 +3,11 @@ import { test } from "node:test";
 import type { Beast } from "../beast.ts";
 import { STATS, decodeAdventurer, encodePacket, type Action } from "../codec.ts";
 import * as combat from "../combat.ts";
-import { DUNGEON, GAME_CORE } from "../config.ts";
+import { DUNGEONS, GAME_CORE } from "../config.ts";
 import { ITEMS, itemOf, levelOf, potionPrice, priceOf } from "../items.ts";
 import { marketOf } from "../market.ts";
 import { hashes, replay, startOf, revertReason, type Snapshot } from "../practice.ts";
-import { MARKET } from "../settings.ts";
+import { settingsOf } from "../settings.ts";
 import { effectiveStats } from "../specials.ts";
 import { provider } from "../wallet.ts";
 import { beastHit, yourHit } from "./damage.ts";
@@ -52,7 +52,7 @@ function choose(l: Local, id: string, rnd: () => number): Action[] {
     const owned = new Set([...Object.values(a.equipment), ...bag].map((i) => i.id));
     const free = l.slots.filter((i) => !i.id).length;
     const empty = (o: { id: number }) => (a.equipment[itemOf(o.id)!.slot].id === 0 ? 0 : 1);
-    for (const offer of marketOf(a, id, MARKET).sort((x, y) => empty(x) - empty(y) || rnd() - 0.5).slice(0, 3)) {
+    for (const offer of marketOf(a, id, settingsOf(id).market).sort((x, y) => empty(x) - empty(y) || rnd() - 0.5).slice(0, 3)) {
       const price = priceOf(offer.id, charisma);
       if (price > gold || owned.has(offer.id) || free < 2) continue;
       gold -= price;
@@ -134,7 +134,7 @@ function invalid(l: Local, id: string): [string, Action[]][] {
     return out;
   }
   out.push(["no upgrades", [{ type: "upgrade", stat: "strength", amount: 1 }]]);
-  const market = marketOf(a, id, MARKET);
+  const market = marketOf(a, id, settingsOf(id).market);
   const offers = market.map((o) => o.id);
   const outside = Array.from({ length: 101 }, (_, i) => i + 1).find((i) => !offers.includes(i))!;
   out.push(["not in market", [{ type: "buy", item: outside, equip: false }]]);
@@ -176,7 +176,7 @@ async function rejections(played: Played[]): Promise<string[]> {
   );
 }
 
-const ids = DUNGEON.benchmark.slice(0, 8);
+const ids = DUNGEONS.beast.benchmark.slice(0, 8);
 let games: Promise<Played[]> | undefined;
 const played = () => (games ??= Promise.all(ids.map((id, i) => play(id, i + 1))));
 
