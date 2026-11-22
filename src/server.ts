@@ -185,7 +185,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
   }
   if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
   if (url.pathname === "/api/games") {
-    const rows = db.prepare(`${games()} ORDER BY onchain DESC, id DESC LIMIT 200`).all() as { id: number; live: number; mode: string; claimed: number | null }[];
+    const rows = db.prepare(`SELECT * FROM (${games()}) WHERE onchain OR id IN (SELECT id FROM games WHERE mode = 'practice' ORDER BY id DESC LIMIT 200) ORDER BY onchain DESC, id DESC`).all() as { id: number; live: number; mode: string; claimed: number | null }[];
     for (const g of rows) if (!g.live && g.claimed !== null) verdicts.delete(g.id);
     return reply(res, rows.map((g) => (g.live ? { ...g, beasts: slain(g.id), claimable: openClaims(g), level: snapshot(seated(g.id))?.level ?? null } : verdicts.has(g.id) ? { ...g, claimable: openClaims(g) } : g)));
   }
