@@ -13,8 +13,7 @@
     "contract": "LS_TAPE=live node --disable-warning=ExperimentalWarning --import ./src/tape.ts --test --test-concurrency=1 'src/**/*.test.ts'",
     "record": "rm -f src/tape.json && LS_TAPE=record node --disable-warning=ExperimentalWarning --import ./src/tape.ts --test --test-concurrency=1 'src/**/*.test.ts'",
     "bench": "node scripts/bench.ts",
-    "prove": "scripts/prove.sh",
-    "typecheck": "tsc --noEmit"
+    "prove": "scripts/prove.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
