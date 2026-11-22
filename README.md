@@ -1,151 +1,149 @@
 # ls-agent
 
-A bot that plays Loot Survivor 2 (Death Mountain) on Starknet mainnet with a fixed rule policy.
-It includes a local port of the game for free practice games and benchmarks, and a one-screen page for watching real games.
+A bot that plays [Loot Survivor 2](https://lootsurvivor.io) on Starknet mainnet by itself, with a fixed rule policy, and a page to watch it.
+It carries a local port of the game, so practice games and benchmarks cost nothing.
 
-## Quick start
+![The page with six live games](docs/page.webp)
 
-You need Node 22.18 or newer, bash, curl and an internet connection. Nothing in this section spends money.
+## What it does on its own
+
+Once you start the loop, the bot keeps playing as long as the wallet holds STRK:
+
+```
+      ┌──────────────────────────────────────────────────────────┐
+      ▼                                                          │
+  STRK ≥ 30 ? ──no──► wait 5 min, read the balance again ────────┤
+      │ yes                                                      │
+      ▼                                                          │
+  80 Beast Mode games                                            │
+      │                                                          │
+      ▼                                                          │
+  the pool's bag with the most named kills a game                │
+  costs ≤ 100 SURVIVOR and the wallet holds it?                  │
+      ├──yes──► buy it, play one Loot Dungeon game ──────────────┤
+      └──no───► skip it and say why ─────────────────────────────┘
+```
+
+30 STRK is the 20 STRK spend floor plus 10 for a round, a ticket purchase and a settlement. The loop's numbers are `LOOP` in `src/loop.ts`.
+
+With `LS_SEATS` above 1, several games play at once and share one transaction per round:
+
+```
+  game 1 ── decide ─┐
+  game 2 ── decide ─┼──► one transaction ──► wait for its block ──► read every game's new state
+  game N ── decide ─┘
+```
+
+When a game ends, its seat takes the next game. A minute later the bot settles the ended game on chain to claim the beasts it killed, when there are any.
+The loop survives a restart: `var/loop.json` keeps it on, and unfinished games in `var/live.json` resume first.
+
+## Watch it
+
+`npm start` serves the page on http://127.0.0.1:4100. In the middle, one card per live game: level, health, gold, the beast it fights, its gear, and the last decision with its odds. On the left are the games of each dungeon with their figures. On the right are the wallet, the beasts won and the loot bag ranking.
+The page is read-only: it sends only GET requests, and the server refuses anything else from another machine.
+
+## Run it
+
+You need Node 22.18 or newer, bash and curl. This part spends nothing:
 
 ```
 npm install
-npm test
-npm start
+npm test                                                  # the local port against recorded contract answers
+npm start                                                 # the page and the API on :4100
+curl -X POST 127.0.0.1:4100/api/play -d '{"games":20}'    # 20 practice games, in the service log only
 ```
 
-`npm test` compares the local port of the game with the contract's answers recorded in `src/tape.json`, without the network: a test that reaches it fails. `npm start` serves the page on http://127.0.0.1:4100.
-
-In a second terminal, play 20 practice games (about three minutes):
+To play for real, fund the bot's own wallet:
 
 ```
-curl -X POST 127.0.0.1:4100/api/play -d '{"games":20}'
+node src/cli.ts wallet                                    # prints the address, creates var/wallet.json
+node src/cli.ts deploy                                    # after sending STRK to it: deploys the account
+curl -X POST 127.0.0.1:4100/api/play -d '{"loop":true}'   # plays on its own, as drawn above
+curl -X POST 127.0.0.1:4100/api/stop                      # turns the loop off after the current move
 ```
 
-The service log prints each decision. The page does not show practice games: it only shows games played on chain, so it stays on "No real game yet". A pass plays up to 20 fixed starts, and each complete pass of 20 uses new luck.
-
-Measure the policy on 10,000 generated starts (under a minute on 14 cores):
-
-```
-npm run bench
-```
-
-The first page load writes a new wallet key to `var/wallet.json`. The wallet is empty and the bot cannot spend until you fund it. Everything the bot stores is in `var/`, which git ignores.
-
-## Prove it
-
-```
-npm run prove -- 2
-```
-
-Starts the real service on port 4199, plays 2 practice games through the HTTP API (`npm run prove -- 2 lootBag` plays Loot Dungeon starts; `npm run prove -- loop` starts the loop on the empty wallet of a fresh `var/`, waits for it to say it waits for STRK, and stops it) and leaves the database, service log, event stream and game list in `var/evidence/<timestamp>/`.
-
-## Playing for real
-
-Real games send transactions on Starknet mainnet and spend STRK from the bot's own wallet. Read this section before you fund it.
-
-1. `node src/cli.ts wallet` prints the wallet address, creating the key if needed.
-2. Send STRK to that address. The bot refuses to send a transaction while the balance is under 20 STRK, so fund more than that.
-3. `node src/cli.ts deploy` deploys the account (one small fee).
-4. On the same machine, `curl -X POST 127.0.0.1:4100/api/play -d '{"live":true}'` plays one game; `'{"live":true,"games":3}'` plays three.
+Costs and risks:
 
 | What | Cost or risk |
 |---|---|
-| Wallet key | `var/wallet.json` holds the private key in plain text, readable only by your user. Whoever reads the file owns the funds. If you delete `var/`, the funds are lost. Back the file up. |
-| Spend floor | 20 STRK, `STRK_FLOOR` in `src/config.ts`. Under it the bot sends nothing. It is the only spending limit: above the floor the bot keeps paying for as many games as you start. |
-| Tickets | A game uses one dungeon ticket. With less than one ticket left, the bot buys 10 on Ekubo and refuses if they cost more than 2 STRK. |
-| Loot Bag games | A Loot Dungeon game starts by buying one bag from the game's pool with SURVIVOR, so the wallet needs SURVIVOR as well as STRK. Name the dungeon, the bag and the most you will pay: `curl -X POST 127.0.0.1:4100/api/play -d '{"live":true,"dungeon":"lootBag","bag":7806,"maxSurvivor":90}'`. The bot refuses when the price is above `maxSurvivor`, when the pool no longer holds that bag, or when the wallet is short. The price rises a little with each bag sold: 84 SURVIVOR at the time of writing, fee and royalty included. `node src/cli.ts bag <bag number>` prints the price now, whether the pool holds the bag, and a simulated purchase, without sending anything. When sending the purchase fails, the bot asks the pool's game token who owns the game it bought: if the wallet does, the purchase landed and the game is played; otherwise the error stands and nothing is retried. |
-| A game | Each move is one transaction. 8 recorded Beast Mode games cost 0.8 to 3.9 STRK each, 2.5 at the median, about 0.04 STRK per move. Fees change with the network. |
-| Settlement | When a finished game killed a beast that can be collected, the bot settles the game on chain a minute later and claims the beast. Simulated cost: 0.5 STRK for a 13-move game, 3.1 STRK for a 115-move game. `node src/cli.ts quote <game id>` simulates it for one game without sending anything. |
-| The loop | `curl -X POST 127.0.0.1:4100/api/play -d '{"loop":true}'` makes the bot play on its own: 80 Beast Mode games, then one Loot Dungeon game on the bag the pool holds with the most named kills a game in the bag ranking, when its price, fee and royalty included, is at most 100 SURVIVOR and the wallet holds it (else that Loot Dungeon game is skipped and says why), then 80 Beast Mode games again. Under 30 STRK (the floor plus 10 for a round, a ticket purchase and a settlement) it waits and reads the balance again every 5 minutes, one call, and goes on by itself once STRK arrives. A failed bag purchase counts as the Loot Dungeon game, so it is never retried blindly. The loop survives a restart: `var/loop.json` keeps it on, with the time of its last Loot Dungeon game, and the Beast Mode games since are counted from the database. Its numbers are `LOOP` in `src/loop.ts`. |
-| Stopping | `curl -X POST 127.0.0.1:4100/api/stop` turns the loop off and ends play after the current move. Unfinished games are kept in `var/live.json` and resume on the next start, before any new game. The bot stops by itself if its local state differs from the contract. |
-| Other machines | By default only your machine can reach the page. If you set `LS_HOST` to serve other machines, they can read everything and change nothing but the loot bag ranking, which they may refresh: the server refuses any other request that is not a GET. A reverse proxy running on the same machine makes every visitor look local, so do not put one in front without its own access control. |
-| Outside services | A public Starknet node (HTTP, and its websocket for new block heads: a move's receipt is read when a head arrives, or after 2 seconds of silence), the game's API (beasts), Ekubo (ticket price, STRK and SURVIVOR prices in dollars) and `lootsurvivor.io` (the embedded spectator). |
+| Wallet key | `var/wallet.json` holds the private key in plain text. Whoever reads it owns the funds. If you delete `var/`, the funds are lost, so back it up. |
+| Spend floor | Under 20 STRK (`STRK_FLOOR` in `src/config.ts`) the bot sends nothing. Above it, nothing else limits spending. |
+| A game | One transaction per move, so a long game costs more. The page's tiles show what the real games of each dungeon cost and reached so far. |
+| Tickets | One per game. With less than one left, the bot buys 10 on Ekubo and refuses if they cost more than 2 STRK. |
+| Loot Dungeon game | Starts by buying a bag with SURVIVOR. The bot refuses above the price you allow, when the pool no longer holds the bag, or when the wallet is short. When sending the purchase fails, the bot asks the game token whether the wallet owns the game anyway, and does not send the purchase again. |
+| Settlement | Claiming a game's beasts costs more for a longer game. `node src/cli.ts quote <game id>` simulates it without sending anything. |
+| Stopping | `POST /api/stop` ends play after the current move. The bot also stops if its local state differs from the contract. |
+| Other machines | Only your machine can reach the page unless you set `LS_HOST`. Other machines can then read everything and change nothing but the loot bag ranking. A reverse proxy on the same machine makes every visitor look local, so give it its own access control. |
 
-The policy loses most games early. In the benchmark, 13% of games reach level 26. Expect to pay for many short games.
-
-## Settings
-
-Settings are environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env` when the file exists.
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `LS_DECIDER` | `rules` | Who decides each move. `rules` is the policy in `src/policy.ts`: it runs locally, calls no model and costs nothing. `jev` and `model` ask an outside model and need your own access (below). |
-| `LS_PACE_MS` | 0 | Pause between a decision and its move, for watching |
-| `LS_SEATS` | 1 | Real games played at once with the `rules` decider. Each round decides one move per game and sends them in one transaction, so its fixed fee is shared; a game that ends is settled a minute later and its seat takes the next game of the batch, whose ticket approval and start ride in the next round's transaction (a ticket purchase, a bag purchase and a settlement stay their own transactions). After a start that failed to send, the account's games minted since the batch began are read from the game token; one that is in no file and no row is adopted in place of a new game, so a start that landed anyway is not paid twice. A move the contract refuses goes back to that game alone as a rejected decision. A game whose round fails on an error (the node, the socket) is read again from the chain and goes on in the same batch; at the third failure in a row it is stopped. Once a real game is stopped unfinished, the batch starts no new game. |
-| `LS_RPC_URL` | public node | Starknet RPC |
-| `LS_HOST`, `LS_PORT` | 127.0.0.1, 4100 | Where the page is served |
-| `LS_VAR_DIR` | `var/` | Where the wallet, database and caches are stored. End it with a slash. |
-| `LS_BEASTS_TO` | unset | Account that receives every beast right after it is claimed. The page lists this account's beasts; unset, it lists the wallet's. |
-| `TYPESAFE_API_KEY`, `LS_JEV_MODEL` | none, `jev-latest` | For `LS_DECIDER=jev`: your key for `api.typesafe.ai` and the model name |
-| `LS_MODEL`, `LS_EFFORT`, `LS_STRATEGY` | `a model`, `medium`, `strategy/prompt.md` | For `LS_DECIDER=model`: it runs the `model` command, which must be installed and logged in on your account |
-
-## Measure a policy
-
-`npm run bench` plays the rule policy from 10,000 generated Beast Mode starts (`--dungeon lootBag` plays the Loot Dungeon's fixed starts), the same on every run, and prints the mean level, its spread, the share of games reaching level 26, 30, 35 and 40, beasts killed, and where games died. A difference under two standard errors is noise.
+## Commands
 
 | Command | What it does |
 |---|---|
-| `npm run bench -- --rules '{}' --rules '{"jewelryLevel":99}'` | Overrides fields of `RULES` in `src/policy.ts` and compares each variant with the first on the same games |
-| `npm run bench -- --gate` | Fails when the mean drops 0.25 levels, the 30+ share drops 1 point or named kills per game drop 0.1 below `scripts/baseline.json`. `--save` rewrites the baseline. |
-| `npm run bench -- --starts 50000 --from 1000000` | More starts, or other starts, to confirm a result on games it was not chosen on |
-| `npm run bench -- --starts 40000 --reach 30 --keep var/level30.json` | Saves every game at the moment it reaches level 30 |
-| `npm run bench -- --starts 30000 --reach weapon --keep var/weapon20.json` | Saves every game at the moment its worn weapon reaches greatness 20 |
-| `npm run bench -- --late var/level30.json --seeds 0-10` | Plays those saved games forward on 10 luck seeds each, to measure late-game rules |
-| `npm run bench -- --exact` | Uses the contract's hash for luck in place of the fast one: same distribution, 30 times slower |
-| `npm run bench -- --dungeon lootBag --ids bags.json --by-id` | Loot bag starts are fixed, so each game id in the file is played on 500 luck seeds, with one line per id |
-| `npm run bench -- --dungeon lootBag --rank [--all]` | Ranks loot bags into `var/bag-ranking.json` at low priority. Without `--all` (what the page's Refresh runs) it adds every bag the pool holds that the list lacks, with its starting gear read from the contract, and replays those only: 10 seconds on 14 cores for three new bags of which one reached the best 30, half a second when there is none. With `--all` it also replays every bag of the pool whose figures come from another policy version (the first 8 characters of the hash of `src/policy.ts`, kept with each bag's figures): run it after a policy change, 3 min 47 s for a pool of 189 bags. A bag is replayed on 100 luck seeds; then the 30 best by mean level and the 30 best by named kills are brought to 500 seeds, so `games` in a row is 100 or 500 (`FIRST_SEEDS`, `FULL_SEEDS`, `SHORTLIST` in `scripts/bench.ts`). Measured on the pool's 189 bags, each recorded on 500 seeds: over 200 random draws of the seeds this setting gave the same best 5 as 500 seeds for every bag each time, by level and by kills, for 42% of the computing; 100 seeds alone got 3 of the best 5 right on average. A second run changes nothing. |
-| `node scripts/search.ts --grid '{"fightRisk":[0.15,0.25,0.35]}' --level 35` | Moves one `RULES` field at a time to the value that raises the share reaching that level, then confirms on other starts |
+| `npm test` | Runs every test without the network, against the contract answers recorded in `src/tape.json`. A test that reaches the network fails. |
+| `npm run contract` | Runs the same tests against the live contract, one file at a time. `scripts/check.sh` runs it daily and records the result for the page. |
+| `npm run record` | Records the contract answers again into `src/tape.json` (about 40 seconds). Two runs give the same file. |
+| `npm run bench` | Plays the policy on 10,000 fixed Beast Mode starts and prints the mean level, its spread, the share reaching levels 26 to 40, named kills and causes of death. A difference under two standard errors is noise. |
+| `npm run prove -- 2` | Starts the real service on port 4199, plays 2 practice games through the API, and leaves the database, log, event stream and game list in `var/evidence/<time>/`. `-- 2 lootBag` plays Loot Dungeon starts; `-- loop` starts the loop on an empty wallet and stops it once it waits for STRK. |
+
+## Settings
+
+Environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LS_SEATS` | 1 | Real games played at once, sharing one transaction per round |
+| `LS_BEASTS_TO` | unset | Account that receives every beast once claimed; the page lists its beasts, else the wallet's |
+| `LS_HOST`, `LS_PORT` | 127.0.0.1, 4100 | Where the page is served |
+| `LS_VAR_DIR` | `var/` | Where the wallet, database and caches live. End it with a slash. |
+| `LS_RPC_URL` | public node | Starknet RPC |
+| `LS_PACE_MS` | 0 | Pause between a decision and its move |
+| `LS_DECIDER` | `rules` | `rules` is `src/policy.ts`, local and free. `jev` asks `api.typesafe.ai` (`TYPESAFE_API_KEY`, `LS_JEV_MODEL`); `model` runs the `model` command (`LS_MODEL`, `LS_EFFORT`, `LS_STRATEGY`). Both play one game at a time. |
 
 ## Feature map
 
 | Feature | How to reach it |
 |---|---|
-| One screen: live games as cards in the middle, panels around them | `/` shows one card per live real game (two columns up to four games, four columns beyond; eight fit a 1080p screen, on a phone they stack). A card shows the game number, the level and the experience to the next one, health, gold, named beasts slain and how many can be claimed, the beast being fought (portrait, name, tier, level, its health) or the last thing that happened, the eight worn items with their greatness, and the last decision (Fight and Flee with their odds, or Explore). Cards follow the event stream (`GET /events`, every event carries its game row) and the games list is read again at most once per round. "Details" on a card opens that game in the official spectator (`/?game=<row id>`) and "Back to live" returns to the cards. With no live game `/` shows the latest real game in the spectator. A game that just started shows "Game N starts" for its first 10 seconds, then the spectator, which cannot load a game its indexer has not seen yet. "Reload" beside the game number in the bar under the spectator loads the spectator again, for when it opened before its indexer had the game. |
-| Watch a real game | "Details" on a live card or a click on a finished game in the list embeds `https://www.lootsurvivor.io/watch?id=<game id in decimal>` in the middle panel. Only one spectator is loaded at a time. |
-| What the bot just decided in a live game | The last chip of its card; with the game open in the spectator, the bar under it, after the named beasts slain so far and how many of them can still be claimed: nobody minted them yet, or they can be taken from a stake as of the block of the kill (`GET /api/games` counts them for a live game with the rule used when a game ends; the games list shows live games as one "Live" row with their number and the best level among them, and a click on it shows the cards). For a finished game it shows the level reached, the beast that killed it, the named beasts slain, how many beasts its settlement claimed (games settled since that count is recorded) and the STRK it cost. Between its end and its settlement a game keeps the count it can claim. In the games list and on the podium the skull and count of a game are gold when it claimed a beast or can claim one. |
-| Pick a real game | "Games" on the left, with "Beast" or "Loot" in its header choosing the dungeon: the three best by level as a podium, the latest 20 newest first, with "More" showing them all. The live games are on top in every state. A Loot Dungeon game carries a bag where a Beast Mode game carries a skull, unless a beast that killed it is shown. The list holds every game of the dungeon, podium games included. Each finished game shows the named beasts it killed beside a skull, counted when the game ends and stored in `games.beasts`. "Live" in the bar returns to the live game. |
-| Main figures of the selected games | Six tiles under the Games header: in the first row games ended, average level and named beasts slain per game; under them the dollars spent on all of them (the STRK of each game and the SURVIVOR paid for its bag, claims left out, at the prices Ekubo quotes, read every 10 minutes), best level and beasts claimed by their settlements. `GET /api/summary` computes them for each dungeon with the benchmark's own `summary` in `src/summary.ts`. |
-| The local port no longer matches the contract | One red line above the middle panel: "The engine no longer matches the contract since <date>" when the last daily check failed (hover for the failing tests), or "The engine was last checked against the contract on <date>" when the last check is older than 2 days. Nothing while the check passes. `scripts/check.sh` (daily, `deploy/ls-agent-check.timer`) runs `npm run contract` and writes `var/contract-check.json` with the date of the first failure in a row; `GET /api/check` serves it. |
-| Wallet: STRK (red under the spend floor), tickets, SURVIVOR | "Wallet" on the right. `GET /api/wallet` (cached 30 seconds). |
-| What the loop does now | While the loop is on, the last line of "Wallet": the batch it plays, the bag it chose and its price or why it skipped one, or that it waits for STRK. `GET /api/loop`, and `loop` events on `GET /events`. |
-| Run on its own as long as there is STRK (spends STRK and SURVIVOR) | `curl -X POST 127.0.0.1:4100/api/play -d '{"loop":true}'` on the machine itself; "The loop" above. |
-| Beasts held or won and not yet claimed | "Beasts" on the right, for the account in `LS_BEASTS_TO` (else the wallet), one group per dungeon: the count, how many per tier, Megas and staked, and the dollars the Loot Dungeon sell pools pay for them now, one at a time, at the STRK price Ekubo quotes. Under it the 5 newest portraits with tier and level, beasts to claim first, greyed with a dashed edge; "More" shows them all; hover for name, type and price. Beast Mode beasts have no pool and show no value. `GET /api/beasts` answers from memory: the list is read from the game's collection API every 10 minutes (one call per 100 beasts and one per dungeon, no RPC), claims and pool prices every 10 minutes while no game is being played. |
-| Loot bags, best 25, with the copies the pool holds | "Loot bags" on the right, ranked by mean level or by named beasts killed: only bags the pool holds now, with their copies, read from the pool every minute. Under the header, how long ago the ranking was computed and "Refresh", which any viewer may press: `POST /api/bags` starts the ranking command above without `--all` in a separate process, one at a time (a press while one runs starts nothing), so it ranks the bags that are new in the pool and replays no bag already ranked, and the panel shows "Ranking the pool's bags" until it ends. `GET /api/bags` gives the rows from `var/bag-ranking.json`, the time the file was written and whether a ranking runs. |
-| Start a real game (spends STRK) | `curl -X POST 127.0.0.1:4100/api/play -d '{"live":true}'` on the machine itself. The dungeon belongs to the batch: `"dungeon"` is `beast` (the default) or `lootBag`, the keys of `DUNGEONS` in `src/config.ts`, and a game's dungeon and its settings (market, ambush) are read from its id, so switching needs no restart. |
-| Start a practice pass | `POST /api/play` with `{"games": n}`. Not on the page. |
-| Stop after the current move, and the loop | `curl -X POST 127.0.0.1:4100/api/stop` on the machine itself. |
-| The page is read-only | The page sends only GET requests and has no control. From another machine the server answers 403 to any request that is not a GET, and to `/mcp`. |
-| Game data | `GET /api/state` (current game), `GET /api/games` (every real game, newest first), `GET /api/games/<row id>` (one game with its events), `GET /events` (live stream), `GET /api/items` (item table) |
-| Wallet address, deployment and balance | `node src/cli.ts wallet` |
-| Deploy the wallet account (spends STRK) | `node src/cli.ts deploy` |
-| Settle a finished real game and claim its beasts (spends STRK, runs by itself after each real game) | `node src/cli.ts collect <game id>` |
-| What settling a finished game would cost (read-only) | `node src/cli.ts quote <game id>` |
-| A loot bag's price now, whether the pool holds it, and a simulated purchase (read-only) | `node src/cli.ts bag <bag number> [address]` |
-| Beasts an address holds or has staked, and its unclaimed kills (read-only) | `node src/cli.ts beasts [address]` |
-| Send every beast the wallet holds to another account (spends STRK; refuses an address with no account, and a transfer that would fail) | `node src/cli.ts send-beasts <address>` |
-| Compare the local port with the live contract | `npm run contract` runs the tests one file at a time against the public node and writes nothing (the flow kind `contract`, run on demand with `build.sh contract`, never in a landing). |
-| Record the contract's answers again | `npm run record` runs the same tests against the public node one file at a time and rewrites `src/tape.json`: 926 answers, about 40 seconds. Run it after a change to a test that calls the contract, or when `npm run contract` finds that the contract changed. Two runs give the same file. |
+| Live games as cards | `/` with live games: one card each, two columns up to four games, four beyond, stacked on a phone. Cards follow `GET /events`. |
+| Watch one game in the official spectator | "Details" on a card, or a finished game in the list: `/?game=<row id>` embeds `lootsurvivor.io/watch`. "Back to live" returns to the cards; "Reload" loads the spectator again when it opened before its indexer had the game. With no live game, `/` shows the latest one. |
+| What the bot decided | The last chips of a card: Fight and Flee with their odds, or Explore. For a game open in the spectator, the bar under it, which for a finished game shows its level, killer, named kills, beasts claimed and STRK cost. |
+| Games of a dungeon | "Games" on the left, "Beast" or "Loot": a podium of the three best, the 20 newest, "More" for all, live games on top. A gold skull marks a game that claimed or can claim a beast. |
+| Figures of a dungeon | The six tiles under "Games": games ended, average level, named kills a game, dollars spent (STRK and SURVIVOR at Ekubo prices), best level, beasts claimed. `GET /api/summary`. |
+| Engine no longer matches the contract | One red line above the middle panel when the last daily check failed or is older than 2 days, and nothing otherwise. `GET /api/check` serves `var/contract-check.json`. |
+| Wallet and the loop's last step | "Wallet" on the right: STRK (red under the floor), tickets, SURVIVOR, and while the loop is on, what it does now. `GET /api/wallet`, `GET /api/loop`. |
+| Beasts held and to claim | "Beasts" on the right, one group per dungeon: count, tiers, Megas, staked, and what the Loot Dungeon pools pay for them. Hover a portrait for its name and price; "More" shows all. `GET /api/beasts`. |
+| Loot bag ranking | "Loot bags" on the right: the best 25 bags the pool holds, by mean level or named kills, with copies left. "Refresh" (any viewer) ranks the bags new in the pool. `GET`/`POST /api/bags`. |
+| Rank every bag again after a policy change | `npm run bench -- --dungeon lootBag --rank --all` |
+| Start the loop / stop | `POST /api/play {"loop":true}` / `POST /api/stop`, from the machine itself |
+| Play real games by hand | `POST /api/play {"live":true,"games":3}`; add `"dungeon":"lootBag","bag":7806,"maxSurvivor":90` for a Loot Dungeon game |
+| Practice games | `POST /api/play {"games":20}`, with `"dungeon":"lootBag"` for Loot Dungeon starts. Not on the page. |
+| Game data | `GET /api/state`, `/api/games`, `/api/games/<row id>`, `/api/items`, `/events` |
+| Preview a decision against random luck, for a model decider | MCP tool `preview` at `/mcp`, from the machine itself |
+| Wallet address and balance / deploy the account | `node src/cli.ts wallet` / `node src/cli.ts deploy` |
+| Settle a game and claim its beasts (runs by itself) / its simulated cost | `node src/cli.ts collect <game id>` / `node src/cli.ts quote <game id>` |
+| A bag's price, whether the pool holds it, a simulated purchase | `node src/cli.ts bag <bag number> [address]`, from the wallet unless an address is given; the simulation needs a deployed account |
+| Beasts an address holds, staked and to claim | `node src/cli.ts beasts [address]` |
+| Send every beast to another account | `node src/cli.ts send-beasts <address>` |
+| Compare policy variants on the same games | `npm run bench -- --rules '{}' --rules '{"jewelryLevel":99}'` |
+| Confirm a result on more or other starts | `npm run bench -- --starts 50000 --from 1000000` |
+| Save every game when it reaches level 30, or when its weapon reaches greatness 20 | `npm run bench -- --starts 40000 --reach 30 --keep var/level30.json`, `--reach weapon` |
+| Play saved games forward on several luck seeds, to measure late-game rules | `npm run bench -- --late var/level30.json --seeds 0-10` |
+| Use the contract's luck hash in place of the fast one (same distribution, 30 times slower) | `npm run bench -- --exact` |
+| Play given Loot Dungeon games on 500 luck seeds each, one line per game | `npm run bench -- --dungeon lootBag --ids games.json --by-id` (a JSON list of game ids) |
+| Fail when the policy gets worse than `scripts/baseline.json` | `npm run bench -- --gate` (`--save` rewrites it) |
+| Search one policy field at a time | `node scripts/search.ts --grid '{"fightRisk":[0.15,0.25,0.35]}' --level 35` |
+| Explain how a game died, move by move | `node scripts/autopsy.ts var/ls.sqlite <row id>...` |
 | Import human games for study | `node scripts/import.ts <dir>...` |
-| Explain how a game died | `node scripts/autopsy.ts <file> <game>...` |
 
 ## Where facts live
 
 | Fact | Source |
 |---|---|
-| Action shapes and packet encoding | `src/codec.ts` |
-| Game rules | The contract. `src/engine/` is the local port, and `src/mechanics.test.ts` and `src/engine/engine.test.ts` compare it with the contract. |
-| The contract's recorded answers that `npm test` replays | `src/tape.json`, written by `npm run record` |
+| Game rules | The contract. `src/engine/` is the local port, checked by the tests. |
 | Rule policy | `src/policy.ts` |
-| Rules told to a model decider | `src/mechanics.ts` |
-| Strategy text for model deciders | `strategy/prompt.md` |
-| Contracts, dungeons, the spend floor and benchmark starts | `src/config.ts` |
-| What the page shows about a state (luck, chances, what gear grants, purse) | `enrich` in `src/play.ts` |
-| Which kills are collectable, and the beast inventory | `src/beasts.ts` |
+| Contracts, dungeons, spend floor, benchmark starts | `src/config.ts` |
+| Action shapes and packet encoding | `src/codec.ts` |
+| Collectable kills and the beast inventory | `src/beasts.ts` |
 
-## The author's deployment
+`deploy/` runs it as systemd user services with a daily `scripts/check.sh` and a Traefik route. `deploy/install.sh` reads `LS_DOMAIN` and `LS_HOST` from `~/.config/ls-agent/env`.
 
-`deploy/` is an example of running the bot as a service: systemd user units, a daily run of `scripts/check.sh` and a Traefik route. `deploy/install.sh` reads `LS_DOMAIN` and `LS_HOST` from `~/.config/ls-agent/env`. The paths in the units are one machine's; adjust them. You do not need it to run locally.
-
-## Licence
-
-MIT, see `LICENSE`.
+MIT licence, see `LICENSE`.

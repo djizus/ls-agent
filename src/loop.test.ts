@@ -39,9 +39,6 @@ test("the loop skips the bag with the purchase's own refusal when its price is o
 
 test("the README states the loop's numbers and the spend floor as the code has them", () => {
   const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
-  const row = (name: string) => readme.split("\n").find((line) => line.startsWith(`| ${name} |`)) ?? "";
-  const loop = row("The loop");
-  for (const said of [`${LOOP.beastGames} Beast Mode games`, `at most ${LOOP.bagCapSurvivor} SURVIVOR`, `Under ${STRK_FLOOR + LOOP.reserveStrk} STRK (the floor plus ${LOOP.reserveStrk}`, `every ${LOOP.recheckMs / 60_000} minutes`]) assert.ok(loop.includes(said), said);
-  assert.ok(row("Spend floor").startsWith(`| Spend floor | ${STRK_FLOOR} STRK, \`STRK_FLOOR\``));
-  assert.ok(readme.includes(`while the balance is under ${STRK_FLOOR} STRK`));
+  const need = STRK_FLOOR + LOOP.reserveStrk;
+  for (const said of [`STRK ≥ ${need} ?`, `wait ${LOOP.recheckMs / 60_000} min`, `${LOOP.beastGames} Beast Mode games`, `costs ≤ ${LOOP.bagCapSurvivor} SURVIVOR`, `${need} STRK is the ${STRK_FLOOR} STRK spend floor plus ${LOOP.reserveStrk}`, `Under ${STRK_FLOOR} STRK (\`STRK_FLOOR\``]) assert.ok(readme.includes(said), said);
 });
