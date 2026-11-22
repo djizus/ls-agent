@@ -29,7 +29,7 @@ With `LS_SEATS` above 1, a round decides one move per game and sends them in one
   game N ── decide ─┘
 ```
 
-When a game ends, its seat takes the next game. A minute later the bot settles the ended game on chain, which claims the beasts it killed. The loop survives a restart: `var/loop.json` keeps it on, and unfinished games in `var/live.json` resume first. 30 STRK is the 20 STRK spend floor plus 10 for a round, a ticket purchase and a settlement.
+When a game ends, its seat takes the next game. A minute later the bot settles the ended game on chain, which claims the beasts it killed. The loop survives a restart: `var/loop.json` keeps it on and holds the time of a Loot Dungeon attempt that started no game (a skipped bag or a failed purchase), the Beast Mode games are counted from the last Loot Dungeon game in the database or that attempt, whichever is later, and unfinished games in `var/live.json` resume first. 30 STRK is the 20 STRK spend floor plus 10 for a round, a ticket purchase and a settlement.
 
 | Risk | What to know |
 |---|---|

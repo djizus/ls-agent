@@ -30,8 +30,8 @@ let wake: () => void = () => {};
 let looping = false;
 
 const on = (): boolean => existsSync(file);
-const since = (): number => JSON.parse(readFileSync(file, "utf8")).since;
-const mark = (): void => writeFileSync(file, JSON.stringify({ since: Date.now() }));
+const attempted = (): number => (on() ? (JSON.parse(readFileSync(file, "utf8")).attempt ?? 0) : 0);
+const mark = (): void => writeFileSync(file, JSON.stringify({ attempt: Date.now() }));
 const say = (text: string): void => {
   last = { on: on(), text, at: Date.now() };
   emit({ kind: "loop", on: last.on, text });
@@ -43,7 +43,8 @@ const pause = (ms: number) => new Promise<void>((resolve) => {
 
 export const loopStatus = () => last;
 
-const beastSince = (): number => (db.prepare("SELECT count(*) AS n FROM games WHERE mode = 'beast' AND started_at > ?").get(since()) as { n: number }).n;
+export const beastSince = (): number =>
+  (db.prepare("SELECT count(*) AS n FROM games WHERE mode = 'beast' AND started_at > max(?, (SELECT coalesce(max(started_at), 0) FROM games WHERE mode = 'lootBag'))").get(attempted()) as { n: number }).n;
 
 const lootLeft = (): boolean => liveIds().some((id) => dungeonOf(id) === "lootBag");
 
@@ -110,7 +111,7 @@ async function run(): Promise<void> {
 }
 
 export function startLoop(): void {
-  if (!on()) mark();
+  if (!on()) writeFileSync(file, "{}");
   void run();
 }
 
