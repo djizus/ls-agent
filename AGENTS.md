@@ -101,6 +101,7 @@ Environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env`.
 | Play saved games forward on several luck seeds, to measure late-game rules | `npm run bench -- --late var/level30.json --seeds 0-10` |
 | Use the contract's luck hash in place of the fast one (same distribution, 30 times slower) | `npm run bench -- --exact` |
 | Play given Loot Dungeon games on 500 luck seeds each, one line per game | `npm run bench -- --dungeon lootBag --ids games.json --by-id` (a JSON list of game ids) |
+| What a Greed Run game returns per STRK wagered, cashing out at fixed levels or when rollouts of the policy say the next level is worth less than cashing now | `node scripts/greed.ts --starts 10000 --rollouts 32`: reads the payout curve from the Greed Run contract and prints the levels and gas it assumes with the returns |
 | Fail when the policy gets worse than `scripts/baseline.json` | `npm run bench -- --gate` (`--save` rewrites it, with the number of games) |
 | Search one policy field at a time | `node scripts/search.ts --grid '{"fightRisk":[0.15,0.25,0.35]}' --level 35` |
 | Explain how a game died, move by move | `node scripts/autopsy.ts var/ls.sqlite <row id>...` |
@@ -113,7 +114,7 @@ Environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env`.
 | Game rules | The contract. `src/engine/` is the local port, checked by the tests. |
 | Rule policy | `src/policy.ts` |
 | The cycle's numbers | `CYCLE` in `src/cycle.ts` |
-| Contracts, dungeons, spend floor, benchmark starts | `src/config.ts` |
+| Contracts, dungeons, the Greed Run contract and its settings, spend floor, benchmark starts | `src/config.ts` |
 | Action shapes and packet encoding | `src/codec.ts` |
 | Collectable kills and the beast inventory | `src/beasts.ts` |
 

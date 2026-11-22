@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { Beast } from "../beast.ts";
 import { STATS, decodeAdventurer, encodePacket, type Action } from "../codec.ts";
 import * as combat from "../combat.ts";
-import { DUNGEONS } from "../config.ts";
+import { DUNGEONS, GREED, settingsIdOf } from "../config.ts";
 import { ITEMS, itemOf, levelOf, potionPrice, priceOf } from "../items.ts";
 import { marketOf } from "../market.ts";
 import { hashes, replay, startOf, revertReason, type Snapshot } from "../practice.ts";
@@ -175,7 +175,8 @@ async function rejections(played: Played[]): Promise<string[]> {
   );
 }
 
-const ids = DUNGEONS.beast.benchmark.slice(0, 8);
+const GREED_GAMES = ["0x2000000000500b4000001c886600116347d00193d01", "0x2000000000500b4000001c88663011634f5001834a1", "0x2000000000500b4000001c8888f011682c1000dc401"];
+const ids = [...DUNGEONS.beast.benchmark.slice(0, 8), ...GREED_GAMES];
 let games: Promise<Played[]> | undefined;
 const played = () => (games ??= Promise.all(ids.map((id, i) => play(id, i + 1))));
 
@@ -183,6 +184,12 @@ test("local engine matches the contract after every packet", { timeout: 600_000 
   const results = await Promise.all((await played()).map(differential));
   results.forEach((r, i) => console.log(ids[i].slice(-8), r.steps, r.mismatch ?? "match"));
   assert.deepEqual(results.map((r) => r.mismatch), ids.map(() => undefined));
+});
+
+test("Greed Run games play Beast Mode's settings with no damage reduction while exploring", () => {
+  assert.deepEqual(GREED_GAMES.map(settingsIdOf), GREED_GAMES.map(() => GREED.settingsId));
+  assert.deepEqual(GREED_GAMES.map((id) => settingsOf(id)), GREED_GAMES.map(() => ({ ...settingsOf(DUNGEONS.beast.benchmark[0]), ambush: 0 })));
+  assert.equal(settingsOf(DUNGEONS.beast.benchmark[0]).ambush, 35);
 });
 
 test("local engine rejects invalid packets with the contract's reasons", { timeout: 600_000 }, async () => {

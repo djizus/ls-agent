@@ -63,7 +63,7 @@ export async function newPracticeGame(id: string, seed = 0): Promise<Game> {
   return { id, seed, packets: [], start, local: fromSnapshot(start) };
 }
 
-export async function syntheticGame(index: number, seed = 0): Promise<Game> {
+export async function syntheticGame(index: number, seed = 0, settingsId = DUNGEONS.beast.settingsId): Promise<Game> {
   const template = await startOf(DUNGEONS.beast.benchmark[0]);
   const roll = createHash("sha256").update(`start:${index}`).digest();
   const stats = Object.fromEntries(STATS.map((s) => [s, 0])) as Adventurer["stats"];
@@ -71,7 +71,8 @@ export async function syntheticGame(index: number, seed = 0): Promise<Game> {
   for (let p = 0; p < points; p++) stats[STATS[roll.readUInt16BE(2 * p) % STATS.length]]++;
   const health = template.adventurer.health + 15 * (stats.vitality - template.adventurer.stats.vitality);
   const start = { ...template, adventurer: { ...template.adventurer, stats, health, level_salt: 1 + (roll.readUInt16BE(30) % 16383) } };
-  return { id: "0x" + (SYNTHETIC + BigInt(index)).toString(16), seed, packets: [], start, local: fromSnapshot(start) };
+  const settings = settingsId === DUNGEONS.beast.settingsId ? 0n : BigInt(settingsId) << 128n;
+  return { id: "0x" + (SYNTHETIC + settings + BigInt(index)).toString(16), seed, packets: [], start, local: fromSnapshot(start) };
 }
 
 export function act(game: Game, actions: Action[]): Snapshot {

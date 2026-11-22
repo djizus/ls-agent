@@ -106,13 +106,20 @@ export const DUNGEONS: Record<string, Dungeon> = {
   },
 };
 
+export const GREED = { name: "Greed Run", address: "0x012ac35cf5112dd1bacd2f1e7342eb5951566262ab52c3c7dddd2b9a77840741", settingsId: 5 };
+
 export const SYNTHETIC = 5n << 244n;
 
-export function dungeonOf(id: string | bigint): string {
+export function settingsIdOf(id: string | bigint): number {
   const n = BigInt(id);
-  const settings = n >> 244n === SYNTHETIC >> 244n ? DUNGEONS.beast.settingsId : Number((n >> 128n) & 0xffffffffn);
+  const settings = Number((n >> 128n) & 0xffffffffn);
+  return n >> 244n === SYNTHETIC >> 244n && settings === 0 ? DUNGEONS.beast.settingsId : settings;
+}
+
+export function dungeonOf(id: string | bigint): string {
+  const settings = settingsIdOf(id);
   const key = Object.keys(DUNGEONS).find((k) => DUNGEONS[k].settingsId === settings);
-  if (!key) throw new Error(`game ${n.toString(16)} belongs to no known dungeon (settings ${settings})`);
+  if (!key) throw new Error(`game ${BigInt(id).toString(16)} belongs to no known dungeon (settings ${settings})`);
   return key;
 }
 export const SURVIVOR = "0x042dd777885ad2c116be96d4d634abc90a26a790ffb5871e037dd5ae7d2ec86b";

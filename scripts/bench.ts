@@ -1,6 +1,5 @@
-import { fork } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { availableParallelism, constants, setPriority } from "node:os";
+import { constants, setPriority } from "node:os";
 import { parseArgs } from "node:util";
 import { BAG_RANKING, DUNGEONS, VAR_DIR } from "../src/config.ts";
 import { useFastLuck } from "../src/hash.ts";
@@ -10,13 +9,14 @@ import { ARMOR, NECK, RULES, VERSION, plan } from "../src/policy.ts";
 import { poolIds, shortlist, unplayed, unranked } from "../src/live.ts";
 import { toSnapshot, type Local } from "../src/engine/engine.ts";
 import { act, newPracticeGame, startOf, syntheticGame, type Game } from "../src/practice.ts";
+import { PROCS, serve, spread } from "./workers.ts";
 
 const { values } = parseArgs({
   options: {
     starts: { type: "string", default: "10000" },
     from: { type: "string", default: "0" },
     seeds: { type: "string" },
-    procs: { type: "string", default: String(Math.max(1, Math.min(14, availableParallelism() - 2))) },
+    procs: { type: "string", default: PROCS },
     rules: { type: "string", multiple: true, default: ["{}"] },
     ids: { type: "string" },
     "by-id": { type: "boolean", default: false },
@@ -146,14 +146,7 @@ async function play(games: Pair[]): Promise<Run> {
 
 
 async function run(games: Pair[]): Promise<Run> {
-  const shares = await Promise.all(
-    Array.from({ length: procs }, (_, share) => new Promise<Run>((resolve, reject) => {
-      const child = fork(process.argv[1], process.argv.slice(2));
-      child.once("message", (m) => resolve(m as Run));
-      child.once("exit", (code) => code && reject(new Error(`worker ${share} exited with ${code}`)));
-      child.send(games.filter((_, i) => i % procs === share));
-    })),
-  );
+  const shares = await spread<Pair, Run>(games, procs);
   return { rows: values.rules.map((_, v) => games.map((_, i) => shares[i % procs].rows[v][Math.floor(i / procs)])), snaps: shares.flatMap((s) => s.snaps) };
 }
 
@@ -166,7 +159,7 @@ function figures(own: (number | null)[][]) {
 }
 
 if (process.send) {
-  process.once("message", async (games: Pair[]) => process.send!(await play(games)));
+  serve(play);
 } else if (values.rank) {
   const started = Date.now();
   setPriority(constants.priority.PRIORITY_LOW);

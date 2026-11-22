@@ -1,4 +1,4 @@
-import { DUNGEONS, GAME_CORE, dungeonOf } from "./config.ts";
+import { DUNGEONS, GAME_CORE, GREED, settingsIdOf } from "./config.ts";
 import type { MarketConfig } from "./market.ts";
 import { provider } from "./wallet.ts";
 
@@ -10,6 +10,11 @@ const read = async (settingsId: number): Promise<Settings> => {
   return { market: { pair01, pair23, pair4_enabled }, ambush: Number(out.at(-7)) };
 };
 
-const SETTINGS: Record<string, Settings> = Object.fromEntries(await Promise.all(Object.entries(DUNGEONS).map(async ([key, d]) => [key, await read(d.settingsId)])));
+const IDS = [...Object.values(DUNGEONS).map((d) => d.settingsId), GREED.settingsId];
+const SETTINGS = new Map(await Promise.all(IDS.map(async (id) => [id, await read(id)] as const)));
 
-export const settingsOf = (gameId: string | bigint): Settings => SETTINGS[dungeonOf(gameId)];
+export function settingsOf(gameId: string | bigint): Settings {
+  const settings = SETTINGS.get(settingsIdOf(gameId));
+  if (!settings) throw new Error(`game ${BigInt(gameId).toString(16)} has settings ${settingsIdOf(gameId)}, which no dungeon here uses`);
+  return settings;
+}
