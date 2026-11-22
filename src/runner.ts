@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { Action } from "./codec.ts";
-import { BEASTS_TO, DUNGEON, DUNGEON_KEY, SEATS, SURVIVOR } from "./config.ts";
+import { BEASTS_TO, DUNGEON, DUNGEON_KEY, DUNGEONS, SEATS, SURVIVOR } from "./config.ts";
 import { db } from "./db.ts";
 import { adopt, collect, head, liveIds, mintedSince, sendBeasts, tickets, type Entry } from "./live.ts";
 import { balanceOf, strkBalance } from "./wallet.ts";
@@ -74,10 +74,15 @@ async function close(seat: Seat): Promise<void> {
   leave(table);
 }
 
-async function settle(seat: Seat): Promise<void> {
-  const id = seat.table.game.id;
+export function unsettled(): { id: string; row: number; due: number }[] {
+  const live = new Set(liveIds());
+  const modes = Object.keys(DUNGEONS);
+  return (db.prepare(`SELECT id AS row, game_id AS id, ended_at + ${CLAIM_DELAY_MS} AS due FROM games WHERE ended_at IS NOT NULL AND claimed IS NULL AND mode IN (${modes.map(() => "?").join(", ")}) ORDER BY id`).all(...modes) as { id: string; row: number; due: number }[]).filter((g) => !live.has(g.id));
+}
+
+async function settle(id: string, row: number): Promise<void> {
   const claimed = await collect(id);
-  db.prepare("UPDATE games SET claimed = ? WHERE id = ?").run(claimed.beasts, seat.row);
+  db.prepare("UPDATE games SET claimed = ? WHERE id = ? AND ended_at IS NOT NULL").run(claimed.beasts, row);
   emit({ kind: "status", text: claimed.beasts ? `claimed ${claimed.beasts} beasts from ${id.slice(-8)} in ${claimed.transaction}` : `no beast to claim from ${id.slice(-8)}` });
   if (!claimed.beasts || !BEASTS_TO) return;
   const sent = await sendBeasts(BEASTS_TO);
@@ -166,6 +171,7 @@ export async function play(count: number, live: boolean, entry?: Entry): Promise
   stopping = false;
   failures.clear();
   const failed = (err: unknown) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` });
+  const sweep = live ? (async () => { for (const g of unsettled()) await new Promise((r) => setTimeout(r, Math.max(0, g.due - Date.now()))).then(() => settle(g.id, g.row)).catch(failed); })().catch(failed) : undefined;
   try {
     const seed = nextSeed();
     const resumed = live ? liveIds().slice(0, count) : [];
@@ -199,7 +205,7 @@ export async function play(count: number, live: boolean, entry?: Entry): Promise
       for (const done of ended.filter((e) => e.due <= Date.now() || (!seats.length && !opening.size))) {
         await new Promise((r) => setTimeout(r, Math.max(0, done.due - Date.now())));
         ended.splice(ended.indexOf(done), 1);
-        await settle(done.seat).catch(failed);
+        await settle(done.seat.table.game.id, done.seat.row).catch(failed);
       }
       while (!stopping && queue.length && seats.length + opening.size < limit && (queue[0].resumed || !rides)) {
         const next = queue.shift()!;
@@ -249,6 +255,7 @@ export async function play(count: number, live: boolean, entry?: Entry): Promise
       }
     }
   } finally {
+    await sweep;
     busy = false;
     emit({ kind: "status", text: "batch done" });
   }
