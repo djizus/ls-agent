@@ -4,7 +4,7 @@ import type { Adventurer } from "./codec.ts";
 import { ITEMS, priceOf } from "./items.ts";
 
 export type MarketConfig = { pair01: bigint; pair23: bigint; pair4_enabled: bigint };
-export type Offer = { id: number; price: number };
+type Offer = { id: number; price: number };
 
 const ALL = (1n << 101n) - 1n;
 const MARKET_SALT = BigInt("0x" + Buffer.from("MARKET").toString("hex"));

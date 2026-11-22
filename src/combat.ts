@@ -23,7 +23,7 @@ const itemPower = (item: Item | undefined): number => {
 
 export const weaponAttack = itemPower;
 export const armorValue = itemPower;
-export const beastPower = (beast: Beast): number => power(beast.level, beast.tier);
+const beastPower = (beast: Beast): number => power(beast.level, beast.tier);
 
 const kindOf = (item: Item | undefined): Kind | undefined => (item?.id ? KIND_OF[itemOf(item.id)!.type] : undefined);
 
@@ -46,9 +46,4 @@ export function yourHit(weapon: Item | undefined, stats: Stats, beast: Beast): H
 
 export function beastHit(beast: Beast, armor: Item | undefined): Hit {
   return landed(typed(beastPower(beast), beast.type, kindOf(armor)), 0, armorValue(armor), MIN_DAMAGE_FROM_BEAST);
-}
-
-export function ambushHit(hit: Hit, reduction: number): Hit {
-  const reduced = (damage: number) => Math.floor((damage * (100 - reduction)) / 100);
-  return { normal: reduced(hit.normal), crit: reduced(hit.crit) };
 }

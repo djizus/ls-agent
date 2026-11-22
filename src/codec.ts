@@ -20,7 +20,7 @@ export const STATS = ["strength", "dexterity", "vitality", "intelligence", "wisd
 const untilHealth = z.number().int().min(0).max(1023).optional();
 const itemId = z.number().int().min(1).max(101).describe("Item id, shown in brackets.");
 
-export const action = z.discriminatedUnion("type", [
+const action = z.discriminatedUnion("type", [
   z.object({ type: z.literal("explore") }),
   z.object({
     type: z.literal("attack"),

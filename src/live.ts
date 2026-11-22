@@ -5,7 +5,7 @@ import { claims as pending } from "./beasts.ts";
 import { BEAST_NFT, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, SURVIVOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, USDC, VAR_DIR, type Dungeon, dungeonOf } from "./config.ts";
 import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
-import { randomHash, startOf, type Chain, type Game, type Snapshot } from "./practice.ts";
+import { randomHash, startOf, type Game, type Snapshot } from "./practice.ts";
 import { transcript } from "./transcript.ts";
 import { request } from "./net.ts";
 import { account, balanceOf, included, keys, provider, strkBalance } from "./wallet.ts";
@@ -39,7 +39,7 @@ export async function usdPrice(token: string): Promise<number> {
   return Number(((await res.json()) as Quote).total_calculated) / 1e9;
 }
 
-export async function ticketCalls(): Promise<{ calls: Call[]; maxStrk: number }> {
+async function ticketCalls(): Promise<{ calls: Call[]; maxStrk: number }> {
   const wanted = BigInt(TICKET_BATCH) * ONE;
   const res = await request(`${EKUBO_QUOTER}/-${wanted}/${TICKET}/${STRK}`);
   if (!res.ok) throw new Error(`ticket quote ${res.status}`);
@@ -70,7 +70,7 @@ export async function ticketCalls(): Promise<{ calls: Call[]; maxStrk: number }>
 }
 
 export type Entry = { bag: number; maxSurvivor: number };
-export type BagQuote = { price: bigint; protocolFee: bigint; royalty: bigint };
+type BagQuote = { price: bigint; protocolFee: bigint; royalty: bigint };
 
 const gameId = (n: bigint) => "0x" + n.toString(16).padStart(64, "0");
 const bagOf = (id: bigint) => Number((id >> 192n) & ((1n << 56n) - 1n));
@@ -112,7 +112,7 @@ export function readQuote(out: string[]): BagQuote {
   return { price: pair(out, 3), protocolFee: pair(out, 5), royalty: pair(out, 7) };
 }
 
-export function bagCalls(pool: string, id: string, max: bigint, recipient: string): Call[] {
+function bagCalls(pool: string, id: string, max: bigint, recipient: string): Call[] {
   return [
     { contractAddress: SURVIVOR, entrypoint: "approve", calldata: [pool, ...u256(max)] },
     { contractAddress: pool, entrypoint: "swap_token_for_specific_nfts", calldata: ["0x1", ...u256(BigInt(id)), ...u256(max), recipient, "0x0", "0x0"] },
@@ -232,20 +232,20 @@ export function settleCalls(dungeon: Dungeon, id: string, packets: bigint[], blo
   return txs;
 }
 
-export async function settlement(id: string, claims: number[]): Promise<Call[][]> {
+async function settlement(id: string, claims: number[]): Promise<Call[][]> {
   const [{ packets, chain }, verified, checkpoint] = await Promise.all([transcript(id), view("is_verified", id), view("get_replay_checkpoint", id)]);
   const dungeon = DUNGEONS[dungeonOf(id)];
   const done = BigInt(verified[0]) === 1n ? packets.length : Number(checkpoint[3]);
   return settleCalls(dungeon, id, packets, chain.blocks, claims, done, BigInt("0x" + randomBytes(8).toString("hex")));
 }
 
-export async function settle(id: string, claims: number[]): Promise<string | undefined> {
+async function settle(id: string, claims: number[]): Promise<string | undefined> {
   let last: string | undefined;
   for (const calls of await settlement(id, claims)) last = (await send(calls)).transaction_hash;
   return last;
 }
 
-export async function claimable(id: string): Promise<number[]> {
+async function claimable(id: string): Promise<number[]> {
   return (await pending(await ownerOf(id), dungeonOf(id), id)).map((c) => c.encounterXp);
 }
 
@@ -270,7 +270,7 @@ export async function sendBeasts(to: string): Promise<{ beasts: number; transact
   return { beasts: calls.length, transaction: (await send(calls)).transaction_hash };
 }
 
-export async function simulate(sender: string, txs: Call[][]): Promise<Simulated[]> {
+async function simulate(sender: string, txs: Call[][]): Promise<Simulated[]> {
   const nonce = BigInt(await provider.getNonceForAddress(sender));
   const none = { max_amount: "0x0", max_price_per_unit: "0x0" };
   const res = await request(RPC_URL, {
@@ -333,9 +333,9 @@ export async function quote(id: string): Promise<{ owner: string; claims: number
 
 const START_MOVES = 8;
 
-export type Move = { game: Game; actions: Action[] };
-export type Moved = { snapshot: Snapshot; strk: number } | { error: unknown };
-export type Round = { moved: Moved[]; started: string[] | { error: unknown }; strk: number };
+type Move = { game: Game; actions: Action[] };
+type Moved = { snapshot: Snapshot; strk: number } | { error: unknown };
+type Round = { moved: Moved[]; started: string[] | { error: unknown }; strk: number };
 
 export type Starts = { dungeon: Dungeon; games: number };
 

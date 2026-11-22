@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import type { Action } from "../src/codec.ts";
 import { describe, render } from "../src/play.ts";
-import { act, newPracticeGame, replay } from "../src/practice.ts";
+import { act, newPracticeGame } from "../src/practice.ts";
 
 const [file, ...ids] = process.argv.slice(2);
 const db = new DatabaseSync(file, { readOnly: true });

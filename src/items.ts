@@ -112,7 +112,6 @@ export const ITEMS: LootItem[] = ROWS.map(([name, slot, type, tier], i) => ({ id
 
 export const itemOf = (id: number): LootItem | undefined => ITEMS[id - 1];
 
-export const itemName = (id: number): string => itemOf(id)?.name ?? "None";
 
 export const basePrice = (tier: number): number => (6 - tier) * 4;
 

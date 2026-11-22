@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { SLOTS, encodePacket, type Action } from "./codec.ts";
 import { DUNGEONS } from "./config.ts";
-import { ITEMS, itemName, priceOf } from "./items.ts";
+import { ITEMS, itemOf, priceOf } from "./items.ts";
 import { marketOf } from "./market.ts";
 import { settingsOf } from "./settings.ts";
 import { act, hashes, newPracticeGame, replay, revertReason, type Game, type Snapshot } from "./practice.ts";
@@ -48,7 +48,7 @@ test("items table names, slots and prices", () => {
   assert.deepEqual(ITEMS[11], { id: 12, name: "Wand", slot: "weapon", type: "Magic", tier: 5 });
   assert.deepEqual(ITEMS[41], { id: 42, name: "Katana", slot: "weapon", type: "Blade", tier: 1 });
   assert.deepEqual(ITEMS[100], { id: 101, name: "Heavy Gloves", slot: "hand", type: "Metal", tier: 5 });
-  assert.equal(itemName(4), "Silver Ring");
+  assert.equal(itemOf(4)!.name, "Silver Ring");
   assert.deepEqual(SLOTS.map((s) => ITEMS.filter((i) => i.slot === s).length), [18, 15, 15, 15, 15, 15, 3, 5]);
   assert.deepEqual([priceOf(42, 0), priceOf(42, 5), priceOf(12, 3), priceOf(12, 9)], [20, 15, 1, 1]);
 });
@@ -66,12 +66,12 @@ for (const levelUps of [1, 2, 3]) {
     const bought = await inBatches(offers, (o) => tryBuy(game, state, o.id));
     offers.forEach((o, i) => {
       const r = bought[i];
-      const label = `${itemName(o.id)} (${o.id}) at ${o.price}, gold ${a.gold}`;
+      const label = `${itemOf(o.id)!.name} (${o.id}) at ${o.price}, gold ${a.gold}`;
       if (o.price > a.gold) assert.deepEqual(r, { error: NOT_ENOUGH_GOLD }, label);
       else assert.deepEqual(r, { gold: a.gold - o.price }, label);
     });
 
     const refused = await inBatches(unlisted, (id) => tryBuy(game, state, id));
-    unlisted.forEach((id, i) => assert.deepEqual(refused[i], { error: NOT_ON_MARKET }, `${itemName(id)} (${id})`));
+    unlisted.forEach((id, i) => assert.deepEqual(refused[i], { error: NOT_ON_MARKET }, `${itemOf(id)!.name} (${id})`));
   });
 }

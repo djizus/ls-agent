@@ -5,10 +5,11 @@ import { settingsOf } from "./settings.ts";
 import { hash } from "starknet";
 import { beastOf } from "./beast.ts";
 import { decodeAdventurer, decodeBag, encodePacket, type Action, type Adventurer, type Item, type Stats } from "./codec.ts";
-import { ambushHit, beastHit, yourHit, type Hit } from "./combat.ts";
-import { DUNGEONS, GAME_CORE } from "./config.ts";
+import { beastHit, yourHit, type Hit } from "./combat.ts";
+import { reduced } from "./engine/damage.ts";
+import { GAME_CORE } from "./config.ts";
 import type { Slot } from "./items.ts";
-import { newPracticeGame, replay } from "./practice.ts";
+import { replay } from "./practice.ts";
 import { effectiveStats } from "./specials.ts";
 import { provider } from "./wallet.ts";
 
@@ -121,5 +122,5 @@ test("an ambush on arrival takes the Beast Mode base reduction off the beast's h
   const arrivals = await inBatches(Object.keys(BEASTS) as (keyof typeof BEASTS)[], async (b) => (await play(levelTwo([], b))).adventurer);
   const ambushed = arrivals.filter((a) => a.health < start);
   assert.ok(ambushed.length >= 2);
-  for (const a of ambushed) assert.equal(start - a.health, ambushHit(beastHit(beastOf(a, BigInt(GAME))!, undefined), reduction).normal);
+  for (const a of ambushed) assert.equal(start - a.health, reduced(beastHit(beastOf(a, BigInt(GAME))!, undefined).normal, reduction));
 });

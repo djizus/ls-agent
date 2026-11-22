@@ -196,7 +196,7 @@ export type Phase = "battle" | "explore";
 
 export type Table = { game: Game; last: Snapshot; row?: number };
 
-export const tables: Table[] = [];
+const tables: Table[] = [];
 
 function state(t: Table): State {
   const s = describe(t.last, t.game.id);
@@ -219,7 +219,7 @@ export const leave = (t: Table): void => void tables.splice(tables.indexOf(t), 1
 
 export const current = (t: Table): State => state(t);
 
-export type Committed = { state: State; strk: number } | { error: Error };
+type Committed = { state: State; strk: number } | { error: Error };
 
 export async function commit(moves: { table: Table; actions: Action[] }[], starts?: Starts): Promise<{ committed: Committed[]; started: string[] | { error: Error }; strk: number }> {
   const live = moves.filter((m) => m.table.game.chain);
@@ -239,10 +239,10 @@ export async function commit(moves: { table: Table; actions: Action[] }[], start
 
 const SAMPLES = 8;
 
-export type Odds = { death: number; ongoing: number; hp: [number, number, number]; xp: number; gold: number };
+type Odds = { death: number; ongoing: number; hp: [number, number, number]; xp: number; gold: number };
 export type Option = { move: string; label: string } & (Odds | { error: string });
 
-export async function odds(t: Table, actions: Action[], samples: number): Promise<Odds> {
+async function odds(t: Table, actions: Action[], samples: number): Promise<Odds> {
   const outcomes = preview(t.game, actions, samples);
   const pick = (values: number[]) => values.sort((x, y) => x - y)[Math.floor(samples / 2)];
   const hp = outcomes.map((o) => o.adventurer.health).sort((x, y) => x - y);
@@ -286,7 +286,7 @@ export async function options(t: Table, s: State): Promise<Option[]> {
   );
 }
 
-export function describeOptions(s: State, list: Option[]): string {
+export function describeOptions(list: Option[]): string {
   if (!list.length) return "";
   return [`Simulated outcomes (${SAMPLES} samples each):`, ...list.map((o) => `- ${o.label}: ${"error" in o ? `rejected: ${o.error}` : describeOdds(o)}`)].join("\n");
 }

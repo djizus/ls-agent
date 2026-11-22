@@ -13,9 +13,9 @@ const PAGE = 100;
 const hex = (n: bigint) => "0x" + n.toString(16);
 const u256 = (n: bigint) => [hex(n & ((1n << 128n) - 1n)), hex(n >> 128n)];
 
-export type Species = { collection: string; species: number; kind: string | null; name: string; prefix: number; suffix: number; tier: number; type: string };
-export type Beast = Species & { tokenId: string; level: number; health: number; minted: number; state: "held" | "staked" | "mega"; transformsAt: number | null; queued: boolean };
-export type Claim = Species & { adventurerId: string; encounterXp: number; level: number; health: number; settled: boolean; takenFrom: string | null };
+type Species = { collection: string; species: number; kind: string | null; name: string; prefix: number; suffix: number; tier: number; type: string };
+type Beast = Species & { tokenId: string; level: number; health: number; minted: number; state: "held" | "staked" | "mega"; transformsAt: number | null; queued: boolean };
+type Claim = Species & { adventurerId: string; encounterXp: number; level: number; health: number; settled: boolean; takenFrom: string | null };
 type Kill = { adventurerId: string; encounterXp: number; actionIndex: number; beastId: number; prefix: number; suffix: number; level: number; health: number; gameOver: boolean; settled: boolean; claimed: boolean };
 type Listed = { tokenId: string; beastId: number; prefix: number; suffix: number; level: number; health: number; mega: boolean; mintedAtBlock: number };
 type Staked = { tokenId: string; speciesId: number; prefix: number; suffix: number; level: number; health: number; mega: boolean; staked: boolean; transformsAt: number | null; unsafeStake: boolean };
@@ -133,7 +133,7 @@ export async function inventory(owner: string): Promise<Record<string, Beast[]>>
   return out;
 }
 
-export type Prices = Record<string, { normal: number[]; mega: number[] }>;
+type Prices = Record<string, { normal: number[]; mega: number[] }>;
 
 export async function sellPrices(): Promise<Prices> {
   const res = await request(`${EKUBO_QUOTER}/${PROBE}/${ETH}/${STRK}`);

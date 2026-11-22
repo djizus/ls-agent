@@ -10,7 +10,7 @@ export const LOOP = { beastGames: 80, bagCapSurvivor: 100, reserveStrk: 10, rech
 
 const file = `${VAR_DIR}loop.json`;
 
-export type Step = { kind: "wait"; need: number } | { kind: "beast"; games: number } | { kind: "loot" };
+type Step = { kind: "wait"; need: number } | { kind: "beast"; games: number } | { kind: "loot" };
 
 export function nextStep(strk: number, beastSince: number, lootUnfinished: boolean): Step {
   const need = STRK_FLOOR + LOOP.reserveStrk;

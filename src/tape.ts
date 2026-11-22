@@ -5,7 +5,7 @@ type Rpc = { jsonrpc: string; id: number | string; method: string; params?: unkn
 type RpcAnswer = { result?: unknown; error?: { code: number; message: string } };
 type Answer = RpcAnswer | { status: number; body: string };
 
-export const TAPE = new URL("./tape.json", import.meta.url);
+const TAPE = new URL("./tape.json", import.meta.url);
 export const OFFLINE = "tests do not reach the network";
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const mode = process.env.LS_TAPE;

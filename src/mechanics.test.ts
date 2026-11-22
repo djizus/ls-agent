@@ -7,7 +7,7 @@ import { decodeAdventurer, decodeBag, encodePacket, type Action, type Stats } fr
 import { GAME_CORE } from "./config.ts";
 import { levelOf, potionPrice, priceOf } from "./items.ts";
 import { marketOf } from "./market.ts";
-import { newPracticeGame, replay, revertReason, type Snapshot } from "./practice.ts";
+import { replay, revertReason, type Snapshot } from "./practice.ts";
 import { effectiveStats, suffixOf } from "./specials.ts";
 import { provider } from "./wallet.ts";
 

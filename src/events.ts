@@ -1,4 +1,4 @@
-export type AgentEvent = (
+type AgentEvent = (
   | { kind: "decision"; phase: string; options: unknown[]; thought: string; actions: unknown[]; note: string; reserve: number; costUsd: number }
   | { kind: "rejected"; actions: unknown[]; reason: string }
   | { kind: "preview"; actions: unknown; result: string }

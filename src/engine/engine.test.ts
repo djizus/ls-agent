@@ -3,13 +3,12 @@ import { test } from "node:test";
 import type { Beast } from "../beast.ts";
 import { STATS, decodeAdventurer, encodePacket, type Action } from "../codec.ts";
 import * as combat from "../combat.ts";
-import { DUNGEONS, GAME_CORE } from "../config.ts";
+import { DUNGEONS } from "../config.ts";
 import { ITEMS, itemOf, levelOf, potionPrice, priceOf } from "../items.ts";
 import { marketOf } from "../market.ts";
 import { hashes, replay, startOf, revertReason, type Snapshot } from "../practice.ts";
 import { settingsOf } from "../settings.ts";
 import { effectiveStats } from "../specials.ts";
-import { provider } from "../wallet.ts";
 import { beastHit, yourHit } from "./damage.ts";
 import { Rejected, fromSnapshot, step, toSnapshot, type Local } from "./engine.ts";
 

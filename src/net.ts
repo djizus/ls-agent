@@ -1,4 +1,4 @@
-export const REQUEST_MS = 30_000;
+const REQUEST_MS = 30_000;
 export const INCLUSION_MS = 300_000;
 const RATE_RETRIES = 5;
 const RATE_LIMITED = /"code"\s*:\s*-32005/;

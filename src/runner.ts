@@ -11,7 +11,7 @@ import { plan } from "./policy.ts";
 import { emit, subscribe } from "./events.ts";
 import { type Option, type State, type Table, auditGame, begin, namedSlain, commit, current, describeOptions, leave, options, phase, render, shape, type Phase } from "./play.ts";
 
-export const DECIDER = process.env.LS_DECIDER ?? "rules";
+const DECIDER = process.env.LS_DECIDER ?? "rules";
 const DECIDER_SOURCE = ["policy.ts", "jev.ts"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("");
 const promptFile = process.env.LS_STRATEGY ?? new URL("../strategy/prompt.md", import.meta.url).pathname;
 const MAX_REJECTIONS = 3;
@@ -36,7 +36,7 @@ db.exec(`UPDATE games SET beasts = NULL WHERE beasts = 0 AND NOT ${RECORDED}`);
 for (const { id } of db.prepare(`SELECT id FROM games WHERE ended_at IS NOT NULL AND beasts IS NULL AND ${RECORDED}`).all() as { id: number }[])
   db.prepare("UPDATE games SET beasts = ? WHERE id = ?").run(slain(id), id);
 
-export function loadStrategy(text = readFileSync(promptFile, "utf8")) {
+function loadStrategy(text = readFileSync(promptFile, "utf8")) {
   const full = `${DECIDER === "rules" ? "rules" : DECIDER === "jev" ? JEV_MODEL : `${MODEL} effort ${EFFORT}`}\n\n${PREAMBLE}\n\n${text}`;
   const hash = createHash("sha256").update(full).update(DECIDER === "model" ? "" : DECIDER_SOURCE).digest("hex").slice(0, 8);
   const [common, ...rest] = text.split(/^<!-- phase:(\w+) -->$/m);
@@ -121,7 +121,7 @@ async function round(seats: Seat[], starts: Starts | undefined): Promise<{ start
     const { table, row, state } = seat;
     try {
       const choices = await options(table, state);
-      const prompt = [render(state), describeOptions(state, choices), seat.note && `Your note from the previous decision: ${seat.note}`, seat.rejected].filter(Boolean).join("\n\n");
+      const prompt = [render(state), describeOptions(choices), seat.note && `Your note from the previous decision: ${seat.note}`, seat.rejected].filter(Boolean).join("\n\n");
       const decision = await decideWithRetry(row, state, seat.rules(phase(state)), prompt, choices);
       seat.cost += decision.costUsd;
       const actions = shape(state, decision.actions as Action[], decision.reserve);

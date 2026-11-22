@@ -21,7 +21,7 @@ export function seeds(entropy: bigint, gameId: bigint, adventurer: Adventurer): 
   return { action: t >> 64n, market: t & U64 };
 }
 
-export type Round = { flee: number; yourCrit: number; beastCrit: number; location: number };
+type Round = { flee: number; yourCrit: number; beastCrit: number; location: number };
 
 export function round(xp: number, n: number, seed: bigint): Round {
   const r = Number(poseidon(xp, seed, n) & 0xffffffffn);

@@ -14,7 +14,7 @@ const typeOf = (item: Item): ItemType | undefined => (item.id ? itemOf(item.id)!
 const named = (item: Item, name: string): boolean => !!item.id && itemOf(item.id)!.name === name;
 const percent = (value: number, item: Item): number => Math.floor((value * 3 * greatness(item)) / 100);
 
-export function typed(attack: number, weapon: ItemType | undefined, armor: ItemType | undefined): number {
+function typed(attack: number, weapon: ItemType | undefined, armor: ItemType | undefined): number {
   const shift = Math.floor(attack / 2);
   if (weapon !== "Magic" && weapon !== "Blade" && weapon !== "Bludgeon") return attack;
   if (!armor || STRONG[weapon] === armor) return attack + shift;
@@ -39,7 +39,7 @@ export function yourHit(adventurer: Adventurer, strength: number, foe: Foe, game
   return { normal: land(attack + bonus + names) + platinum, crit: land(2 * attack + bonus + names) + platinum + titanium };
 }
 
-export const neckBonus = (armor: Item, neck: Item): number =>
+const neckBonus = (armor: Item, neck: Item): number =>
   armor.id && named(neck, NECK[typeOf(armor)!] ?? "") ? percent(armorValue(armor), neck) : 0;
 
 export function beastHit(adventurer: Adventurer, foe: Foe, armor: Item, gameId: bigint): Hit {

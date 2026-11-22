@@ -27,7 +27,7 @@ const FALLBACK = ["vitality", "strength", "dexterity", "charisma", "intelligence
 export const ARMOR = ["chest", "head", "waist", "foot", "hand"];
 const JEWELRY = ["neck", "ring"];
 
-export type Plan = { actions: Action[]; why: string };
+type Plan = { actions: Action[]; why: string };
 type Gear = State["bag"][number];
 type Offer = State["market"][number];
 
@@ -70,7 +70,7 @@ function odds(mine: Blow[], theirs: Blow[], flee: number) {
   };
 }
 
-export function explorationHit(s: State): number {
+function explorationHit(s: State): number {
   const item = (slot: string) => s.equipment.find((g) => g.slot === slot) ?? { id: 0, xp: 0 };
   const crit = Math.min(100, s.level) / 100;
   const hits = new Map<number, number>();
