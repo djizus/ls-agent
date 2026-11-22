@@ -1,0 +1,12 @@
+[project]
+setup = "npm ci"
+
+[kind.build]
+cmd = "npx tsc --noEmit -p ."
+
+[kind.test]
+cmd = "npm test"
+
+[land]
+kinds = "test"
+forbid = "co-authored-by|generated with|claude|anthropic"
