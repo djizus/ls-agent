@@ -6,11 +6,11 @@ import { benchTable, resultsSection, withResults } from "./results.ts";
 import { dungeonFigures } from "./summary.ts";
 
 const names = { beast: { name: "Beast Mode" }, lootBag: { name: "Loot Bag" } };
-const game = (id: number, mode: string, level: number, beasts: number, claimed: number | null) => ({ id, mode, level, beasts, claimed, gas_strk: 1, survivor: null });
+const game = (id: number, mode: string, level: number, beasts: number, claimed: number | null, survivor: number | null = null) => ({ id, mode, level, beasts, claimed, gas_strk: 1.5, survivor });
 const section = resultsSection(
   "2026-11-22",
   { beast: { games: 10000, mean: 16.16, "30+": 8.7, named: 1.98 }, lootBag: { games: 10000, mean: 18.05, "30+": 9.7, named: 2.61 } },
-  dungeonFigures([game(1, "beast", 12, 1, 0), game(2, "beast", 30, 4, 2), game(3, "beast", 30, 6, null), game(4, "practice", 50, 9, null)], names),
+  dungeonFigures([game(1, "beast", 12, 1, 0), game(2, "beast", 30, 4, 2), game(3, "beast", 30, 6, null), game(4, "practice", 50, 9, null), game(5, "lootBag", 20, 3, 1, 84)], names, [0.2, 0.1]),
   names,
 );
 
@@ -32,7 +32,14 @@ test("the Results section shows the benchmark and the real games per dungeon, wi
     "| Dungeon | Games | Average level | Best level | Named beasts a game | Beasts claimed | Record game |",
     "|---|---|---|---|---|---|---|",
     "| Beast Mode | 3 | 24 | 30 | 3.7 | 2 | level 30, 6 named beasts |",
-    "| Loot Bag | 0 | - | - | - | - | - |",
+    "| Loot Bag | 1 | 20 | 20 | 3 | 1 | level 20, 3 named beasts |",
+    "",
+    "What the real games cost for their moves and loot bags, in dollars at today's prices:",
+    "",
+    "| Dungeon | Spent | Per game | Per named beast killed |",
+    "|---|---|---|---|",
+    "| Beast Mode | 5 STRK ($0.9) | 1.5 STRK ($0.3) | $0.08 |",
+    "| Loot Bag | 2 STRK + 84 SURVIVOR ($8.7) | 1.5 STRK + 84 SURVIVOR ($8.7) | $2.9 |",
     "",
   ].join("\n"));
 });

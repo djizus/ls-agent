@@ -12,6 +12,12 @@ export const benchTable = (baselines: Record<string, Baseline>, names: Record<st
   ...Object.entries(baselines).map(([mode, b]) => `| ${names[mode]?.name ?? mode} | ${n(b.games, 0)} | ${n(b.mean)} | ${n(b["30+"])}% | ${n(b.named)} |`),
 ];
 
+const spent = (strk: number, survivor: number, usd: number | null, digits: number) =>
+  `${n(strk, digits)} STRK${survivor ? ` + ${n(survivor, digits)} SURVIVOR` : ""}${usd == null ? "" : ` ($${n(usd, digits + 1)})`}`;
+
+const costRow = (f: Figures) =>
+  f.record ? `| ${f.name} | ${spent(f.strk, f.survivor, f.usd, 0)} | ${spent(f.strk / f.games, f.survivor / f.games, f.usd == null ? null : f.usd / f.games, 1)} | ${f.usd == null || !f.killed ? "-" : `$${n(f.usd / f.killed, 2)}`} |` : `| ${f.name} | - | - | - |`;
+
 export function resultsSection(date: string, baselines: Record<string, Baseline>, real: Figures[], names: Record<string, { name: string }>): string {
   const games = real.map((f) => (f.record ? `| ${f.name} | ${n(f.games, 0)} | ${n(f.mean)} | ${f.best} | ${n(f.slain)} | ${n(f.claimed, 0)} | level ${f.record.level}, ${f.record.beasts} named beasts |` : `| ${f.name} | 0 | - | - | - | - | - |`));
   return [
@@ -28,6 +34,12 @@ export function resultsSection(date: string, baselines: Record<string, Baseline>
     "| Dungeon | Games | Average level | Best level | Named beasts a game | Beasts claimed | Record game |",
     "|---|---|---|---|---|---|---|",
     ...games,
+    "",
+    "What the real games cost for their moves and loot bags, in dollars at today's prices:",
+    "",
+    "| Dungeon | Spent | Per game | Per named beast killed |",
+    "|---|---|---|---|",
+    ...real.map(costRow),
     "",
   ].join("\n");
 }

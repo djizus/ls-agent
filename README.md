@@ -46,8 +46,15 @@ How the real games went:
 
 | Dungeon | Games | Average level | Best level | Named beasts a game | Beasts claimed | Record game |
 |---|---|---|---|---|---|---|
-| Beast Mode | 447 | 15.9 | 42 | 1.9 | 24 | level 42, 25 named beasts |
+| Beast Mode | 477 | 15.8 | 42 | 1.8 | 25 | level 42, 25 named beasts |
 | Loot Bag | 4 | 28.3 | 32 | 6 | 24 | level 32, 11 named beasts |
+
+What the real games cost for their moves and loot bags, in dollars at today's prices:
+
+| Dungeon | Spent | Per game | Per named beast killed |
+|---|---|---|---|
+| Beast Mode | 639 STRK ($20.2) | 1.3 STRK ($0.04) | $0.02 |
+| Loot Bag | 16 STRK + 234 SURVIVOR ($10.9) | 4 STRK + 58.6 SURVIVOR ($2.72) | $0.45 |
 
 ## Run it yourself
 

@@ -10,7 +10,7 @@ export type Ended = { id: number; mode: string; level: number; beasts: number | 
 
 export const ENDED = "SELECT id, mode, level, beasts, claimed, gas_strk, survivor FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC";
 
-export function dungeonFigures(ended: Ended[], dungeons: Record<string, { name: string }>) {
+export function dungeonFigures(ended: Ended[], dungeons: Record<string, { name: string }>, usd: readonly [strk: number, survivor: number] | null) {
   const mean = (values: number[]) => (values.length ? summary(values).mean : null);
   return Object.entries(dungeons).map(([mode, d]) => {
     const games = ended.filter((g) => g.mode === mode);
@@ -24,6 +24,10 @@ export function dungeonFigures(ended: Ended[], dungeons: Record<string, { name: 
       best: record.level,
       slain: mean(games.flatMap((g) => (g.beasts === null ? [] : [g.beasts]))),
       claimed: games.reduce((sum, g) => sum + (g.claimed ?? 0), 0),
+      killed: games.reduce((sum, g) => sum + (g.beasts ?? 0), 0),
+      strk: games.reduce((sum, g) => sum + (g.gas_strk ?? 0), 0),
+      survivor: games.reduce((sum, g) => sum + (g.survivor ?? 0), 0),
+      usd: usd ? games.reduce((sum, g) => sum + usd[0] * (g.gas_strk ?? 0) + usd[1] * (g.survivor ?? 0), 0) : null,
       record: { id: record.id, level: record.level, beasts: record.beasts ?? 0 },
     };
   });

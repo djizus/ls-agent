@@ -34,9 +34,7 @@ const PRICE_MS = 600_000;
 const price = background(PRICE_MS, () => Promise.all([usdPrice(STRK), usdPrice(SURVIVOR)]));
 
 function figures() {
-  const ended = db.prepare(ENDED).all() as Ended[];
-  const usd = (mode: string) => (price() ? ended.filter((g) => g.mode === mode).reduce((sum, g) => sum + price()![0] * (g.gas_strk ?? 0) + price()![1] * (g.survivor ?? 0), 0) : null);
-  return dungeonFigures(ended, DUNGEONS).map((f) => (f.games ? { ...f, usd: usd(f.mode) } : f));
+  return dungeonFigures(db.prepare(ENDED).all() as Ended[], DUNGEONS, price() ?? null);
 }
 
 const tokens = (n: bigint) => Number(n) / 1e18;
