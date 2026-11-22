@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 games="${1:-1}"
+dungeon="${2:-beast}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/var/evidence/$(date +%Y%m%d-%H%M%S)"
 port="${LS_PROVE_PORT:-4199}"
@@ -14,7 +15,19 @@ for _ in $(seq 40); do curl -sf "127.0.0.1:$port/" > /dev/null && break; sleep 0
 
 curl -sN "127.0.0.1:$port/events" | sed -un 's/^data: //p' > "$out/events.jsonl" &
 stream=$!
-curl -sf -XPOST "127.0.0.1:$port/api/play" -d "{\"games\":$games}" > /dev/null
+if [[ "$games" == loop ]]; then
+  curl -sf -XPOST "127.0.0.1:$port/api/play" -d '{"loop":true}' > /dev/null
+  timeout 120 bash -c "until grep -q '\"kind\":\"loop\".*waiting for STRK' '$out/events.jsonl'; do sleep 1; done" || echo "timed out" >> "$out/service.log"
+  curl -sf "127.0.0.1:$port/api/loop" > "$out/loop-on.json"
+  curl -sf -XPOST "127.0.0.1:$port/api/stop" > /dev/null
+  sleep 1
+  curl -sf "127.0.0.1:$port/api/loop" > "$out/loop-off.json"
+  kill $stream 2>/dev/null || true
+  cat "$out/loop-on.json" "$out/loop-off.json"
+  echo "evidence: $out"
+  exit
+fi
+curl -sf -XPOST "127.0.0.1:$port/api/play" -d "{\"games\":$games,\"dungeon\":\"$dungeon\"}" > /dev/null
 timeout "${LS_PROVE_TIMEOUT:-3600}" bash -c "until grep -q '\"text\":\"batch done\"' '$out/events.jsonl'; do sleep 2; done" || echo "timed out" >> "$out/service.log"
 kill $stream 2>/dev/null || true
 node --disable-warning=ExperimentalWarning -e '

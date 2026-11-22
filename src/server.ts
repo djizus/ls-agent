@@ -5,7 +5,8 @@ import { networkInterfaces } from "node:os";
 import { BAG_RANKING, BEASTS_TO, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
-import { halt, play, slain } from "./runner.ts";
+import { play, slain } from "./runner.ts";
+import { loopStatus, resumeLoop, startLoop, stopLoop } from "./loop.ts";
 import { enrich, namedKills, seated, snapshot } from "./play.ts";
 import { balanceOf, keys, strkBalance } from "./wallet.ts";
 import { affixes, claimableKill, inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
@@ -170,14 +171,15 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     return;
   }
   if (url.pathname === "/api/play" && req.method === "POST") {
-    const body = (await json(req)) as { games?: number; live?: boolean; dungeon?: string; bag?: number; maxSurvivor?: number } | undefined;
+    const body = (await json(req)) as { games?: number; live?: boolean; loop?: boolean; dungeon?: string; bag?: number; maxSurvivor?: number } | undefined;
+    if (body?.loop === true) return startLoop(), res.end("ok");
     const dungeon = body?.dungeon ?? "beast";
     if (!DUNGEONS[dungeon]) return res.writeHead(400).end(`dungeon is one of ${Object.keys(DUNGEONS).join(", ")}`);
     play(Number(body?.games) || (body?.live ? 1 : DUNGEONS[dungeon].benchmark.length), body?.live === true, dungeon, body?.bag ? { bag: Number(body.bag), maxSurvivor: Number(body.maxSurvivor) } : undefined);
     return res.end("ok");
   }
   if (url.pathname === "/api/stop" && req.method === "POST") {
-    halt();
+    stopLoop();
     return res.end("ok");
   }
   if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
@@ -194,6 +196,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     return reply(res, { game, events: events.map((e) => (e.kind === "state" ? { ...e, state: enrich(e.state) } : e)) });
   }
   if (url.pathname === "/api/summary") return reply(res, figures());
+  if (url.pathname === "/api/loop") return reply(res, loopStatus());
   if (url.pathname === "/api/wallet") return reply(res, await wallet());
   if (url.pathname === "/api/beasts") return reply(res, await beasts());
   if (url.pathname === "/api/items") return reply(res, ITEMS);
@@ -215,4 +218,5 @@ export function serve(): void {
   createServer((req, res) => void route(req, res).catch(() => res.writeHead(500).end())).listen(PORT, HOST, () => console.log(`ls-agent on http://${HOST}:${PORT}`));
   beasts();
   pool();
+  resumeLoop();
 }

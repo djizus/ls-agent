@@ -214,7 +214,7 @@ let bagSort = keep("bagSort") in SORTS ? keep("bagSort") : "mean";
 
 const items = {};
 const byName = {};
-const data = { games: [], wallet: null, beasts: null, summary: null, bags: null, check: null };
+const data = { games: [], wallet: null, beasts: null, summary: null, bags: null, check: null, loop: null };
 const seen = new Map();
 let slots = [];
 
@@ -334,7 +334,7 @@ function render() {
 
   const w = data.wallet;
   put($("wallet"), `<h2>Wallet</h2>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
-    <div class="row"><span>${pic("dungeon_ticket", "Tickets")}<span class="n">${round(w.tickets, 1)}</span></span><span>${pic("survivor_token", "SURVIVOR tokens")}<span class="n">${round(w.survivor, 1)}</span></span></div>`}`);
+    <div class="row"><span>${pic("dungeon_ticket", "Tickets")}<span class="n">${round(w.tickets, 1)}</span></span><span>${pic("survivor_token", "SURVIVOR tokens")}<span class="n">${round(w.survivor, 1)}</span></span></div>`}${data.loop?.on ? `<div class="dim" title="What the standing loop does now">Loop: ${esc(data.loop.text)}</div>` : ""}`);
 
   const b = data.beasts;
   const STATE = { held: "", staked: ", staked", mega: ", Mega", claim: ", to claim" };
@@ -367,8 +367,8 @@ async function load() {
 }
 
 async function loadSide() {
-  const [w, b, c, bags] = await Promise.all(["wallet", "beasts", "check", "bags"].map((p) => get(`/api/${p}`)));
-  Object.assign(data, { wallet: w ?? data.wallet, beasts: b ?? data.beasts, check: c ?? data.check, bags: bags ?? data.bags });
+  const [w, b, c, bags, loop] = await Promise.all(["wallet", "beasts", "check", "bags", "loop"].map((p) => get(`/api/${p}`)));
+  Object.assign(data, { wallet: w ?? data.wallet, beasts: b ?? data.beasts, check: c ?? data.check, bags: bags ?? data.bags, loop: loop ?? data.loop });
   render();
   if (data.bags?.running) setTimeout(loadSide, RANKING_MS);
 }
@@ -400,6 +400,7 @@ const source = new EventSource("/events");
 source.onopen = load;
 source.onmessage = (m) => {
   const e = JSON.parse(m.data);
+  if (e.kind === "loop") { data.loop = e; return render(); }
   if (e.kind === "status") return load();
   if (seen.has(e.row)) { track(e); render(); }
   if (e.kind === "state" && lives().length) soon();

@@ -120,13 +120,20 @@ export function bagCalls(pool: string, id: string, max: bigint, recipient: strin
   ];
 }
 
+const capOf = (entry: Entry): bigint => (entry.maxSurvivor > 0 ? BigInt(Math.round(entry.maxSurvivor * 1e6)) * (ONE / 1_000_000n) : 0n);
+
+export function bagRefusal(held: string[], quote: BagQuote, entry: Entry, survivor: bigint): string | null {
+  if (!held.length) return `the pool holds no game of bag ${entry.bag}`;
+  if (capOf(entry) === 0n) return "give the most SURVIVOR to pay for the bag as maxSurvivor";
+  if (quote.price > capOf(entry)) return `bag ${entry.bag} costs ${units(quote.price)} SURVIVOR, over the ${entry.maxSurvivor} limit`;
+  if (survivor < quote.price) return `bag ${entry.bag} costs ${units(quote.price)} SURVIVOR and the wallet holds ${units(survivor)}`;
+  return null;
+}
+
 export function bagPurchase(pool: string, held: string[], quote: BagQuote, entry: Entry, recipient: string, survivor: bigint): { id: string; calls: Call[] } {
-  const max = entry.maxSurvivor > 0 ? BigInt(Math.round(entry.maxSurvivor * 1e6)) * (ONE / 1_000_000n) : 0n;
-  if (!held.length) throw new Error(`the pool holds no game of bag ${entry.bag}`);
-  if (max === 0n) throw new Error("give the most SURVIVOR to pay for the bag as maxSurvivor");
-  if (quote.price > max) throw new Error(`bag ${entry.bag} costs ${units(quote.price)} SURVIVOR, over the ${entry.maxSurvivor} limit`);
-  if (survivor < quote.price) throw new Error(`bag ${entry.bag} costs ${units(quote.price)} SURVIVOR and the wallet holds ${units(survivor)}`);
-  return { id: held[0], calls: bagCalls(pool, held[0], max, recipient) };
+  const refused = bagRefusal(held, quote, entry, survivor);
+  if (refused) throw new Error(refused);
+  return { id: held[0], calls: bagCalls(pool, held[0], capOf(entry), recipient) };
 }
 
 export async function bagMarket(pool: string, bag: number): Promise<{ held: string[]; quote: BagQuote }> {

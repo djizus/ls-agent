@@ -3,6 +3,7 @@ export type AgentEvent = (
   | { kind: "rejected"; actions: unknown[]; reason: string }
   | { kind: "preview"; actions: unknown; result: string }
   | { kind: "status"; text: string; ending?: string }
+  | { kind: "loop"; on: boolean; text: string }
   | { kind: "state"; game: string; state: object }
 ) & { row?: number };
 
