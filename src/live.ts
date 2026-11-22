@@ -7,8 +7,8 @@ import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
 import { randomHash, startOf, type Chain, type Game, type Snapshot } from "./practice.ts";
 import { transcript } from "./transcript.ts";
-import { nextHead } from "./heads.ts";
-import { account, balanceOf, keys, provider, strkBalance } from "./wallet.ts";
+import { request } from "./net.ts";
+import { account, balanceOf, included, keys, provider, strkBalance } from "./wallet.ts";
 
 const ONE = 10n ** 18n;
 const TRANSFER = BigInt(hash.getSelectorFromName("Transfer"));
@@ -20,12 +20,7 @@ async function submit(calls: Call[]) {
   const [balance, nonce] = await Promise.all([strkBalance(), provider.getNonceForAddress(keys().address)]);
   if (balance < BigInt(STRK_FLOOR) * ONE) throw new Error(`spend cap reached: balance is under ${STRK_FLOOR} STRK`);
   const { transaction_hash } = await account().execute(calls, { tip: 0n, nonce });
-  for (;;) {
-    const receipt = await provider.getTransactionReceipt(transaction_hash).catch(() => undefined);
-    if (receipt?.isSuccess() && "block_hash" in receipt.value && receipt.value.block_hash) return receipt.value;
-    if (receipt && (receipt.isReverted() || receipt.isError())) throw new Error(`transaction ${transaction_hash} failed`);
-    await nextHead();
-  }
+  return included(transaction_hash);
 }
 
 let turn: Promise<unknown> = Promise.resolve();
@@ -39,14 +34,14 @@ function send(calls: Call[]) {
 type Quote = { total_calculated: string; splits: { amount_specified: string; route: { pool_key: { token0: string; token1: string; fee: string; tick_spacing: number | string; extension: string }; sqrt_ratio_limit: string; skip_ahead: number | string }[] }[] };
 
 export async function usdPrice(token: string): Promise<number> {
-  const res = await fetch(`${EKUBO_QUOTER}/${1000n * ONE}/${token}/${USDC}`);
+  const res = await request(`${EKUBO_QUOTER}/${1000n * ONE}/${token}/${USDC}`);
   if (!res.ok) throw new Error(`dollar quote ${res.status}`);
   return Number(((await res.json()) as Quote).total_calculated) / 1e9;
 }
 
 export async function ticketCalls(): Promise<{ calls: Call[]; maxStrk: number }> {
   const wanted = BigInt(TICKET_BATCH) * ONE;
-  const res = await fetch(`${EKUBO_QUOTER}/-${wanted}/${TICKET}/${STRK}`);
+  const res = await request(`${EKUBO_QUOTER}/-${wanted}/${TICKET}/${STRK}`);
   if (!res.ok) throw new Error(`ticket quote ${res.status}`);
   const quote = (await res.json()) as Quote;
   const total = BigInt(quote.total_calculated);
@@ -274,7 +269,7 @@ export async function sendBeasts(to: string): Promise<{ beasts: number; transact
 export async function simulate(sender: string, txs: Call[][]): Promise<Simulated[]> {
   const nonce = BigInt(await provider.getNonceForAddress(sender));
   const none = { max_amount: "0x0", max_price_per_unit: "0x0" };
-  const res = await fetch(RPC_URL, {
+  const res = await request(RPC_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({

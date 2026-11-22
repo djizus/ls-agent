@@ -1,11 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { Account, CallData, RpcProvider, ec, hash, stark } from "starknet";
+import { Account, CallData, RpcProvider, ec, hash, stark, type GetTransactionReceiptResponse } from "starknet";
 import { OZ_ACCOUNT_CLASS, RPC_URL, STRK, VAR_DIR } from "./config.ts";
+import { nextHead } from "./heads.ts";
+import { INCLUSION_MS, request } from "./net.ts";
 
 type Keys = { privateKey: string; publicKey: string; address: string };
 
 const file = `${VAR_DIR}wallet.json`;
-export const provider = new RpcProvider({ nodeUrl: RPC_URL, batch: 0 });
+export const provider = new RpcProvider({ nodeUrl: RPC_URL, batch: 0, baseFetch: request });
 
 export function keys(): Keys {
   if (existsSync(file)) return JSON.parse(readFileSync(file, "utf8"));
@@ -47,6 +49,15 @@ export async function deploy(): Promise<string> {
     constructorCalldata: CallData.compile({ publicKey: k.publicKey }),
     addressSalt: k.publicKey,
   });
-  await provider.waitForTransaction(transaction_hash);
+  await included(transaction_hash);
   return transaction_hash;
+}
+
+export async function included(transaction_hash: string, read = () => provider.getTransactionReceipt(transaction_hash), wait = nextHead, ms = INCLUSION_MS) {
+  for (const end = Date.now() + ms; Date.now() < end; await wait()) {
+    const receipt: GetTransactionReceiptResponse | undefined = await read().catch(() => undefined);
+    if (receipt?.isSuccess() && "block_hash" in receipt.value && receipt.value.block_hash) return receipt.value;
+    if (receipt && (receipt.isReverted() || receipt.isError())) throw new Error(`transaction ${transaction_hash} failed`);
+  }
+  throw new Error(`transaction ${transaction_hash} not included within ${ms / 60_000} minutes`);
 }

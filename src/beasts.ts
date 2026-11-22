@@ -1,6 +1,7 @@
 import { LOOT_NAMES, NAMES, PREFIXES, SUFFIXES } from "./beast.ts";
 import { BEAST_NFT, COLLECTION_API, DUNGEONS, EKUBO_QUOTER, ETH, GAME_API, STRK } from "./config.ts";
 import { readQuote } from "./live.ts";
+import { request } from "./net.ts";
 import { transcript } from "./transcript.ts";
 import { provider } from "./wallet.ts";
 
@@ -62,7 +63,7 @@ export function unclaimed(kills: Kill[], firstSpecies: number): (Kill & { specie
 }
 
 async function api<T>(path: string): Promise<T> {
-  const res = await fetch(`${GAME_API}${path}`);
+  const res = await request(`${GAME_API}${path}`);
   if (!res.ok) throw new Error(`${path.split("?")[0]} ${res.status}`);
   return (await res.json()) as T;
 }
@@ -117,7 +118,7 @@ export async function pendingClaims(owner: string): Promise<Claim[]> {
 export async function inventory(owner: string): Promise<Record<string, Beast[]>> {
   const held: Listed[] = [];
   for (let cursor: string | null = ""; cursor !== null; ) {
-    const res = await fetch(`${COLLECTION_API}/collections/beasts/owners/${owner}?limit=${PAGE}${cursor && `&cursor=${cursor}`}`);
+    const res = await request(`${COLLECTION_API}/collections/beasts/owners/${owner}?limit=${PAGE}${cursor && `&cursor=${cursor}`}`);
     if (!res.ok) throw new Error(`beasts of ${owner.slice(0, 8)} ${res.status}`);
     const page = (await res.json()) as { items: Listed[]; nextCursor: string | null };
     held.push(...page.items);
@@ -135,7 +136,7 @@ export async function inventory(owner: string): Promise<Record<string, Beast[]>>
 export type Prices = Record<string, { normal: number[]; mega: number[] }>;
 
 export async function sellPrices(): Promise<Prices> {
-  const res = await fetch(`${EKUBO_QUOTER}/${PROBE}/${ETH}/${STRK}`);
+  const res = await request(`${EKUBO_QUOTER}/${PROBE}/${ETH}/${STRK}`);
   if (!res.ok) throw new Error(`ETH quote ${res.status}`);
   const rate = Number(BigInt(((await res.json()) as { total_calculated: string }).total_calculated)) / Number(PROBE);
   const quote = async (pool: string) => (Number(readQuote(await provider.callContract({ contractAddress: pool, entrypoint: "get_sell_nft_quote", calldata: ["0x0", "0x0", "0x1", "0x0"] })).price) / 1e18) * rate;
