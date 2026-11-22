@@ -1,6 +1,6 @@
 # ls-agent
 
-A bot that plays [Loot Survivor 2](https://lootsurvivor.io), a dungeon game on the Starknet blockchain, day and night. It picks every move with fixed rules, pays for each move from its own wallet, and keeps the beasts it kills.
+A bot that plays [Loot Survivor 2](https://lootsurvivor.io), a dungeon game on the Starknet blockchain. It picks every move with fixed rules, pays for each move from its own wallet, and keeps the beasts it kills.
 
 You watch it on a page that runs on your own machine: `npm start`, then open http://127.0.0.1:4100.
 
@@ -8,19 +8,19 @@ You watch it on a page that runs on your own machine: `npm start`, then open htt
 
 ## What it does
 
+One command runs one cycle, then the bot stops until you run it again:
+
 ```
-      ┌───────────────────────────────────────────────────┐
-      ▼                                                   │
-  STRK ≥ 30 ? ──no──► wait 5 min, check again ────────────┤
-      │ yes                                               │
-      ▼                                                   │
-  40 Beast Mode games                                     │
-      │                                                   │
-      ▼                                                   │
-  the best loot bag costs ≤ 100 SURVIVOR                  │
-  and the wallet has enough?                              │
-      ├──yes──► buy it, play one Loot Dungeon game ───────┤
-      └──no───► skip it ──────────────────────────────────┘
+  curl -X POST 127.0.0.1:4100/api/play -d '{"cycle":true}'
+      │
+      ▼
+  40 Beast Mode games
+      │
+      ▼
+  the best loot bag costs ≤ 100 SURVIVOR
+  and the wallet has enough?
+      ├──yes──► buy it, play one Loot Dungeon game ──► done
+      └──no───► skip it and say why ─────────────────► done
 ```
 
 Several games run side by side, and their moves go out together, so they share the network fee.
@@ -29,7 +29,7 @@ Several games run side by side, and their moves go out together, so they share t
 
 Every move is a small payment in STRK, the network's token, so a long game costs more than a short one. The page shows what the games have cost so far. Most games end early, so expect many short games for each deep one.
 
-The bot never spends its last 20 STRK. It waits once the wallet holds less than 30 STRK: the 20 it keeps, plus 10 of margin for the next moves. A Loot Dungeon game first buys a loot bag with SURVIVOR tokens, and the bot pays at most 100 for it.
+The bot never spends its last 20 STRK: below that it sends nothing, and the games of the cycle stop. A Loot Dungeon game first buys a loot bag with SURVIVOR tokens, and the bot pays at most 100 for it.
 
 ## Results
 

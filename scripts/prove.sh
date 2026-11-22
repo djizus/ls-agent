@@ -15,15 +15,13 @@ for _ in $(seq 40); do curl -sf "127.0.0.1:$port/" > /dev/null && break; sleep 0
 
 curl -sN "127.0.0.1:$port/events" | sed -un 's/^data: //p' > "$out/events.jsonl" &
 stream=$!
-if [[ "$games" == loop ]]; then
-  curl -sf -XPOST "127.0.0.1:$port/api/play" -d '{"loop":true}' > /dev/null
-  timeout 120 bash -c "until grep -q '\"kind\":\"loop\".*waiting for STRK' '$out/events.jsonl'; do sleep 1; done" || echo "timed out" >> "$out/service.log"
-  curl -sf "127.0.0.1:$port/api/loop" > "$out/loop-on.json"
-  curl -sf -XPOST "127.0.0.1:$port/api/stop" > /dev/null
-  sleep 1
-  curl -sf "127.0.0.1:$port/api/loop" > "$out/loop-off.json"
+sleep 1
+if [[ "$games" == cycle ]]; then
+  curl -sf -XPOST "127.0.0.1:$port/api/play" -d '{"cycle":true}' > /dev/null
+  timeout 300 bash -c "until grep -q '\"kind\":\"cycle\",\"on\":false' '$out/events.jsonl'; do sleep 1; done" || echo "timed out" >> "$out/service.log"
+  curl -sf "127.0.0.1:$port/api/cycle" > "$out/cycle.json"
   kill $stream 2>/dev/null || true
-  cat "$out/loop-on.json" "$out/loop-off.json"
+  grep '"kind":"cycle"' "$out/events.jsonl"
   echo "evidence: $out"
   exit
 fi

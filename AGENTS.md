@@ -17,8 +17,8 @@ Playing for real spends STRK from the bot's own wallet:
 ```
 node src/cli.ts wallet                                    # prints the address, creates var/wallet.json
 node src/cli.ts deploy                                    # after sending STRK to it: deploys the account
-curl -X POST 127.0.0.1:4100/api/play -d '{"loop":true}'   # the loop drawn in README.md
-curl -X POST 127.0.0.1:4100/api/stop                      # turns the loop off after the current move
+curl -X POST 127.0.0.1:4100/api/play -d '{"cycle":true}'  # one cycle, drawn in README.md, then it stops
+curl -X POST 127.0.0.1:4100/api/stop                      # ends play after the current move, and the cycle
 ```
 
 With `LS_SEATS` above 1, a round decides one move per game and sends them in one transaction:
@@ -29,7 +29,7 @@ With `LS_SEATS` above 1, a round decides one move per game and sends them in one
   game N ── decide ─┘
 ```
 
-When a game ends, its seat takes the next game. A minute later the bot settles the ended game on chain, which claims the beasts it killed. The loop survives a restart: `var/loop.json` keeps it on and holds the time of a Loot Dungeon attempt that started no game (a skipped bag or a failed purchase), the Beast Mode games are counted from the last Loot Dungeon game in the database or that attempt, whichever is later, and unfinished games in `var/live.json` resume first. 30 STRK is the 20 STRK spend floor plus 10 for a round, a ticket purchase and a settlement.
+When a game ends, its seat takes the next game. A minute later the bot settles the ended game on chain, which claims the beasts it killed. A cycle does not survive a restart: after one, unfinished games in `var/live.json` resume with the next batch or cycle, and ended games whose claim was cut off are settled when the next live batch starts. A bag purchase is tried once per cycle; when sending it fails, the bot asks who owns the game it bought and plays it only if the wallet does.
 
 | Risk | What to know |
 |---|---|
@@ -47,7 +47,7 @@ When a game ends, its seat takes the next game. A minute later the bot settles t
 | `npm test` | Every test, without the network: contract answers come from `src/tape.json`, and a test that reaches the network fails. |
 | `npm run contract` | The same tests against the live contract, one file at a time. `scripts/check.sh` runs it daily and writes `var/contract-check.json` for the page. |
 | `npm run record` | Records the contract answers again into `src/tape.json` (about 40 seconds). Two runs give the same file. |
-| `npm run prove -- 2` | Starts the real service on port 4199, plays 2 practice games through the API, and leaves the database, log, event stream and game list in `var/evidence/<time>/`. `-- 2 lootBag` plays Loot Dungeon starts; `-- loop` starts the loop on an empty wallet and stops it once it waits for STRK. |
+| `npm run prove -- 2` | Starts the real service on port 4199, plays 2 practice games through the API, and leaves the database, log, event stream and game list in `var/evidence/<time>/`. `-- 2 lootBag` plays Loot Dungeon starts; `-- cycle` runs one cycle on the empty wallet of a fresh `var/`, where nothing can be spent, and keeps its status lines. |
 | `npm run stats` | Rewrites the Results section of `README.md` from `scripts/baseline.json` and `var/ls.sqlite` (opened read-only), and nothing else in the file. Run it with `LS_VAR_DIR` on a copy of the production database. |
 | `npm run bench` | Plays the policy on 10,000 fixed Beast Mode starts: mean level and spread, share reaching levels 26 to 40, named kills, causes of death. A difference under two standard errors is noise. |
 
@@ -81,11 +81,11 @@ Environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env`.
 | Games of a dungeon | "Games" on the left, "Beast" or "Loot": a podium of the three best, the 20 newest, "More" for all, live games on top. Each row shows its own dungeon: a bag for a Loot Dungeon game, a skull for Beast Mode, and the Live row shows the bag when any live game is a Loot Dungeon game. A gold skull marks a game that claimed or can claim a beast. |
 | Figures of a dungeon | The six tiles under "Games": games ended, average level, named kills a game, dollars spent (STRK and SURVIVOR at Ekubo prices), best level, beasts claimed. `GET /api/summary`. |
 | Engine no longer matches the contract | One red line above the middle panel when the last daily check failed or is older than 2 days, and nothing otherwise. `GET /api/check` serves `var/contract-check.json`. |
-| Wallet and the loop's last step | "Wallet" on the right: STRK (red under the floor), tickets, SURVIVOR, and while the loop is on, what it does now. `GET /api/wallet`, `GET /api/loop`. |
+| Wallet and the cycle's last step | "Wallet" on the right: STRK (red under the floor), tickets, SURVIVOR, and the cycle's step now or how the last one ended. `GET /api/wallet`, `GET /api/cycle`. |
 | Beasts held and to claim | "Beasts" on the right, one group per dungeon: count, tiers, Megas, staked, and what the Loot Dungeon pools pay for them. Hover a portrait for its name and price; "More" shows all. `GET /api/beasts`. |
 | Loot bag ranking | "Loot bags" on the right: the best 25 bags the pool holds, by mean level or named kills, with copies left. "Refresh" (any viewer) ranks the bags new in the pool. `GET`/`POST /api/bags`. |
 | Rank every bag again after a policy change | `npm run bench -- --dungeon lootBag --rank --all` |
-| Start the loop / stop | `POST /api/play {"loop":true}` / `POST /api/stop`, from the machine itself |
+| Run one cycle / stop | `POST /api/play {"cycle":true}` (409 while a batch or a cycle runs) / `POST /api/stop`, from the machine itself |
 | Play real games by hand | `POST /api/play {"live":true,"games":3}`; add `"dungeon":"lootBag","bag":7806,"maxSurvivor":90` for a Loot Dungeon game |
 | Practice games | `POST /api/play {"games":20}`, with `"dungeon":"lootBag"` for Loot Dungeon starts. Not on the page. |
 | Game data | `GET /api/state`, `/api/games`, `/api/games/<row id>`, `/api/items`, `/events` |
@@ -112,7 +112,7 @@ Environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env`.
 |---|---|
 | Game rules | The contract. `src/engine/` is the local port, checked by the tests. |
 | Rule policy | `src/policy.ts` |
-| The loop's numbers | `LOOP` in `src/loop.ts` |
+| The cycle's numbers | `CYCLE` in `src/cycle.ts` |
 | Contracts, dungeons, spend floor, benchmark starts | `src/config.ts` |
 | Action shapes and packet encoding | `src/codec.ts` |
 | Collectable kills and the beast inventory | `src/beasts.ts` |
