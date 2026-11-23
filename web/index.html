@@ -417,9 +417,10 @@ function panel() {
     el.innerHTML = `<form><label>Key <input type="password" name="key" autocomplete="current-password" required></label><span class="seg"><button>Check</button></span></form><p class="${run.bad ? "bad" : "dim"}">${esc(run.said || "The key the service was started with. This browser keeps it.")}</p>`;
     return el.querySelector("input").focus();
   }
-  const rows = forPlay();
-  run.rows = rows.map((x) => x.bag).join();
-  for (const bag of run.caps.keys()) if (!rows.some((x) => x.bag === bag)) run.caps.delete(bag);
+  const ranked = forPlay();
+  run.rows = ranked.map((x) => x.bag).join();
+  for (const bag of run.caps.keys()) if (!ranked.some((x) => x.bag === bag)) run.caps.delete(bag);
+  const rows = [...ranked.filter((x) => run.caps.has(x.bag)), ...ranked.filter((x) => !run.caps.has(x.bag))];
   const cap = data.cycle?.bagCapSurvivor ?? "";
   el.innerHTML = `    <label>Beast games <input type="number" data-beasts min="0" step="1" value="${run.beasts}"></label>
     <div class="head"><span>Loot bags <small class="dim" data-each></small></span><span class="seg"><button type="button" data-act="rank" title="Rank the bags new in the pool">Refresh</button></span></div>
@@ -443,6 +444,20 @@ function sync() {
   const going = busy();
   put(el.querySelector("[data-acts]"), run.ask ? `<button type="button" class="go" data-act="yes">Spend</button><button type="button" data-act="back">Back</button>` : `<button type="button" class="go" data-act="play" ${going || !(run.beasts || run.caps.size) ? "disabled" : ""}>Play</button><button type="button" data-act="cycle" ${going || !data.cycle ? "disabled" : ""}>Cycle</button>${going ? `<button type="button" class="stop" data-act="stop">Stop</button>` : ""}`);
   put(el.querySelector("[data-said]"), run.ask ? `<span class="gold">${esc(run.ask.text)}</span>` : run.said ? `<span class="${run.bad ? "bad" : "dim"}">${esc(run.said)}</span>` : "");
+  const picks = $("picks");
+  const edge = picks.getBoundingClientRect().right - 1;
+  const gone = picks.offsetWidth ? [...picks.querySelectorAll("input:checked")].filter((box) => box.closest("li").getBoundingClientRect().left >= edge) : [];
+  if (!gone.length) return;
+  for (const box of gone) {
+    box.checked = false;
+    box.closest("li").classList.remove("on");
+    box.closest("li").querySelector(".cap").disabled = true;
+    run.caps.delete(+box.dataset.bag);
+  }
+  run.ask = null;
+  run.said = gone.length > 1 ? `Bags ${gone.map((box) => box.dataset.bag).join(", ")} no longer fit the list and were unchecked` : `Bag ${gone[0].dataset.bag} no longer fits the list and was unchecked`;
+  run.bad = true;
+  sync();
 }
 
 const tell = (text, bad = false) => { run.said = text; run.bad = bad; panel(); };
@@ -562,6 +577,7 @@ $("stage").onclick = (e) => { if (e.target.closest("[data-details]")) go(`?game=
 $("golive").onclick = () => go("");
 addEventListener("popstate", render);
 addEventListener("hashchange", render);
+addEventListener("resize", sync);
 
 const source = new EventSource("/events");
 source.onopen = load;
