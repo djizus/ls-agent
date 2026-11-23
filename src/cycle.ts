@@ -1,9 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
-import { BAG_RANKING, DUNGEONS, SURVIVOR, dungeonOf } from "./config.ts";
+import { BAG_RANKING, DUNGEONS, dungeonOf } from "./config.ts";
 import { emit } from "./events.ts";
-import { bagMarket, bagRefusal, forSale, liveIds, poolIds, units } from "./live.ts";
+import { bagOf, forSale, liveIds, poolIds } from "./live.ts";
 import { halt, play, running } from "./runner.ts";
-import { balanceOf } from "./wallet.ts";
 
 export const CYCLE = { beastGames: 40, bagCapSurvivor: 100 };
 
@@ -25,30 +24,24 @@ const say = (text: string, on = true): void => {
 export const cycleStatus = () => last;
 
 async function loot(): Promise<string> {
-  if (liveIds().some((id) => dungeonOf(id) === "lootBag")) {
-    say("resuming the unfinished Loot Dungeon game");
-    await play(1, true, "lootBag");
-    return "the unfinished Loot Dungeon game was played";
-  }
-  const pool = DUNGEONS.lootBag.pool!;
+  const unfinished = liveIds().find((id) => dungeonOf(id) === "lootBag");
   const rows = existsSync(BAG_RANKING) ? (JSON.parse(readFileSync(BAG_RANKING, "utf8")) as Ranked[]) : [];
-  const best = bestBag(rows, await poolIds(pool));
+  const best = unfinished ? { bag: bagOf(unfinished), kills: undefined } : bestBag(rows, await poolIds(DUNGEONS.lootBag.pool!));
   if (!best) return "no Loot Dungeon game: the pool holds no ranked bag";
-  const [{ held, quote }, survivor] = await Promise.all([bagMarket(pool, best.bag), balanceOf(SURVIVOR)]);
-  const entry = { bag: best.bag, maxSurvivor: CYCLE.bagCapSurvivor };
-  const refused = bagRefusal(held, quote, entry, survivor);
-  if (refused) return `no Loot Dungeon game on the bag with the most named kills (${best.kills} a game): ${refused}`;
   if (stopped) return "stopped before the Loot Dungeon game";
-  if (running()) return "no Loot Dungeon game: another batch is running";
-  say(`Loot Dungeon game on bag ${best.bag} (${best.kills} named kills a game) for ${units(quote.price)} SURVIVOR`);
-  await play(1, true, "lootBag", entry);
+  const run = await play({ seats: [{ dungeon: "lootBag", bag: best.bag, maxSurvivor: CYCLE.bagCapSurvivor }] });
+  if ("refused" in run) return `no Loot Dungeon game on bag ${best.bag}: ${run.refused}`;
+  say(unfinished ? `resuming the unfinished Loot Dungeon game on bag ${best.bag}` : `Loot Dungeon game on bag ${best.bag} (${best.kills} named kills a game)`);
+  await run.done;
   return `the Loot Dungeon game on bag ${best.bag} was played`;
 }
 
 async function run(): Promise<void> {
   try {
     say(`${CYCLE.beastGames} Beast Mode games`);
-    await play(CYCLE.beastGames, true, "beast");
+    const beasts = await play({ seats: Array.from({ length: CYCLE.beastGames }, () => ({ dungeon: "beast" })) });
+    if ("refused" in beasts) return say(`stopped: ${beasts.refused}`, false);
+    await beasts.done;
     if (stopped) return say("stopped", false);
     say("the Loot Dungeon step");
     say(`cycle done: ${await loot().catch((err) => `the Loot Dungeon step failed: ${(err as Error).message.slice(0, 200)}`)}`, false);

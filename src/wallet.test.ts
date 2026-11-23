@@ -20,11 +20,12 @@ test("a transaction is included once its receipt shows success in a block, and f
   await assert.rejects(included("0x1", async () => receipt({ execution_status: "REVERTED", revert_reason: "no", block_hash: "0xb", block_number: 7 }), tick, 60_000), /transaction 0x1 failed/);
 });
 
-test("no outside request leaves without the bound", () => {
+test("no outside request leaves without the bound, and the command fetches only from the service", () => {
   const src = new URL(".", import.meta.url).pathname;
   const files = readdirSync(src, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
-  const found = (pattern: RegExp, allowed: string) => files.filter((f) => f !== allowed && pattern.test(readFileSync(src + f, "utf8")));
-  assert.deepEqual(found(/\bfetch\(/, "net.ts"), []);
+  const found = (pattern: RegExp, ...allowed: string[]) => files.filter((f) => !allowed.includes(f) && pattern.test(readFileSync(src + f, "utf8")));
+  assert.deepEqual(found(/\bfetch\(/, "net.ts", "cli.ts"), []);
   assert.deepEqual(found(/new RpcProvider\(/, "wallet.ts"), []);
-  assert.deepEqual(found(/waitForTransaction\(/, ""), []);
+  assert.deepEqual(found(/waitForTransaction\(/), []);
+  assert.deepEqual([...readFileSync(`${src}cli.ts`, "utf8").matchAll(/\bfetch\(([^,)]*)/g)].map((m) => m[1].split("}")[0]), ["`${SERVICE", "`${SERVICE"]);
 });

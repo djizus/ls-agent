@@ -32,8 +32,3 @@ export function nextHead(): Promise<void> {
     });
   });
 }
-
-export function hangUp(): void {
-  socket?.close();
-  socket = undefined;
-}

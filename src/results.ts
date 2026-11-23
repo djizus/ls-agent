@@ -47,8 +47,8 @@ export function resultsSection(date: string, baselines: Record<string, Baseline>
 export function withResults(readme: string, section: string): string {
   const start = readme.indexOf(`\n${HEADING}\n`);
   if (start < 0) {
-    const before = readme.indexOf("\n## Run it yourself\n");
-    if (before < 0) throw new Error("README.md has no Results section and no Run it yourself section to put it before");
+    const before = readme.indexOf("\n## Feature map\n");
+    if (before < 0) throw new Error("README.md has no Results section and no Feature map section to put it before");
     return `${readme.slice(0, before + 1)}${section}\n${readme.slice(before + 1)}`;
   }
   const next = readme.indexOf("\n## ", start + 1);

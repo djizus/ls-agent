@@ -5,7 +5,8 @@ import { BAG_RANKING, DUNGEONS, VAR_DIR } from "../src/config.ts";
 import { useFastLuck } from "../src/hash.ts";
 import { describe, slewNamed } from "../src/play.ts";
 import { summary } from "../src/summary.ts";
-import { ARMOR, NECK, RULES, VERSION, plan } from "../src/policy.ts";
+import { ARMOR, NECK, plan } from "../src/policy.ts";
+import { RULES, version } from "../src/rules.ts";
 import { poolIds, shortlist, unplayed, unranked } from "../src/live.ts";
 import { toSnapshot, type Local } from "../src/engine/engine.ts";
 import { act, newPracticeGame, startOf, syntheticGame, type Game } from "../src/practice.ts";
@@ -90,6 +91,7 @@ const BANDS = [[1, 9], [10, 14], [15, 19], [20, 29], [30, 99]];
 const reach = values.reach === "weapon" ? 1 : Number(values.reach ?? 0);
 const reached = (state: ReturnType<typeof describe>) => (values.reach === "weapon" ? (state.equipment.find((g) => g.slot === "weapon")?.greatness ?? 0) >= 20 : state.level >= reach);
 const defaults = { ...RULES };
+const VERSION = version(defaults);
 
 type Run = { rows: (number | null)[][][]; snaps: Kept[] };
 

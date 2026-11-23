@@ -8,7 +8,7 @@ port="${LS_PROVE_PORT:-4199}"
 mkdir -p "$out"
 [[ -f "$HOME/.config/ls-agent/env" ]] && set -a && source "$HOME/.config/ls-agent/env" && set +a
 
-LS_HOST=127.0.0.1 LS_PORT="$port" LS_VAR_DIR="$out/" node --disable-warning=ExperimentalWarning "$root/src/main.ts" > "$out/service.log" 2>&1 &
+LS_HOST=127.0.0.1 LS_PORT="$port" LS_VAR_DIR="$out/" node --disable-warning=ExperimentalWarning "$root/src/cli.ts" start > "$out/service.log" 2>&1 &
 service=$!
 trap 'kill $service 2>/dev/null; wait $service 2>/dev/null || true' EXIT
 for _ in $(seq 40); do curl -sf "127.0.0.1:$port/" > /dev/null && break; sleep 0.5; done
@@ -17,16 +17,14 @@ curl -sN "127.0.0.1:$port/events" | sed -un 's/^data: //p' > "$out/events.jsonl"
 stream=$!
 sleep 1
 if [[ "$games" == cycle ]]; then
-  curl -sf -XPOST "127.0.0.1:$port/api/play" -d '{"cycle":true}' > /dev/null
-  timeout 300 bash -c "until grep -q '\"kind\":\"cycle\",\"on\":false' '$out/events.jsonl'; do sleep 1; done" || echo "timed out" >> "$out/service.log"
+  LS_HOST=127.0.0.1 LS_PORT="$port" timeout 300 node --disable-warning=ExperimentalWarning "$root/src/cli.ts" cycle > "$out/cli.txt" 2>&1 || echo "timed out or refused" >> "$out/service.log"
   curl -sf "127.0.0.1:$port/api/cycle" > "$out/cycle.json"
   kill $stream 2>/dev/null || true
   grep '"kind":"cycle"' "$out/events.jsonl"
   echo "evidence: $out"
   exit
 fi
-curl -sf -XPOST "127.0.0.1:$port/api/play" -d "{\"games\":$games,\"dungeon\":\"$dungeon\"}" > /dev/null
-timeout "${LS_PROVE_TIMEOUT:-3600}" bash -c "until grep -q '\"text\":\"batch done\"' '$out/events.jsonl'; do sleep 2; done" || echo "timed out" >> "$out/service.log"
+LS_HOST=127.0.0.1 LS_PORT="$port" timeout "${LS_PROVE_TIMEOUT:-3600}" node --disable-warning=ExperimentalWarning "$root/src/cli.ts" play --practice "$dungeon" "$games" > "$out/cli.txt" 2>&1 || echo "timed out or refused" >> "$out/service.log"
 kill $stream 2>/dev/null || true
 node --disable-warning=ExperimentalWarning -e '
 const { DatabaseSync } = require("node:sqlite");

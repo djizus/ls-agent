@@ -44,10 +44,10 @@ test("the Results section shows the benchmark and the real games per dungeon, wi
   ].join("\n"));
 });
 
-test("writing the section replaces only it, puts it before Run it yourself the first time, and a second run changes nothing", () => {
-  const readme = "# ls-agent\n\nIntro.\n\n## What it costs\n\nSome.\n\n## Run it yourself\n\nSteps.\n";
+test("writing the section replaces only it, puts it before the Feature map the first time, and a second run changes nothing", () => {
+  const readme = "# ls-agent\n\nIntro.\n\n## What it costs\n\nSome.\n\n## Feature map\n\nSteps.\n";
   const once = withResults(readme, section);
-  assert.equal(once, `# ls-agent\n\nIntro.\n\n## What it costs\n\nSome.\n\n${section}\n## Run it yourself\n\nSteps.\n`);
+  assert.equal(once, `# ls-agent\n\nIntro.\n\n## What it costs\n\nSome.\n\n${section}\n## Feature map\n\nSteps.\n`);
   assert.equal(withResults(once, section), once);
   assert.equal(withResults(once, section.replace("2026-11-22", "2026-12-01")), once.replace("2026-11-22", "2026-12-01"));
 });

@@ -7,8 +7,10 @@
   "engines": {
     "node": ">=22.18"
   },
+  "bin": {
+    "ls-agent": "src/cli.ts"
+  },
   "scripts": {
-    "start": "node --disable-warning=ExperimentalWarning src/main.ts",
     "test": "node --disable-warning=ExperimentalWarning --import ./src/tape.ts --test 'src/**/*.test.ts'",
     "contract": "LS_TAPE=live node --disable-warning=ExperimentalWarning --import ./src/tape.ts --test --test-concurrency=1 'src/**/*.test.ts'",
     "stats": "node --disable-warning=ExperimentalWarning scripts/stats.ts",

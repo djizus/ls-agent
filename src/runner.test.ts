@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 
@@ -28,4 +28,31 @@ test("a batch settles every real game that ended unsettled and is not waiting to
   add("beast", "0x8", 2, null);
   writeFileSync(`${process.env.LS_VAR_DIR}live.json`, JSON.stringify({ ids: ["0x8"] }));
   assert.deepEqual(unsettled().map((g) => ({ ...g })), [{ id: "0x1", row: died, due: 60_002 }, { id: "0x2", row: bag, due: 60_002 }]);
+});
+
+test("a live run seats one game for each entry: each Loot Dungeon bag with its cap, each Beast Mode game, and an unfinished game in the seat that asks for its dungeon and bag", async () => {
+  const { seating } = await import("./runner.ts");
+  const unfinished = "0x0100000000001e7e00000400000000060000000001c878b901144c4a000161c1";
+  const run = { seats: [{ dungeon: "lootBag", bag: 7273, maxSurvivor: 100 }, { dungeon: "beast" }, { dungeon: "lootBag", bag: 7806, maxSurvivor: 90 }, { dungeon: "lootBag", bag: 3378, maxSurvivor: 100 }, { dungeon: "beast" }] };
+  assert.deepEqual(seating(run, [unfinished]), [
+    { dungeon: "lootBag", resumed: unfinished },
+    { dungeon: "lootBag", entry: { bag: 7273, maxSurvivor: 100 } },
+    { dungeon: "lootBag", entry: { bag: 3378, maxSurvivor: 100 } },
+    { dungeon: "beast", entry: undefined },
+    { dungeon: "beast", entry: undefined },
+  ]);
+  assert.equal(seating({ seats: [{ dungeon: "lootBag", bag: 7273 }, { dungeon: "lootBag", bag: 7273 }] }, []), "bag 7273 is asked twice: one seat a bag");
+  assert.equal(seating({ seats: [{ dungeon: "lootBag" }] }, []), "a Loot Bag seat needs its bag");
+  assert.equal(seating({ seats: [{ dungeon: "beast", bag: 7273 }] }, []), "a Beast Mode seat takes no bag");
+});
+
+test("a run with a bag the pool does not hold is refused before anything is bought, and starts no game", async () => {
+  const { play, running } = await import("./runner.ts");
+  const { db } = await import("./db.ts");
+  rmSync(`${process.env.LS_VAR_DIR}live.json`, { force: true });
+  const before = db.prepare("SELECT count(*) AS n FROM games").get();
+  const run = await play({ seats: [{ dungeon: "beast" }, { dungeon: "lootBag", bag: 99999, maxSurvivor: 100 }] });
+  assert.deepEqual(run, { refused: "the pool holds no game of bag 99999" });
+  assert.equal(running(), false);
+  assert.deepEqual(db.prepare("SELECT count(*) AS n FROM games").get(), before);
 });

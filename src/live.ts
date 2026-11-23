@@ -73,7 +73,7 @@ export type Entry = { bag: number; maxSurvivor: number };
 type BagQuote = { price: bigint; protocolFee: bigint; royalty: bigint };
 
 const gameId = (n: bigint) => "0x" + n.toString(16).padStart(64, "0");
-const bagOf = (id: bigint) => Number((id >> 192n) & ((1n << 56n) - 1n));
+export const bagOf = (id: bigint | string) => Number((BigInt(id) >> 192n) & ((1n << 56n) - 1n));
 const pair = (list: string[], at: number) => BigInt(list[at]) + (BigInt(list[at + 1]) << 128n);
 export const units = (n: bigint) => `${n / ONE}.${(n % ONE).toString().padStart(18, "0")}`.replace(/\.?0+$/, "");
 
@@ -136,8 +136,8 @@ export function bagPurchase(pool: string, held: string[], quote: BagQuote, entry
   return { id: held[0], calls: bagCalls(pool, held[0], capOf(entry), recipient) };
 }
 
-export async function bagMarket(pool: string, bag: number): Promise<{ held: string[]; quote: BagQuote }> {
-  const held = heldGames(await poolIds(pool), bag);
+export async function bagMarket(pool: string, bag: number, ids?: string[]): Promise<{ held: string[]; quote: BagQuote }> {
+  const held = heldGames(ids ?? (await poolIds(pool)), bag);
   const quote = readQuote(await provider.callContract({ contractAddress: pool, entrypoint: "get_buy_nft_quote", calldata: [...u256(BigInt(held[0] ?? 0)), "0x1", "0x0"] }));
   return { held, quote };
 }

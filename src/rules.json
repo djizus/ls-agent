@@ -1,0 +1,12 @@
+{
+  "potionPrice": 1,
+  "dexPerLevel": 0.9,
+  "weaponCatchUp": 5,
+  "jewelryLevel": 8,
+  "jewelryReserve": 2,
+  "armorReserve": 0.5,
+  "fightRisk": 0.35,
+  "swapGain": 0.05,
+  "weaponReserve": 3,
+  "healthFloor": 0.97
+}

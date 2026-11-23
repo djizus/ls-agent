@@ -1,9 +1,11 @@
+import { z } from "zod";
 import type { Action } from "./codec.ts";
 import { BEASTS_TO, DUNGEONS, SEATS, SURVIVOR, dungeonOf } from "./config.ts";
 import { db } from "./db.ts";
-import { adopt, collect, head, liveIds, mintedSince, sendBeasts, tickets, type Entry, type Starts } from "./live.ts";
+import { adopt, bagMarket, bagOf, bagRefusal, collect, head, heldGames, liveIds, mintedSince, poolIds, sendBeasts, tickets, units, type Entry, type Starts } from "./live.ts";
 import { balanceOf, strkBalance } from "./wallet.ts";
-import { VERSION, plan } from "./policy.ts";
+import { plan } from "./policy.ts";
+import { RULES, chosen, version, type Rules } from "./rules.ts";
 import { emit, subscribe } from "./events.ts";
 import { type State, type Table, auditGame, begin, namedSlain, commit, current, leave, phase, shape } from "./play.ts";
 
@@ -12,7 +14,7 @@ const LIVE_CHECK_MOVES = 100;
 const CLAIM_DELAY_MS = 60_000;
 const PACE_MS = Number(process.env.LS_PACE_MS ?? 0);
 
-type Seat = { table: Table; row: number; state: State; rejections: number; ending?: string; failed?: string };
+type Seat = { table: Table; row: number; state: State; rules: Rules; rejections: number; ending?: string; failed?: string };
 
 let stopping = false;
 let busy = false;
@@ -30,7 +32,6 @@ for (const { id } of db.prepare(`SELECT id FROM games WHERE ended_at IS NOT NULL
   db.prepare("UPDATE games SET beasts = ? WHERE id = ?").run(slain(id), id);
 
 async function open(practiceId: string | undefined, seed: number, dungeon: string, entry?: Entry, resumed?: string, strk = 0): Promise<Seat> {
-  db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(VERSION, `rules policy ${VERSION}`, Date.now());
   const funds = () => (practiceId || resumed ? null : Promise.all([strkBalance(), balanceOf(SURVIVOR)]).then((held) => held.map(Number), () => null));
   const before = await funds();
   const table = await begin(practiceId, seed, DUNGEONS[dungeon], entry, resumed);
@@ -38,13 +39,17 @@ async function open(practiceId: string | undefined, seed: number, dungeon: strin
   const id = table.game.id;
   const mode = practiceId ? "practice" : dungeon;
   const known = practiceId ? undefined : (db.prepare("SELECT id FROM games WHERE game_id = ? AND mode = ?").get(id, mode) as { id: number } | undefined);
-  const row = known?.id ?? Number(db.prepare("INSERT INTO games (mode, game_id, seed, strategy, started_at) VALUES (?, ?, ?, ?, ?)").run(mode, id, seed, VERSION, Date.now()).lastInsertRowid);
+  const kept = known && (db.prepare("SELECT text FROM strategies WHERE hash = (SELECT strategy FROM games WHERE id = ?) AND text LIKE '{%'").get(known.id) as { text: string } | undefined);
+  const rules: Rules = kept ? JSON.parse(kept.text) : chosen();
+  const strategy = version(rules);
+  db.prepare("INSERT OR IGNORE INTO strategies (hash, text, created_at) VALUES (?, ?, ?)").run(strategy, JSON.stringify(rules), Date.now());
+  const row = known?.id ?? Number(db.prepare("INSERT INTO games (mode, game_id, seed, strategy, started_at) VALUES (?, ?, ?, ?, ?)").run(mode, id, seed, strategy, Date.now()).lastInsertRowid);
   if (known) db.prepare("UPDATE games SET ended_at = NULL WHERE id = ?").run(row);
   if (before !== null && after !== null) db.prepare("UPDATE games SET gas_strk = coalesce(gas_strk, 0) + ?, survivor = coalesce(survivor, 0) + ? WHERE id = ?").run((before[0] - after[0]) / 1e18, (before[1] - after[1]) / 1e18, row);
   if (strk) db.prepare("UPDATE games SET gas_strk = coalesce(gas_strk, 0) + ? WHERE id = ?").run(strk, row);
   table.row = row;
   emit({ kind: "status", text: `game ${row} on ${id.slice(-8)}`, row });
-  return { table, row, state: current(table), rejections: 0 };
+  return { table, row, state: current(table), rules, rejections: 0 };
 }
 
 async function close(seat: Seat): Promise<void> {
@@ -73,7 +78,7 @@ async function settle(id: string, row: number): Promise<void> {
 }
 
 function nextSeed(benchmark: string[]): number {
-  const played = db.prepare("SELECT seed, count(*) AS n FROM games WHERE strategy = ? AND ended_at IS NOT NULL GROUP BY seed ORDER BY seed").all(VERSION) as { seed: number; n: number }[];
+  const played = db.prepare("SELECT seed, count(*) AS n FROM games WHERE strategy = ? AND ended_at IS NOT NULL GROUP BY seed ORDER BY seed").all(version(chosen())) as { seed: number; n: number }[];
   const complete = played.filter((p) => p.n >= benchmark.length).map((p) => p.seed);
   let seed = 0;
   while (complete.includes(seed)) seed++;
@@ -87,6 +92,7 @@ async function round(seats: Seat[], starts: Starts | undefined): Promise<{ start
   for (const seat of seats) {
     const { row, state } = seat;
     try {
+      Object.assign(RULES, seat.rules);
       const decision = plan(state);
       const actions = shape(state, decision.actions);
       emit({ kind: "decision", phase: phase(state), thought: decision.why, actions, row });
@@ -128,41 +134,93 @@ export function retry(id: string): boolean {
 
 export const cleared = (id: string): void => void failures.delete(id);
 
-export async function play(count: number, live: boolean, dungeon: string, entry?: Entry): Promise<void> {
-  if (busy) return;
+export const RUN = z.strictObject({
+  practice: z.boolean().optional(),
+  seats: z.array(z.strictObject({ dungeon: z.enum(Object.keys(DUNGEONS)), bag: z.number().int().positive().optional(), maxSurvivor: z.number().positive().optional() })).min(1),
+});
+type Run = z.infer<typeof RUN>;
+type Queued = { dungeon: string; entry?: Entry; practice?: string; resumed?: string };
+
+export function seating(run: Run, unfinished: string[]): Queued[] | string {
+  const left = [...unfinished];
+  const queue: Queued[] = [];
+  for (const { dungeon, bag, maxSurvivor } of run.seats) {
+    const d = DUNGEONS[dungeon];
+    if (run.practice) {
+      const next = queue.filter((q) => q.dungeon === dungeon).length;
+      if (bag !== undefined) return "a practice game plays a benchmark start, not a bag";
+      if (next === d.benchmark.length) return `${d.name} has ${d.benchmark.length} practice starts`;
+      queue.push({ dungeon, practice: d.benchmark[next] });
+      continue;
+    }
+    if (!d.pool !== (bag === undefined)) return d.pool ? `a ${d.name} seat needs its bag` : `a ${d.name} seat takes no bag`;
+    if (bag !== undefined && run.seats.filter((s) => s.bag === bag).length > 1) return `bag ${bag} is asked twice: one seat a bag`;
+    const at = left.findIndex((id) => dungeonOf(id) === dungeon && (bag === undefined || bagOf(id) === bag));
+    queue.push(at >= 0 ? { dungeon, resumed: left.splice(at, 1)[0] } : { dungeon, entry: bag === undefined ? undefined : { bag, maxSurvivor: maxSurvivor ?? 0 } });
+  }
+  const order = (q: Queued) => (q.resumed ? 0 : q.entry ? 1 : 2);
+  return queue.sort((a, b) => order(a) - order(b));
+}
+
+async function bagsRefusal(queue: Queued[]): Promise<string | null> {
+  const buys = queue.flatMap((q) => (q.entry ? [{ pool: DUNGEONS[q.dungeon].pool!, entry: q.entry }] : []));
+  const pools = new Map<string, string[]>();
+  for (const { pool, entry } of buys) {
+    if (!pools.has(pool)) pools.set(pool, await poolIds(pool));
+    if (!heldGames(pools.get(pool)!, entry.bag).length) return `the pool holds no game of bag ${entry.bag}`;
+  }
+  if (!buys.length) return null;
+  const survivor = await balanceOf(SURVIVOR);
+  let total = 0n;
+  for (const { pool, entry } of buys) {
+    const { held, quote } = await bagMarket(pool, entry.bag, pools.get(pool));
+    const refused = bagRefusal(held, quote, entry, survivor);
+    if (refused) return refused;
+    total += quote.price;
+  }
+  return total > survivor ? `the ${buys.length} bags cost ${units(total)} SURVIVOR together and the wallet holds ${units(survivor)}` : null;
+}
+
+export async function play(run: Run): Promise<{ refused: string } | { done: Promise<void> }> {
+  if (busy) return { refused: "a run is going: wait for batch done, or POST /api/stop" };
   busy = true;
+  const queue = seating(run, run.practice ? [] : liveIds());
+  const refused = typeof queue === "string" ? queue : await bagsRefusal(queue).catch((err) => `the bags could not be checked: ${(err as Error).message.slice(0, 200)}`);
+  if (typeof queue === "string" || refused) {
+    busy = false;
+    return { refused: refused! };
+  }
+  return { done: batch(queue, !run.practice) };
+}
+
+async function batch(queue: Queued[], live: boolean): Promise<void> {
   stopping = false;
   failures.clear();
   const failed = (err: unknown) => emit({ kind: "status", text: `game failed: ${(err as Error).message}` });
   const sweep = live ? (async () => { for (const g of unsettled()) await new Promise((r) => setTimeout(r, Math.max(0, g.due - Date.now()))).then(() => settle(g.id, g.row)).catch(failed); })().catch(failed) : undefined;
   try {
-    const d = DUNGEONS[dungeon];
-    const seed = nextSeed(d.benchmark);
-    const resumed = live ? liveIds().filter((id) => dungeonOf(id) === dungeon).slice(0, count) : [];
-    const queue: { practice?: string; resumed?: string }[] = live
-      ? [...resumed.map((id) => ({ resumed: id })), ...Array.from({ length: count - resumed.length }, () => ({}))]
-      : d.benchmark.slice(0, count).map((practice) => ({ practice }));
+    const seed = Object.fromEntries(Object.entries(DUNGEONS).map(([key, d]) => [key, nextSeed(d.benchmark)]));
     const seats: Seat[] = [];
     const arrived: Seat[] = [];
     const opening = new Set<Promise<void>>();
     const ended: { seat: Seat; due: number }[] = [];
-    const again = (id: string) => (retry(id) ? queue.unshift({ resumed: id }) : (queue.length = 0));
-    const rides = live && !d.pool;
+    const again = (id: string) => (retry(id) ? queue.unshift({ dungeon: dungeonOf(id), resumed: id }) : (queue.length = 0));
+    const rides = (q: Queued) => live && !q.resumed && !DUNGEONS[q.dungeon].pool;
     const join = (id: string, strk = 0) => {
-      const done = open(undefined, seed, dungeon, entry, id, strk)
+      const done = open(undefined, seed[dungeonOf(id)], dungeonOf(id), undefined, id, strk)
         .then((seat) => void arrived.push(seat), (err) => (failed(err), void again(id)))
         .finally(() => opening.delete(done));
       opening.add(done);
     };
-    const from = rides ? await head() : 0;
-    const recorded = (id: string) => liveIds().includes(id) || !!db.prepare("SELECT 1 FROM games WHERE game_id = ? AND mode = ?").get(id, dungeon);
+    const from = queue.some(rides) ? await head() : 0;
+    const recorded = (id: string) => liveIds().includes(id) || !!db.prepare("SELECT 1 FROM games WHERE game_id = ? AND mode = ?").get(id, dungeonOf(id));
     let lost = false;
     for (;;) {
       seats.push(...arrived.splice(0));
       for (const id of lost ? (await mintedSince(from).catch(() => [])).filter((id) => !recorded(id)) : []) {
         adopt(id);
-        const next = queue.findIndex((q) => !q.resumed);
-        queue.splice(Math.max(0, next), Number(next >= 0), { resumed: id });
+        const next = queue.findIndex((q) => rides(q) && q.dungeon === dungeonOf(id));
+        queue.splice(Math.max(0, next), Number(next >= 0), { dungeon: dungeonOf(id), resumed: id });
         emit({ kind: "status", text: `found game ${id.slice(-8)} started on chain and in no file: it takes the place of a new game` });
       }
       for (const done of ended.filter((e) => e.due <= Date.now() || (!seats.length && !opening.size))) {
@@ -170,13 +228,14 @@ export async function play(count: number, live: boolean, dungeon: string, entry?
         ended.splice(ended.indexOf(done), 1);
         await settle(done.seat.table.game.id, done.seat.row).catch(failed);
       }
-      while (!stopping && queue.length && seats.length + opening.size < SEATS && (queue[0].resumed || !rides)) {
+      while (!stopping && queue.length && seats.length + opening.size < SEATS && !rides(queue[0])) {
         const next = queue.shift()!;
         if (next.resumed) join(next.resumed);
-        else await open(next.practice, seed, dungeon, entry).then((seat) => seats.push(seat), failed);
+        else await open(next.practice, seed[next.dungeon], next.dungeon, next.entry).then((seat) => seats.push(seat), failed);
       }
       const free = SEATS - seats.length - opening.size;
-      const wanted = rides && !stopping && free > 0 && queue.length && !queue[0].resumed ? Math.min(free, queue.length) : 0;
+      const riding = queue.findIndex((q) => !rides(q) || q.dungeon !== queue[0].dungeon);
+      const wanted = !stopping && free > 0 && queue.length && rides(queue[0]) ? Math.min(free, riding < 0 ? queue.length : riding) : 0;
       const starts = wanted ? await tickets(wanted).catch((err) => (failed(err), 0)) : 0;
       if (!seats.length && !starts) {
         if (!opening.size) break;
@@ -185,7 +244,7 @@ export async function play(count: number, live: boolean, dungeon: string, entry?
       }
       const { started } = stopping
         ? { started: [] }
-        : await round(seats, starts ? { dungeon: d, games: starts } : undefined).then(
+        : await round(seats, starts ? { dungeon: DUNGEONS[queue[0].dungeon], games: starts } : undefined).then(
             (sent) => ({ started: "error" in sent.started ? sent.started : sent.started.map((id) => ({ id, strk: sent.strk })) }),
             (err: Error) => (seats.forEach((seat) => (seat.failed ??= err.message.slice(0, 200))), { started: starts ? { error: err } : [] }),
           );
@@ -207,7 +266,7 @@ export async function play(count: number, live: boolean, dungeon: string, entry?
         seats.splice(seats.indexOf(seat), 1);
         if (seat.failed && unfinished && retry(game.id)) {
           leave(seat.table);
-          queue.unshift({ resumed: game.id });
+          queue.unshift({ dungeon: dungeonOf(game.id), resumed: game.id });
           emit({ kind: "status", text: `game ${seat.row} resumes from the chain after: ${seat.failed}` });
           continue;
         }

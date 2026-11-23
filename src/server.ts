@@ -5,13 +5,15 @@ import { networkInterfaces } from "node:os";
 import { BAG_RANKING, BEASTS_TO, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
-import { play, slain } from "./runner.ts";
+import { z } from "zod";
+import { RUN, play, running, slain } from "./runner.ts";
 import { cycleStatus, startCycle, stopCycle } from "./cycle.ts";
 import { enrich, namedKills, seated, snapshot } from "./play.ts";
-import { balanceOf, keys, strkBalance } from "./wallet.ts";
+import { balanceOf, deploy, isDeployed, keys, strkBalance } from "./wallet.ts";
 import { affixes, claimableKill, inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
-import { liveRows, subscribe } from "./events.ts";
-import { forSale, poolIds, usdPrice } from "./live.ts";
+import { emit, liveRows, subscribe } from "./events.ts";
+import { SHIPPED, choose, chosen, version } from "./rules.ts";
+import { bagReport, collect, forSale, poolIds, quote, sendBeasts, usdPrice } from "./live.ts";
 import { ENDED, dungeonFigures, type Ended } from "./summary.ts";
 
 const page = readFileSync(new URL("../web/index.html", import.meta.url));
@@ -49,8 +51,8 @@ function cached(ttlMs: number, load: () => Promise<object>): () => Promise<objec
 
 const wallet = cached(30_000, () => {
   const address = keys().address;
-  return Promise.all([strkBalance(), balanceOf(TICKET), balanceOf(SURVIVOR)]).then(
-    ([strk, tickets, survivor]) => ({ address, floor: STRK_FLOOR, strk: tokens(strk), tickets: tokens(tickets), survivor: tokens(survivor) }),
+  return Promise.all([strkBalance(), balanceOf(TICKET), balanceOf(SURVIVOR), isDeployed()]).then(
+    ([strk, tickets, survivor, deployed]) => ({ address, floor: STRK_FLOOR, deployed, strk: tokens(strk), tickets: tokens(tickets), survivor: tokens(survivor) }),
     () => ({ address, floor: STRK_FLOOR }),
   );
 });
@@ -137,6 +139,18 @@ function beasts() {
   };
 }
 
+const TOOLS: Record<string, (body: Record<string, string>) => Promise<unknown>> = {
+  "/api/deploy": () => deploy(),
+  "/api/collect": async ({ game }) => (await collect(game)).transaction ?? "nothing to claim",
+  "/api/quote": ({ game }) => quote(game),
+  "/api/send-beasts": ({ to }) => sendBeasts(to),
+  "/api/bag": ({ bag, address }) => bagReport(Number(bag), address ?? keys().address),
+  async "/api/holdings"({ address = keys().address }) {
+    const [beasts, claims] = await Promise.all([inventory(address), pendingClaims(address)]);
+    return { address, inventory: beasts, pendingClaims: claims };
+  },
+};
+
 const OWN = new Set(Object.values(networkInterfaces()).flatMap((list) => (list ?? []).map((i) => i.address)));
 
 async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown> {
@@ -155,16 +169,34 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     return;
   }
   if (url.pathname === "/api/play" && req.method === "POST") {
-    const body = (await json(req)) as { games?: number; live?: boolean; cycle?: boolean; dungeon?: string; bag?: number; maxSurvivor?: number } | undefined;
-    if (body?.cycle === true) return startCycle() ? res.end("ok") : res.writeHead(409).end("a batch or a cycle is running");
-    const dungeon = body?.dungeon ?? "beast";
-    if (!DUNGEONS[dungeon]) return res.writeHead(400).end(`dungeon is one of ${Object.keys(DUNGEONS).join(", ")}`);
-    play(Number(body?.games) || (body?.live ? 1 : DUNGEONS[dungeon].benchmark.length), body?.live === true, dungeon, body?.bag ? { bag: Number(body.bag), maxSurvivor: Number(body.maxSurvivor) } : undefined);
-    return res.end("ok");
+    const run = RUN.safeParse(await json(req).catch(() => undefined));
+    if (!run.success) return res.writeHead(400).end(z.prettifyError(run.error));
+    if (cycleStatus().on) return res.writeHead(409).end("a cycle is running: wait for it to end, or stop it");
+    const started = await play(run.data);
+    return "refused" in started ? res.writeHead(409).end(started.refused) : res.end("ok");
   }
+  if (url.pathname === "/api/cycle" && req.method === "POST") return startCycle() ? res.end("ok") : res.writeHead(409).end("a run or a cycle is going");
   if (url.pathname === "/api/stop" && req.method === "POST") {
     stopCycle();
     return res.end("ok");
+  }
+  if (url.pathname === "/api/rules" && req.method === "POST") {
+    const body = (await json(req).catch(() => undefined)) as { set?: string[] } | undefined;
+    try {
+      choose(body?.set ?? []);
+    } catch (err) {
+      return res.writeHead(400).end((err as Error).message);
+    }
+  }
+  if (url.pathname === "/api/rules") return reply(res, { rules: chosen(), shipped: SHIPPED, strategy: version(chosen()) });
+  const tool = TOOLS[url.pathname];
+  if (tool && req.method === "POST") {
+    const body = ((await json(req).catch(() => undefined)) ?? {}) as Record<string, string>;
+    return tool(body).then((out) => reply(res, out), (err: Error) => res.writeHead(500).end(err.message.slice(0, 500)));
+  }
+  if (url.pathname === "/api/status") {
+    const rows = db.prepare(`SELECT id, dungeon, game_id FROM (${games()}) WHERE live ORDER BY id`).all() as { id: number }[];
+    return reply(res, { running: running(), cycle: cycleStatus(), live: rows.map((g) => ({ ...g, level: snapshot(seated(g.id))?.level ?? null, beasts: slain(g.id) })) });
   }
   if (url.pathname === "/api/state") return reply(res, snapshot() ?? null);
   if (url.pathname === "/api/games") {
@@ -197,7 +229,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
 }
 
 export function serve(): void {
+  subscribe((e) => console.log(JSON.stringify(e)));
+  for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => process.exit(0));
   createServer((req, res) => void route(req, res).catch(() => res.writeHead(500).end())).listen(PORT, HOST, () => console.log(`ls-agent on http://${HOST}:${PORT}`));
   beasts();
   pool();
+  emit({ kind: "status", text: "service up" });
 }
