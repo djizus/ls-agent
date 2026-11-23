@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Loot Survivor agent</title>
-<link rel="icon" href="/assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jersey+20&display=swap" rel="stylesheet">
@@ -41,7 +40,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .rows img { width: 2.4rem; height: 2.4rem; object-fit: contain; }
 .tag { padding: 0 0.35rem; border-radius: 3px; background: var(--lime); color: #000; margin-left: 0.4rem; }
 
-#logo { width: 11rem; image-rendering: auto; margin: -0.2rem auto 0; }
+#logo { width: 11rem; image-rendering: auto; mix-blend-mode: lighten; margin: -0.2rem auto 0; }
 #games { flex: 1; }
 .rows li.more { display: block; padding: 0; }
 .more button { width: 100%; padding: 0.3rem; color: var(--dim); border: 2px solid var(--edge); border-radius: 4px; }
@@ -165,7 +164,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 <body>
 <div class="win">
   <aside class="panel">
-    <img id="logo" src="/assets/logo.png" alt="Loot Survivor">
+    <img id="logo" alt="Loot Survivor">
     <section id="games"><div class="head" id="modes"></div><div id="sum"></div><ol id="podium"></ol><ol id="board" class="rows scroll"></ol></section>
   </aside>
   <main id="mid">
@@ -179,21 +178,25 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
     <section id="bags"></section>
   </aside>
 </div>
-<script>
+<script type="module">
+import { beastArt, icon, lootArt, statArt } from "/art.js";
+
 const $ = (id) => document.getElementById(id);
+document.head.append(Object.assign(document.createElement("link"), { rel: "icon", href: icon.favicon }));
+$("logo").src = icon.logo;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const get = (url) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 const round = (n, digits = 0) => Number(n).toLocaleString("en", { maximumFractionDigits: digits });
 const put = (el, html) => { if (el.html !== html) el.innerHTML = el.html = html; };
 const title = (word) => word[0].toUpperCase() + word.slice(1);
-const stat = (name) => `<i class="ic" style="--i:url(/assets/icons/${title(name)}.svg)" title="${title(name)}"></i>`;
-const pic = (name, label) => `<img class="pic" src="/assets/icons/${name}.png" alt="${label}" title="${label}">`;
-const art = (name) => `<img class="pic" src="/assets/loot/${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.png" alt="${esc(name)}" title="${esc(name)}">`;
+const stat = (name) => `<i class="ic" style="--i:url(${statArt(name)})" title="${title(name)}"></i>`;
+const pic = (name, label) => `<img class="pic" src="${icon[name]}" alt="${label}" title="${label}">`;
+const art = (name) => `<img class="pic" src="${lootArt(name)}" alt="${esc(name)}" title="${esc(name)}">`;
 const won = (g) => g.claimed ?? g.claimable;
-const slain = (g) => (g.beasts == null ? `<span></span>` : `<span class="slain${won(g) ? " won" : ""}" title="Named beasts slain${won(g) ? `, ${won(g)} ${g.claimed == null ? "to claim" : "claimed"}` : ""}"><img src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`);
-const MARK = { lootBag: "/assets/bag.png" };
-const face = (name) => (/^[A-Za-z]+$/.test(name ?? "") ? `/assets/beasts/${name.toLowerCase()}.png` : "/assets/skull.png");
-const mark = (games) => MARK[games.map((g) => g.mode).find((m) => MARK[m])] ?? "/assets/skull.png";
+const slain = (g) => (g.beasts == null ? `<span></span>` : `<span class="slain${won(g) ? " won" : ""}" title="Named beasts slain${won(g) ? `, ${won(g)} ${g.claimed == null ? "to claim" : "claimed"}` : ""}"><img src="${icon.skull}" alt="Named beasts slain">${g.beasts}</span>`);
+const MARK = { lootBag: icon.bag };
+const face = (name, collection) => (/^[A-Za-z]+$/.test(name ?? "") ? beastArt(name, collection) : icon.skull);
+const mark = (games) => MARK[games.map((g) => g.mode).find((m) => MARK[m])] ?? icon.skull;
 const portrait = (g) => (killer(g) ? face(killer(g)[1]) : mark([g]));
 const killer = (g) => (g.ending ?? "").match(/against (?:".*" )?(\w+) level (\d+)$/);
 
@@ -248,7 +251,7 @@ function planHtml(e, market) {
 
 function endHtml(g) {
   const k = killer(g);
-  return `${g.level === null ? "" : `<span class="chip">Level ${g.level}</span>`}${k ? `<span class="chip"><img class="pic" src="${face(k[1])}" alt="">${k[1]} ${k[2]}</span>` : ""}${g.beasts == null ? "" : `<span class="chip" title="Named beasts slain"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts}</span>`}${toClaim(g)}${g.claimed == null ? "" : `<span class="chip gold" title="Beasts the settlement claimed for the wallet">${g.claimed} claimed</span>`}${g.gas_strk === null ? "" : `<span class="chip">${round(g.gas_strk, 1)}<small>STRK</small></span>`}`;
+  return `${g.level === null ? "" : `<span class="chip">Level ${g.level}</span>`}${k ? `<span class="chip"><img class="pic" src="${face(k[1])}" alt="">${k[1]} ${k[2]}</span>` : ""}${g.beasts == null ? "" : `<span class="chip" title="Named beasts slain"><img class="pic" src="${icon.skull}" alt="Named beasts slain">${g.beasts}</span>`}${toClaim(g)}${g.claimed == null ? "" : `<span class="chip gold" title="Beasts the settlement claimed for the wallet">${g.claimed} claimed</span>`}${g.gas_strk === null ? "" : `<span class="chip">${round(g.gas_strk, 1)}<small>STRK</small></span>`}`;
 }
 
 const CLAIM_TITLE = "Of those, beasts nobody minted yet or that can be taken from a stake: the ones the settlement will claim";
@@ -308,7 +311,7 @@ function render() {
   $("mode").className = live ? "live good" : g ? "bad" : "dim";
   $("mode").textContent = live ? "Live" : g ? "Ended" : "Idle";
   $("which").textContent = g ? `Game ${g.id}` : lives().length ? `${lives().length} ${lives().length === 1 ? "game" : "games"}` : "";
-  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="/assets/skull.png" alt="Named beasts slain">${g.beasts ?? 0}</span>${toClaim(g)}${now?.move ? planHtml(now.move, now.state?.market ?? []) : ""}` : endHtml(g));
+  put($("plan"), !g ? "" : g.live ? `<span class="chip" title="Named beasts slain this game"><img class="pic" src="${icon.skull}" alt="Named beasts slain">${g.beasts ?? 0}</span>${toClaim(g)}${now?.move ? planHtml(now.move, now.state?.market ?? []) : ""}` : endHtml(g));
   $("again").hidden = !g;
   $("golive").hidden = !lives().length || !g;
 
@@ -339,9 +342,9 @@ function render() {
 
   const b = data.beasts;
   const STATE = { held: "", staked: ", staked", mega: ", Mega", claim: ", to claim" };
-  const cell = (x) => `<div class="card ${x.state}" title="${esc(`${x.name}: tier ${x.tier} ${x.type}, level ${x.level}${STATE[x.state]}${x.strk === null ? "" : `, sells for ${round(x.strk, 1)} STRK`}`)}"><img src="${face(x.kind)}" alt="${esc(x.name)}"><i>T${x.tier}</i><b>${x.level}</b></div>`;
+  const cell = (x, collection) => `<div class="card ${x.state}" title="${esc(`${x.name}: tier ${x.tier} ${x.type}, level ${x.level}${STATE[x.state]}${x.strk === null ? "" : `, sells for ${round(x.strk, 1)} STRK`}`)}"><img src="${face(x.kind, collection)}" alt="${esc(x.name)}"><i>T${x.tier}</i><b>${x.level}</b></div>`;
   const tiers = (x) => x.tiers.map((n, i) => (n ? `<span><span class="gold">T${i + 1}</span> <span class="n">${round(n)}</span></span>` : "")).join("");
-  const group = (x) => `<div class="head"><span><span class="dim">${x.name}</span><span class="n">${round(x.held)}</span>${x.claims ? `<span class="gold">${x.claims} to claim</span>` : ""}</span>${x.usd === null ? "" : `<span class="n" title="What the pools pay for them now, one at a time, at the STRK price Ekubo quotes">$${round(x.usd, 2)}</span>`}</div>${x.held ? `<div class="row tally">${tiers(x)}${x.mega ? `<span><span class="n">${x.mega}</span> Mega</span>` : ""}${x.staked ? `<span><span class="n">${x.staked}</span> staked</span>` : ""}</div>` : ""}${x.beasts.length ? `<div class="cells">${x.beasts.slice(0, zooAll ? undefined : STRIP).map(cell).join("")}</div>` : ""}`;
+  const group = (x) => `<div class="head"><span><span class="dim">${x.name}</span><span class="n">${round(x.held)}</span>${x.claims ? `<span class="gold">${x.claims} to claim</span>` : ""}</span>${x.usd === null ? "" : `<span class="n" title="What the pools pay for them now, one at a time, at the STRK price Ekubo quotes">$${round(x.usd, 2)}</span>`}</div>${x.held ? `<div class="row tally">${tiers(x)}${x.mega ? `<span><span class="n">${x.mega}</span> Mega</span>` : ""}${x.staked ? `<span><span class="n">${x.staked}</span> staked</span>` : ""}</div>` : ""}${x.beasts.length ? `<div class="cells">${x.beasts.slice(0, zooAll ? undefined : STRIP).map((y) => cell(y, x.key)).join("")}</div>` : ""}`;
   const more = !zooAll && b?.groups?.some((x) => x.beasts.length > STRIP);
   put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.groups ? round(b.groups.reduce((n, x) => n + x.held, 0)) : ""}</span></div>${b?.failed ? `<span class="bad">No answer</span>` : ""}${b?.groups ? `<div id="zoo" class="scroll">${b.groups.map(group).join("")}${more ? `<div class="more"><button type="button" data-more>More</button></div>` : ""}</div>` : ""}`);
 

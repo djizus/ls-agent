@@ -3,7 +3,8 @@ import net from "node:net";
 
 type Rpc = { jsonrpc: string; id: number | string; method: string; params?: unknown };
 type RpcAnswer = { result?: unknown; error?: { code: number; message: string } };
-type Answer = RpcAnswer | { status: number; body: string };
+type Plain = { status: number; body: string; type?: string };
+type Answer = RpcAnswer | Plain;
 
 const TAPE = new URL("./tape.json", import.meta.url);
 export const OFFLINE = "tests do not reach the network";
@@ -39,8 +40,8 @@ async function replay(input: string | URL | Request, init?: RequestInit): Promis
   if (LOOPBACK.has(url.hostname)) return live(input, init);
   const rpc = parse(init?.body);
   if (!rpc) {
-    const answer = recorded(plainKey(url, init)) as { status: number; body: string };
-    return new Response(answer.body, { status: answer.status });
+    const answer = recorded(plainKey(url, init)) as Plain;
+    return new Response(answer.body, { status: answer.status, headers: answer.type ? { "content-type": answer.type } : {} });
   }
   const one = (r: Rpc) => ({ jsonrpc: "2.0", id: r.id, ...recorded(rpcKey(r)) });
   return Response.json(Array.isArray(rpc) ? rpc.map(one) : one(rpc));
@@ -52,7 +53,7 @@ async function record(input: string | URL | Request, init?: RequestInit): Promis
   if (LOOPBACK.has(url.hostname)) return res;
   const body = await res.text();
   const rpc = parse(init?.body);
-  if (!rpc && res.status !== 429) fresh[plainKey(url, init)] = { status: res.status, body };
+  if (!rpc && res.status !== 429) fresh[plainKey(url, init)] = { status: res.status, body, type: res.headers.get("content-type") ?? "" };
   if (rpc && res.status !== 429) {
     const answers = [JSON.parse(body)].flat() as (Rpc & RpcAnswer)[];
     for (const r of [rpc].flat()) {

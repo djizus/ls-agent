@@ -115,5 +115,6 @@ Environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env`.
 | Contracts, dungeons, the Greed Run contract and its settings, spend floor, benchmark starts | `src/config.ts` |
 | Action shapes and packet encoding | `src/codec.ts` |
 | Collectable kills and the beast inventory | `src/beasts.ts` |
+| Game art: the lootsurvivor.io images and the Loot Dungeon beasts of `@provable-games/collectables`, loaded by the page at runtime | `web/art.js`, checked by `src/assets.test.ts` |
 
 `deploy/` runs it as systemd user services with a daily `scripts/check.sh` and a Traefik route. `deploy/install.sh` reads `LS_DOMAIN` and `LS_HOST` from `~/.config/ls-agent/env`.

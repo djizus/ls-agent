@@ -15,6 +15,7 @@ import { forSale, poolIds, usdPrice } from "./live.ts";
 import { ENDED, dungeonFigures, type Ended } from "./summary.ts";
 
 const page = readFileSync(new URL("../web/index.html", import.meta.url));
+const art = readFileSync(new URL("../web/art.js", import.meta.url));
 const CHECK = `${VAR_DIR}contract-check.json`;
 const games = () => `SELECT *, CASE mode ${Object.entries(DUNGEONS).map(([k, d]) => `WHEN '${k}' THEN '${d.name}'`).join(" ")} END AS dungeon, mode IN (${Object.keys(DUNGEONS).map((k) => `'${k}'`)}) AS onchain, id IN (${liveRows().join(",") || "NULL"}) AS live FROM games`;
 
@@ -184,11 +185,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
   if (url.pathname === "/api/beasts") return reply(res, await beasts());
   if (url.pathname === "/api/items") return reply(res, ITEMS);
   if (url.pathname === "/api/check") return reply(res, existsSync(CHECK) ? JSON.parse(readFileSync(CHECK, "utf8")) : null);
-  if (url.pathname.startsWith("/assets/") && /^\/assets\/[a-z]+\/?[A-Za-z0-9_]*\.(png|svg)$/.test(url.pathname)) {
-    const file = new URL(`../web${url.pathname}`, import.meta.url).pathname;
-    if (!existsSync(file)) return res.writeHead(404).end();
-    res.writeHead(200, { "content-type": file.endsWith(".svg") ? "image/svg+xml" : "image/png", "cache-control": "public, max-age=86400" });
-    return res.end(readFileSync(file));
+  if (url.pathname === "/art.js") {
+    res.writeHead(200, { "content-type": "text/javascript" });
+    return res.end(art);
   }
   if (url.pathname === "/") {
     res.writeHead(200, { "content-type": "text/html" });
