@@ -17,6 +17,9 @@ const { values } = parseArgs({
     procs: { type: "string", default: PROCS },
     exit: { type: "string", multiple: true, default: ['{"rollouts":64,"horizon":6}'] },
     baseline: { type: "string", default: "10" },
+    wager: { type: "string" },
+    bankroll: { type: "string", default: "335" },
+    games: { type: "string", default: "200" },
   },
 });
 
@@ -27,6 +30,7 @@ const CASH_STRK = 0.3;
 const LEVEL_MOVES = 40;
 const MIN_ROLLOUTS = 8;
 const ONE = 10n ** 18n;
+const BANKROLL_RUNS = 20_000;
 const DEFAULT_RULES = { ...RULES };
 
 type Exit = { rollouts: number; horizon: number; margin: number; floor: number; clear: number; rules: Partial<typeof RULES> };
@@ -40,7 +44,10 @@ async function setup(): Promise<Setup> {
   const call = async (entrypoint: string, calldata: string[] = []) => BigInt((await provider.callContract({ contractAddress: GREED.address, entrypoint, calldata }))[0]);
   const value = await call("txsh_value", [String(ONE), "0"]);
   const quotes = await Promise.all(Array.from({ length: TOP_LEVEL + 1 }, (_, l) => (l ? call("quote_reward_txsh", [String(ONE), String(l)]) : 0n)));
-  return { pay: quotes.map((q) => Number((q * value) / ONE) / 1e18), wager: Number((await call("max_wager")) / 10n ** 15n) / 1000 };
+  const [least, most] = (await Promise.all([call("cost_to_play"), call("max_wager")])).map((x) => Number(x / 10n ** 15n) / 1000);
+  const wager = values.wager === undefined ? most : Number(values.wager);
+  if (!(wager >= least && wager <= most)) throw new Error(`--wager ${values.wager}: the contract takes ${least} to ${most} STRK`);
+  return { pay: quotes.map((q) => Number((q * value) / ONE) / 1e18), wager };
 }
 
 const luck = (id: string, seed: number, move: number, rollout: number) => "0x" + createHash("sha256").update(`${id}:${seed}:${move}:${rollout}`).digest("hex").slice(0, 62);
@@ -136,12 +143,25 @@ if (process.send) {
   };
   const net = (o: Outcome) => o.back - s.wager - ENTRY_STRK - MOVE_STRK * o.moves - (o.cashed ? CASH_STRK : 0);
   console.log(`wager ${s.wager} STRK; gas ${ENTRY_STRK} to enter, ${MOVE_STRK} a move, ${CASH_STRK} to cash out; all figures in STRK per game; differences are paired on the same starts and luck`);
-  console.log("exit | move gas | cash gas | back | net mean ± se | vs fixed ± se | vs first ± se | median | died | cashed at a loss | cashed at a profit | p10 | p90 | best | net over 100 games");
+  console.log(`exit | move gas | cash gas | back | net mean ± se | vs fixed ± se | vs first ± se | median | died | cashed at a loss | cashed at a profit | p10 | p90 | best | broke within ${values.games} games from ${values.bankroll} | bankroll after them: p10, median, p90`);
   const fixed = played.map((p) => p.baseline);
+  const bankroll = (nets: number[]) => {
+    let seed = 1;
+    const draw = () => nets[Math.floor(((seed = (seed * 48271) % 2147483647) / 2147483647) * nets.length)];
+    const ends = Array.from({ length: BANKROLL_RUNS }, () => {
+      let bank = Number(values.bankroll);
+      for (let g = 0; g < Number(values.games); g++) {
+        if (bank < s.wager + ENTRY_STRK) return { bank, broke: true };
+        bank += draw();
+      }
+      return { bank, broke: false };
+    });
+    const banks = ends.map((e) => e.bank).sort((a, b) => a - b);
+    return [`${((100 * ends.filter((e) => e.broke).length) / BANKROLL_RUNS).toFixed(1)}%`, [0.1, 0.5, 0.9].map((q) => Math.round(banks[Math.floor(q * BANKROLL_RUNS)])).join(", ")];
+  };
   const report = (name: string, outcomes: Outcome[], first?: Outcome[]) => {
     const nets = outcomes.map(net);
     const sorted = [...nets].sort((a, b) => a - b);
-    const sd = se(nets) * Math.sqrt(n);
     const paired = (other?: Outcome[]) => {
       if (!other || other === outcomes) return "-";
       const d = nets.map((x, i) => x - net(other[i]));
@@ -152,7 +172,7 @@ if (process.send) {
       [name, mean(outcomes.map((o) => MOVE_STRK * o.moves)).toFixed(2), mean(outcomes.map((o) => (o.cashed ? CASH_STRK : 0))).toFixed(2), round(mean(outcomes.map((o) => o.back))),
         `${round(mean(nets))} ± ${round(se(nets))}`, paired(fixed), paired(first), round(sorted[n >> 1]), share((o) => !o.cashed),
         share((o, i) => o.cashed && nets[i] < 0), share((o, i) => o.cashed && nets[i] >= 0), round(sorted[Math.floor(n * 0.1)]), round(sorted[Math.floor(n * 0.9)]), round(sorted[n - 1]),
-        `${Math.round(100 * mean(nets))} ± ${Math.round(10 * sd)}`].join(" | "),
+        ...bankroll(nets)].join(" | "),
     );
   };
   report(`fixed L${values.baseline}`, fixed);
