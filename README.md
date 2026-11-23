@@ -2,24 +2,24 @@
 
 A bot that plays Loot Survivor 2, a dungeon game on the Starknet blockchain. It picks every move with fixed rules, pays for each move from its own wallet, and keeps the beasts it kills. Several games run side by side and send their moves together, so they share the network fee.
 
-You watch it on a page served from your own machine, at http://127.0.0.1:4100 once `ls-agent start` runs.
+You watch it on a page served from your own machine, at http://127.0.0.1:4100 once `ls-agent start` runs. Whoever holds the key can also start and stop runs there, from the Play panel at `/#play`.
 
 ![The page with six live games](docs/page.webp)
 
 ## Setup
 
-You need Node 22.18 or newer, bash and curl.
+You need Node 22.18 or newer and openssl. The proof script, `scripts/prove.sh`, also needs bash and curl.
 
 ```
 npm install
 npm link                 # puts ls-agent on your PATH
 mkdir -p ~/.config/ls-agent && echo "LS_TOKEN=$(openssl rand -hex 32)" >> ~/.config/ls-agent/env   # the key for actions
 ls-agent start           # the page and the API on :4100; keep it running
-ls-agent wallet          # in another terminal: creates var/wallet.json and prints its address
+ls-agent wallet          # in another terminal: the address of the wallet the service made in var/wallet.json
 ls-agent deploy          # after sending STRK to that address: deploys the account
 ```
 
-`var/wallet.json` holds the private key in plain text. Whoever reads it owns the funds, so back it up. Practice games and `ls-agent bench` need no wallet and cost nothing.
+`var/wallet.json` holds the private key in plain text. Whoever reads it owns the funds, so back it up. Practice games (`ls-agent play --practice`) and `ls-agent bench` cost nothing.
 
 Every command, `ls-agent start` included, reads these settings from the environment and from `~/.config/ls-agent/env` when that file exists, one `NAME=value` a line; a variable set in the shell wins over the file. Put them in the file so the service and the commands agree on where the service listens.
 
@@ -28,7 +28,7 @@ Every command, `ls-agent start` included, reads these settings from the environm
 | `LS_SEATS` | 1 | Real games played at once, sharing one transaction per round |
 | `LS_BEASTS_TO` | unset | Account that receives every beast once claimed; the page lists its beasts, else the wallet's |
 | `LS_HOST`, `LS_PORT` | 127.0.0.1, 4100 | Where the service listens |
-| `LS_TOKEN` | unset | The key every action needs: `ls-agent` sends it, and any other caller sends `Authorization: Bearer <LS_TOKEN>`. Unset, the service refuses every action |
+| `LS_TOKEN` | unset | The key every action needs: `ls-agent` sends it, the page's Play panel asks for it once, and any other caller sends `Authorization: Bearer <LS_TOKEN>`. Unset, the service refuses every action |
 | `LS_VAR_DIR` | `var/` | Where the wallet, database and caches live. End it with a slash. |
 | `LS_RPC_URL` | public node | Starknet RPC |
 | `LS_PACE_MS` | 0 | Pause between a decision and its move |
