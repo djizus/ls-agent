@@ -146,6 +146,27 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .seg button { padding: 0 0.5rem; border: 2px solid var(--edge); border-radius: 3px; color: var(--dim); }
 .seg button[aria-pressed="true"] { color: #000; background: var(--gold); border-color: var(--gold); }
 .seg button:disabled { opacity: 0.4; cursor: default; }
+#run[hidden] { display: none; }
+#run { gap: 0.6rem; }
+#run label { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+#run input { font: inherit; color: var(--bone); background: #000; border: 2px solid var(--edge); border-radius: 3px; padding: 0.1rem 0.4rem; width: 5rem; text-align: right; }
+#run input:focus { border-color: var(--gold); outline: none; }
+#run input:disabled { opacity: 0.4; }
+#run input[type="password"] { flex: 1; width: auto; min-width: 0; text-align: left; }
+#run form { display: flex; gap: 0.5rem; align-items: center; }
+#run form label { flex: 1; }
+#run .over .cap { color: var(--blood); border-color: var(--blood); }
+#picks { display: flex; flex-direction: column; gap: 0.3rem; max-height: 12rem; }
+#picks li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.5rem; padding: 0.15rem 0.4rem; }
+#picks li.on { border-color: var(--gold); }
+#picks input[type="checkbox"] { width: 1.2rem; height: 1.2rem; accent-color: var(--gold); }
+.acts { display: flex; gap: 0.4rem; }
+.acts button { flex: 1; padding: 0.3rem; border: 2px solid var(--edge); border-radius: 4px; color: var(--bone); }
+.acts button:hover:not(:disabled) { border-color: var(--gold); }
+.acts .go { color: #000; background: var(--gold); border-color: var(--gold); }
+.acts .stop { color: var(--blood); border-color: var(--blood); }
+.acts button:disabled { opacity: 0.4; cursor: default; }
+.link { color: var(--dim); text-decoration: underline; }
 
 
 @media (max-width: 900px) {
@@ -174,6 +195,7 @@ section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
   </main>
   <aside class="panel">
     <section id="wallet"></section>
+    <section id="run" hidden></section>
     <section id="beasts"></section>
     <section id="bags"></section>
   </aside>
@@ -337,7 +359,7 @@ function render() {
   $("warn").title = c?.failures?.join("\n") ?? "";
 
   const w = data.wallet;
-  put($("wallet"), `<h2>Wallet</h2>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
+  put($("wallet"), `<div class="head"><h2>Wallet</h2>${canPlay() ? `<span class="seg"><button type="button" data-play aria-pressed="${run.open}" title="Start or stop a run">Play</button></span>` : ""}</div>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
     <div class="row"><span>${pic("dungeon_ticket", "Tickets")}<span class="n">${round(w.tickets, 1)}</span></span><span>${pic("survivor_token", "SURVIVOR tokens")}<span class="n">${round(w.survivor, 1)}</span></span></div>`}${data.cycle?.text ? `<div class="dim" title="${data.cycle.on ? "What the cycle does now" : "How the last cycle ended"}">Cycle: ${esc(data.cycle.text)}</div>` : ""}`);
 
   const b = data.beasts;
@@ -353,7 +375,148 @@ function render() {
   const since = isNaN(age) ? "" : age < 1 ? "now" : age < 60 ? `${Math.floor(age)} min ago` : age < 1440 ? `${Math.floor(age / 60)} h ago` : `${Math.floor(age / 1440)} d ago`;
   const sacks = [...(data.bags?.rows ?? [])].sort((a, b) => (b[bagSort] ?? -1) - (a[bagSort] ?? -1)).slice(0, BAGS);
   put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><div class="head"><span class="dim">${data.bags?.running ? "Ranking the pool's bags" : `Ranked ${since || "never"}`}</span></div><ol id="sacks" class="rows scroll">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>${x.n ? `x${x.n}` : ""}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>`);
+  if (run.open && run.key && run.rows !== forPlay().map((x) => x.bag).join()) panel();
+  else sync();
 }
+
+const KEY = "playKey";
+const run = { open: false, key: keep(KEY), beasts: 0, caps: new Map(), said: "", bad: false, ask: null, rows: "" };
+const canPlay = () => !!run.key || location.hash === "#play";
+const busy = () => lives().length > 0 || !!data.cycle?.on;
+const forPlay = () => [...(data.bags?.rows ?? [])].sort((a, b) => (b.kills ?? -1) - (a.kills ?? -1)).slice(0, BAGS);
+const perGame = (mode) => { const f = data.summary?.find((x) => x.mode === mode); return f?.games ? f.strk / f.games : null; };
+const amount = (n, unit) => (n == null || isNaN(n) ? `? ${unit}` : `${round(n, n < 10 ? 1 : 0)} ${unit}`);
+
+function cost(beasts, bags) {
+  const price = data.bags?.price ?? null;
+  const strk = (beasts ? beasts * (perGame("beast") ?? NaN) : 0) + (bags ? bags * (perGame("lootBag") ?? NaN) : 0);
+  const survivor = bags * (price ?? NaN);
+  const usd = data.wallet?.usd ? strk * data.wallet.usd[0] + (bags ? survivor * data.wallet.usd[1] : 0) : NaN;
+  return { strk, survivor, usd };
+}
+
+function plan() {
+  const caps = [...run.caps.values()];
+  const c = cost(run.beasts, caps.length);
+  const cap = caps.reduce((n, x) => n + x, 0);
+  const parts = [run.beasts ? `${run.beasts} Beast game${run.beasts > 1 ? "s" : ""}` : "", caps.length ? `${caps.length} Loot bag${caps.length > 1 ? "s" : ""}` : ""].filter(Boolean).join(" and ");
+  const bags = caps.length ? `at most ${amount(cap, "SURVIVOR")} for the bags${isNaN(c.survivor) ? "" : ` (${amount(c.survivor, "SURVIVOR")} now)`} and ` : "";
+  return `Play ${parts}: ${bags}about ${amount(c.strk, "STRK")} in moves${isNaN(c.usd) ? "" : `, $${round(c.usd, 2)} at today's prices`}?`;
+}
+
+function cyclePlan() {
+  const c = data.cycle;
+  return `Run a cycle: ${c.beastGames} Beast games, about ${amount(cost(c.beastGames, 0).strk, "STRK")} in moves, then the best bag if it costs at most ${c.bagCapSurvivor} SURVIVOR${data.bags?.price == null ? "" : ` (${amount(data.bags.price, "SURVIVOR")} now)`}?`;
+}
+
+function panel() {
+  const el = $("run");
+  el.hidden = !run.open;
+  if (!run.open) return;
+  if (!run.key) {
+    el.innerHTML = `<div class="head"><h2>Play</h2></div><form><label>Key <input type="password" name="key" autocomplete="current-password" required></label><span class="seg"><button>Check</button></span></form><p class="${run.bad ? "bad" : "dim"}">${esc(run.said || "The key the service was started with. This browser keeps it.")}</p>`;
+    return el.querySelector("input").focus();
+  }
+  const rows = forPlay();
+  run.rows = rows.map((x) => x.bag).join();
+  for (const bag of run.caps.keys()) if (!rows.some((x) => x.bag === bag)) run.caps.delete(bag);
+  const cap = data.cycle?.bagCapSurvivor ?? "";
+  el.innerHTML = `<div class="head"><h2>Play</h2><button type="button" class="link" data-forget>Forget key</button></div>
+    <label>Beast games <input type="number" data-beasts min="0" step="1" value="${run.beasts}"></label>
+    <div class="head"><span>Loot bags <small class="dim" data-each></small></span><span class="seg"><button type="button" data-act="rank" title="Rank the bags new in the pool">Refresh</button></span></div>
+    <ol id="picks" class="scroll">${rows.map((x) => `<li class="card${run.caps.has(x.bag) ? " on" : ""}" data-row="${x.bag}"><input type="checkbox" data-bag="${x.bag}" aria-label="Bag ${x.bag}" ${run.caps.has(x.bag) ? "checked" : ""}><span><span class="dim">${x.bag}</span> ${x.kills === undefined ? "-" : round(x.kills, 1)} kills${x.n > 1 ? ` <span class="dim">x${x.n}</span>` : ""}</span><input type="number" class="cap" data-cap="${x.bag}" min="1" step="1" value="${run.caps.get(x.bag) ?? cap}" title="Most SURVIVOR to pay for this bag" aria-label="SURVIVOR cap for bag ${x.bag}" ${run.caps.has(x.bag) ? "" : "disabled"}></li>`).join("") || `<li class="dim">No ranked bag for sale</li>`}</ol>
+    <p data-spend></p><div class="acts" data-acts></div><p data-said></p>`;
+  sync();
+}
+
+function sync() {
+  const el = $("run");
+  if (!run.open || !run.key || !el.querySelector("[data-acts]")) return;
+  const price = data.bags?.price;
+  const w = data.wallet;
+  el.querySelector("[data-each]").textContent = data.bags?.running ? "ranking the pool" : `by named kills${price == null ? "" : `, ${round(price, 1)} SURVIVOR each`}`;
+  el.querySelector("[data-act=rank]").disabled = !!data.bags?.running;
+  for (const li of el.querySelectorAll("[data-row]")) li.classList.toggle("over", price != null && run.caps.has(+li.dataset.row) && price > run.caps.get(+li.dataset.row));
+  const c = cost(run.beasts, run.caps.size);
+  const spendable = w?.strk === undefined ? null : Math.max(0, w.strk - w.floor);
+  const short = (need, have) => (have != null && need > have ? "bad" : "");
+  put(el.querySelector("[data-spend]"), run.beasts || run.caps.size ? `About <span class="${short(c.strk, spendable)}">${amount(c.strk, "STRK")}</span> in moves, of ${amount(spendable, "STRK")} spendable${run.caps.size ? `, and <span class="${short(c.survivor, w?.survivor)}">${amount(c.survivor, "SURVIVOR")}</span> for bags, of ${amount(w?.survivor, "SURVIVOR")} held` : ""}${isNaN(c.usd) ? "" : `: $${round(c.usd, 2)} at today's prices`}.` : `<span class="dim">Pick Beast games or bags. Moves cost what past games cost on average.</span>`);
+  const going = busy();
+  put(el.querySelector("[data-acts]"), run.ask ? `<button type="button" class="go" data-act="yes">Spend</button><button type="button" data-act="back">Back</button>` : `<button type="button" class="go" data-act="play" ${going || !(run.beasts || run.caps.size) ? "disabled" : ""}>Play</button><button type="button" data-act="cycle" ${going || !data.cycle ? "disabled" : ""}>Cycle</button>${going ? `<button type="button" class="stop" data-act="stop">Stop</button>` : ""}`);
+  put(el.querySelector("[data-said]"), run.ask ? `<span class="gold">${esc(run.ask.text)}</span>` : run.said ? `<span class="${run.bad ? "bad" : "dim"}">${esc(run.said)}</span>` : "");
+}
+
+const tell = (text, bad = false) => { run.said = text; run.bad = bad; panel(); };
+const auth = () => (run.key ? { authorization: `Bearer ${run.key}` } : {});
+
+function forget() {
+  run.key = null;
+  try { localStorage.removeItem(KEY); } catch {}
+}
+
+async function check(key) {
+  const res = await fetch("/api/auth", { headers: { authorization: `Bearer ${key}` } }).catch(() => null);
+  if (res?.status === 204) {
+    run.key = key;
+    keep(KEY, key);
+    run.said = "";
+    return panel();
+  }
+  tell(!res ? "No answer from the service" : res.status === 401 ? "Wrong key" : res.status === 403 ? "The service has no key set" : `The service cannot check the key (${res.status})`, true);
+}
+
+async function send(path, body, done) {
+  run.ask = null;
+  const res = await fetch(path, { method: "POST", headers: auth(), body: JSON.stringify(body) }).catch(() => null);
+  if (!res) return tell("No answer from the service", true);
+  const text = (await res.text()).trim();
+  if (res.status === 401) { forget(); return tell("The service refused the key", true); }
+  if (res.status === 403) return tell(text || "The service has no key set", true);
+  if (!res.ok) return tell(text || `Refused (${res.status})`, true);
+  tell(done);
+  load();
+  loadSide();
+}
+
+const seatsOf = () => [...Array.from({ length: run.beasts }, () => ({ dungeon: "beast" })), ...[...run.caps].map(([bag, maxSurvivor]) => ({ dungeon: "lootBag", bag, maxSurvivor }))];
+const ACTS = {
+  play: () => { run.ask = { text: plan(), go: () => send("/api/play", { seats: seatsOf() }, "Started") }; sync(); },
+  cycle: () => { run.ask = { text: cyclePlan(), go: () => send("/api/cycle", {}, "Cycle started") }; sync(); },
+  stop: () => send("/api/stop", {}, "Stopping after the current move"),
+  rank: () => send("/api/bags", {}, "Ranking the bags new in the pool"),
+  yes: () => run.ask?.go(),
+  back: () => { run.ask = null; sync(); },
+};
+
+$("run").onsubmit = (e) => { e.preventDefault(); check(e.target.key.value.trim()); };
+$("run").onclick = (e) => {
+  if (e.target.closest("[data-forget]")) { forget(); run.said = ""; return panel(); }
+  const act = e.target.closest("[data-act]");
+  if (act) ACTS[act.dataset.act]();
+};
+$("run").oninput = (e) => {
+  const t = e.target;
+  run.ask = null;
+  if (t.dataset.beasts !== undefined) run.beasts = Math.max(0, Math.floor(+t.value || 0));
+  if (t.dataset.cap && run.caps.has(+t.dataset.cap)) run.caps.set(+t.dataset.cap, +t.value || 0);
+  if (t.dataset.bag) {
+    const bag = +t.dataset.bag;
+    const cap = t.closest("li").querySelector(".cap");
+    if (t.checked) run.caps.set(bag, +cap.value || 0); else run.caps.delete(bag);
+    cap.disabled = !t.checked;
+    t.closest("li").classList.toggle("on", t.checked);
+  }
+  sync();
+};
+$("wallet").onclick = (e) => {
+  if (!e.target.closest("[data-play]")) return;
+  run.open = !run.open;
+  run.said = "";
+  run.ask = null;
+  render();
+  panel();
+  if (run.open) $("run").scrollIntoView({ block: "nearest" });
+};
 
 let due;
 const soon = () => { clearTimeout(due); due = setTimeout(load, ROUND_MS); };
@@ -399,6 +562,7 @@ $("again").onclick = () => watch(target(), true);
 $("stage").onclick = (e) => { if (e.target.closest("[data-details]")) go(`?game=${e.target.closest(".seat").dataset.id}`); };
 $("golive").onclick = () => go("");
 addEventListener("popstate", render);
+addEventListener("hashchange", render);
 
 const source = new EventSource("/events");
 source.onopen = load;

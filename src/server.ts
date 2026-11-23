@@ -7,13 +7,13 @@ import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
 import { z } from "zod";
 import { RUN, play, running, slain } from "./runner.ts";
-import { cycleStatus, startCycle, stopCycle } from "./cycle.ts";
+import { CYCLE, cycleStatus, startCycle, stopCycle } from "./cycle.ts";
 import { enrich, namedKills, seated, snapshot } from "./play.ts";
 import { balanceOf, deploy, isDeployed, keys, strkBalance } from "./wallet.ts";
 import { affixes, claimableKill, inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
 import { emit, liveRows, subscribe } from "./events.ts";
 import { SHIPPED, choose, chosen, version } from "./rules.ts";
-import { bagReport, collect, forSale, poolIds, quote, sendBeasts, usdPrice } from "./live.ts";
+import { bagMarket, bagOf, bagReport, collect, forSale, poolIds, quote, sendBeasts, usdPrice } from "./live.ts";
 import { ENDED, dungeonFigures, type Ended } from "./summary.ts";
 
 const page = readFileSync(new URL("../web/index.html", import.meta.url));
@@ -100,6 +100,11 @@ function openClaims(g: { id: number; mode: string }): number | null {
 
 const POOL_MS = 60_000;
 const pool = background(POOL_MS, () => poolIds(DUNGEONS.lootBag.pool!));
+const bagPrice = background(POOL_MS, async () => {
+  const ids = pool();
+  if (!ids?.length) throw new Error("the pool is not read yet");
+  return tokens((await bagMarket(DUNGEONS.lootBag.pool!, bagOf(ids[0]), ids)).quote.price);
+});
 
 let ranking: ChildProcess | undefined;
 
@@ -110,7 +115,7 @@ function rankBags(): void {
 
 function bags() {
   const [ranked, ids] = [existsSync(BAG_RANKING) ? JSON.parse(readFileSync(BAG_RANKING, "utf8")) : [], pool()];
-  return { rows: ids ? forSale(ranked, ids) : ranked, at: existsSync(BAG_RANKING) ? statSync(BAG_RANKING).mtimeMs : null, running: !!ranking };
+  return { rows: ids ? forSale(ranked, ids) : ranked, price: bagPrice() ?? null, at: existsSync(BAG_RANKING) ? statSync(BAG_RANKING).mtimeMs : null, running: !!ranking };
 }
 
 function beasts() {
@@ -220,8 +225,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     return reply(res, { game, events: events.map((e) => (e.kind === "state" ? { ...e, state: enrich(e.state) } : e)) });
   }
   if (url.pathname === "/api/summary") return reply(res, figures());
-  if (url.pathname === "/api/cycle") return reply(res, cycleStatus());
-  if (url.pathname === "/api/wallet") return reply(res, await wallet());
+  if (url.pathname === "/api/cycle") return reply(res, { ...cycleStatus(), ...CYCLE });
+  if (url.pathname === "/api/wallet") return reply(res, { ...(await wallet()), usd: price() ?? null });
   if (url.pathname === "/api/beasts") return reply(res, await beasts());
   if (url.pathname === "/api/items") return reply(res, ITEMS);
   if (url.pathname === "/api/check") return reply(res, existsSync(CHECK) ? JSON.parse(readFileSync(CHECK, "utf8")) : null);
