@@ -40,6 +40,11 @@ section[hidden] { display: none; }
 .rows { display: flex; flex-direction: column; gap: 0.4rem; }
 .rows li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.6rem; padding: 0.25rem 0.7rem 0.25rem 0.4rem; }
 .rows b { font: 400 2rem/1 var(--num); color: var(--gold); }
+.rows.fit, .fit { column-gap: 0; }
+.pager { display: flex; justify-content: center; align-items: center; gap: 0.8rem; }
+.pager[hidden] { display: none; }
+.pager button { padding: 0 0.6rem; border: 2px solid var(--edge); border-radius: 3px; color: var(--bone); }
+.pager button:disabled { opacity: 0.3; cursor: default; }
 .rows img { width: 2.4rem; height: 2.4rem; object-fit: contain; }
 .tag { padding: 0 0.35rem; border-radius: 3px; background: var(--lime); color: #000; margin-left: 0.4rem; }
 
@@ -157,7 +162,7 @@ section[hidden] { display: none; }
 #run input:disabled { opacity: 0.4; }
 #run input[type="password"] { flex: 1; width: auto; min-width: 0; text-align: left; }
 #run form { display: flex; gap: 0.5rem; align-items: center; }
-#run form label { flex: 1; }
+#run form label { flex: 1; min-width: 0; }
 #run .over .cap { color: var(--blood); border-color: var(--blood); }
 #picks li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.5rem; padding: 0.1rem 0.4rem; }
 #picks li.on { border-color: var(--gold); }
@@ -169,6 +174,7 @@ section[hidden] { display: none; }
 .acts .stop { color: var(--blood); border-color: var(--blood); }
 .acts button:disabled { opacity: 0.4; cursor: default; }
 .link { color: var(--dim); text-decoration: underline; }
+.forget { align-self: flex-end; }
 
 
 @media (max-width: 900px) {
@@ -360,24 +366,61 @@ function render() {
   $("warn").title = c?.failures?.join("\n") ?? "";
 
   const w = data.wallet;
-  put($("wallet"), `<div class="head"><h2>Wallet</h2>${canPlay() ? `<span class="seg"><button type="button" data-play aria-pressed="${run.open}" title="Start or stop a run">Play</button></span>` : ""}</div>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
+  put($("wallet"), `<div class="head"><h2>Wallet</h2>${canPlay() ? `<span class="seg"><button type="button" data-view="holdings" aria-pressed="${!run.open}" title="Beasts and loot bags">Holdings</button><button type="button" data-view="play" aria-pressed="${run.open}" title="Start or stop a run">Play</button></span>` : ""}</div>${!w ? "" : w.strk === undefined ? `<span class="bad">No answer</span>` : `<div class="big ${w.strk > w.floor ? "good" : "bad"}" title="The agent never spends below ${w.floor} STRK">${round(w.strk, 1)} <small>STRK</small></div>
     <div class="row"><span>${pic("dungeon_ticket", "Tickets")}<span class="n">${round(w.tickets, 1)}</span></span><span>${pic("survivor_token", "SURVIVOR tokens")}<span class="n">${round(w.survivor, 1)}</span></span></div>`}${data.cycle?.text ? `<div class="dim" title="${data.cycle.on ? "What the cycle does now" : "How the last cycle ended"}">Cycle: ${esc(data.cycle.text)}</div>` : ""}`);
 
   const b = data.beasts;
   const STATE = { held: "", staked: ", staked", mega: ", Mega", claim: ", to claim" };
   const cell = (x, collection) => `<div class="card ${x.state}" title="${esc(`${x.name}: tier ${x.tier} ${x.type}, level ${x.level}${STATE[x.state]}${x.strk === null ? "" : `, sells for ${round(x.strk, 1)} STRK`}`)}"><img src="${face(x.kind, collection)}" alt="${esc(x.name)}"><i>T${x.tier}</i><b>${x.level}</b></div>`;
   const tiers = (x) => x.tiers.map((n, i) => (n ? `<span><span class="gold">T${i + 1}</span> <span class="n">${round(n)}</span></span>` : "")).join("");
-  const group = (x) => `<div class="head"><span><span class="dim">${x.name}</span><span class="n">${round(x.held)}</span>${x.claims ? `<span class="gold">${x.claims} to claim</span>` : ""}</span>${x.usd === null ? "" : `<span class="n" title="What the pools pay for them now, one at a time, at the STRK price Ekubo quotes">$${round(x.usd, 2)}</span>`}</div>${x.held ? `<div class="row tally">${tiers(x)}${x.mega ? `<span><span class="n">${x.mega}</span> Mega</span>` : ""}${x.staked ? `<span><span class="n">${x.staked}</span> staked</span>` : ""}</div>` : ""}${x.beasts.length ? `<div class="cells">${x.beasts.slice(0, STRIP).map((y) => cell(y, x.key)).join("")}</div>` : ""}`;
+  const group = (x) => `<div class="head"><span><span class="dim">${x.name}</span><span class="n">${round(x.held)}</span>${x.claims ? `<span class="gold">${x.claims} to claim</span>` : ""}</span>${x.usd === null ? "" : `<span class="n" title="What the pools pay for them now, one at a time, at the STRK price Ekubo quotes">$${round(x.usd, 2)}</span>`}</div>${x.held ? `<div class="row tally">${tiers(x)}${x.mega ? `<span><span class="n">${x.mega}</span> Mega</span>` : ""}${x.staked ? `<span><span class="n">${x.staked}</span> staked</span>` : ""}</div>` : ""}${x.beasts.length ? `<div class="cells">${x.beasts.slice(zooAt(x) * STRIP, zooAt(x) * STRIP + STRIP).map((y) => cell(y, x.key)).join("")}</div>${bar(`zoo:${x.key}`, zooAt(x), Math.ceil(x.beasts.length / STRIP))}` : ""}`;
   put($("beasts"), `<div class="head"><h2>Beasts</h2><span class="n big">${b?.groups ? round(b.groups.reduce((n, x) => n + x.held, 0)) : ""}</span></div>${b?.failed ? `<span class="bad">No answer</span>` : ""}${b?.groups ? `<div id="zoo">${b.groups.map(group).join("")}</div>` : ""}`);
 
   const first = (text) => text.replace(/ (T\d|G\d).*$/, "");
   const age = (Date.now() - (data.bags?.at ?? NaN)) / 60_000;
   const since = isNaN(age) ? "" : age < 1 ? "now" : age < 60 ? `${Math.floor(age)} min ago` : age < 1440 ? `${Math.floor(age / 60)} h ago` : `${Math.floor(age / 1440)} d ago`;
   const sacks = [...(data.bags?.rows ?? [])].sort((a, b) => (b[bagSort] ?? -1) - (a[bagSort] ?? -1)).slice(0, BAGS);
-  put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><div class="head"><span class="dim">${data.bags?.running ? "Ranking the pool's bags" : `Ranked ${since || "never"}`}</span></div><ol id="sacks" class="rows fit">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>${x.n ? `x${x.n}` : ""}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>`);
+  put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><div class="head"><span class="dim">${data.bags?.running ? "Ranking the pool's bags" : `Ranked ${since || "never"}`}</span></div><ol id="sacks" class="rows fit">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>${x.n ? `x${x.n}` : ""}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>${bar("sacks")}`);
   if (run.open && run.key && run.rows !== forPlay().map((x) => x.bag).join()) panel();
   else sync();
+  pagers();
 }
+
+const page = { sacks: 0, picks: 0 };
+const zoo = {};
+const zooAt = (x) => Math.min(zoo[x.key] ?? 0, Math.max(0, Math.ceil(x.beasts.length / STRIP) - 1));
+const bar = (id, at = 0, n = 1) => `<div class="pager" data-pager="${id}" ${n < 2 && !(id in page) ? "hidden" : ""}><button type="button" data-step="-1" aria-label="Previous page" ${at ? "" : "disabled"}>‹</button><span class="dim">${at + 1}/${n}</span><button type="button" data-step="1" aria-label="Next page" ${at < n - 1 ? "" : "disabled"}>›</button></div>`;
+
+function pagers() {
+  for (const id of Object.keys(page)) {
+    const list = $(id);
+    const pager = document.querySelector(`[data-pager="${id}"]`);
+    if (!list || !pager || !list.offsetParent) continue;
+    pager.hidden = false;
+    const origin = list.getBoundingClientRect().left - list.scrollLeft;
+    const columns = [...new Set([...list.children].map((x) => Math.round(x.getBoundingClientRect().left - origin)))].sort((x, y) => x - y);
+    const n = Math.max(1, columns.length);
+    page[id] = Math.max(0, Math.min(page[id], n - 1));
+    pager.hidden = n < 2;
+    list.scrollLeft = columns[page[id]] ?? 0;
+    pager.querySelector("span").textContent = `${page[id] + 1}/${n}`;
+    pager.querySelector("[data-step='-1']").disabled = page[id] === 0;
+    pager.querySelector("[data-step='1']").disabled = page[id] === n - 1;
+  }
+}
+
+addEventListener("click", (e) => {
+  const step = e.target.closest("[data-step]");
+  if (!step) return;
+  const id = step.closest("[data-pager]").dataset.pager;
+  if (id in page) {
+    page[id] += Number(step.dataset.step);
+    return pagers();
+  }
+  const key = id.slice("zoo:".length);
+  zoo[key] = (zoo[key] ?? 0) + Number(step.dataset.step);
+  render();
+});
 
 const KEY = "playKey";
 const run = { open: false, key: keep(KEY), beasts: 0, caps: new Map(), said: "", bad: false, ask: null, rows: "" };
@@ -399,7 +442,7 @@ function plan() {
   const caps = [...run.caps.values()];
   const c = cost(run.beasts, caps.length);
   const cap = caps.reduce((n, x) => n + x, 0);
-  const parts = [run.beasts ? `${run.beasts} Beast game${run.beasts > 1 ? "s" : ""}` : "", caps.length ? `${caps.length} Loot bag${caps.length > 1 ? "s" : ""}` : ""].filter(Boolean).join(" and ");
+  const parts = [run.beasts ? `${run.beasts} Beast game${run.beasts > 1 ? "s" : ""}` : "", caps.length ? `Loot bag${caps.length > 1 ? "s" : ""} ${[...run.caps.keys()].join(", ")}` : ""].filter(Boolean).join(" and ");
   const bags = caps.length ? `at most ${amount(cap, "SURVIVOR")} for the bags${isNaN(c.survivor) ? "" : ` (${amount(c.survivor, "SURVIVOR")} now)`} and ` : "";
   return `Play ${parts}: ${bags}about ${amount(c.strk, "STRK")} in moves${isNaN(c.usd) ? "" : `, $${round(c.usd, 2)} at today's prices`}?`;
 }
@@ -420,12 +463,11 @@ function panel() {
   const ranked = forPlay();
   run.rows = ranked.map((x) => x.bag).join();
   for (const bag of run.caps.keys()) if (!ranked.some((x) => x.bag === bag)) run.caps.delete(bag);
-  const rows = [...ranked.filter((x) => run.caps.has(x.bag)), ...ranked.filter((x) => !run.caps.has(x.bag))];
   const cap = data.cycle?.bagCapSurvivor ?? "";
   el.innerHTML = `    <label>Beast games <input type="number" data-beasts min="0" step="1" value="${run.beasts}"></label>
     <div class="head"><span>Loot bags <small class="dim" data-each></small></span><span class="seg"><button type="button" data-act="rank" title="Rank the bags new in the pool">Refresh</button></span></div>
-    <ol id="picks" class="fit">${rows.map((x) => `<li class="card${run.caps.has(x.bag) ? " on" : ""}" data-row="${x.bag}"><input type="checkbox" data-bag="${x.bag}" aria-label="Bag ${x.bag}" ${run.caps.has(x.bag) ? "checked" : ""}><span><span class="dim">${x.bag}</span> ${x.kills === undefined ? "-" : round(x.kills, 1)} kills${x.n > 1 ? ` <span class="dim">x${x.n}</span>` : ""}</span><input type="number" class="cap" data-cap="${x.bag}" min="1" step="1" value="${run.caps.get(x.bag) ?? cap}" title="Most SURVIVOR to pay for this bag" aria-label="SURVIVOR cap for bag ${x.bag}" ${run.caps.has(x.bag) ? "" : "disabled"}></li>`).join("") || `<li class="dim">No ranked bag for sale</li>`}</ol>
-    <p data-spend></p><div class="acts" data-acts></div><div class="head"><span data-said></span><button type="button" class="link" data-forget>Forget key</button></div>`;
+    <ol id="picks" class="fit">${ranked.map((x) => `<li class="card${run.caps.has(x.bag) ? " on" : ""}" data-row="${x.bag}"><input type="checkbox" data-bag="${x.bag}" aria-label="Bag ${x.bag}" ${run.caps.has(x.bag) ? "checked" : ""}><span><span class="dim">${x.bag}</span> ${x.kills === undefined ? "-" : round(x.kills, 1)} kills${x.n > 1 ? ` <span class="dim">x${x.n}</span>` : ""}</span><input type="number" class="cap" data-cap="${x.bag}" min="1" step="1" value="${run.caps.get(x.bag) ?? cap}" title="Most SURVIVOR to pay for this bag" aria-label="SURVIVOR cap for bag ${x.bag}" ${run.caps.has(x.bag) ? "" : "disabled"}></li>`).join("") || `<li class="dim">No ranked bag for sale</li>`}</ol>${bar("picks")}
+    <p data-spend></p><div class="acts" data-acts></div><p data-said></p><button type="button" class="link forget" data-forget>Forget key</button>`;
   sync();
 }
 
@@ -444,20 +486,7 @@ function sync() {
   const going = busy();
   put(el.querySelector("[data-acts]"), run.ask ? `<button type="button" class="go" data-act="yes">Spend</button><button type="button" data-act="back">Back</button>` : `<button type="button" class="go" data-act="play" ${going || !(run.beasts || run.caps.size) ? "disabled" : ""}>Play</button><button type="button" data-act="cycle" ${going || !data.cycle ? "disabled" : ""}>Cycle</button>${going ? `<button type="button" class="stop" data-act="stop">Stop</button>` : ""}`);
   put(el.querySelector("[data-said]"), run.ask ? `<span class="gold">${esc(run.ask.text)}</span>` : run.said ? `<span class="${run.bad ? "bad" : "dim"}">${esc(run.said)}</span>` : "");
-  const picks = $("picks");
-  const edge = picks.getBoundingClientRect().right - 1;
-  const gone = picks.offsetWidth ? [...picks.querySelectorAll("input:checked")].filter((box) => box.closest("li").getBoundingClientRect().left >= edge) : [];
-  if (!gone.length) return;
-  for (const box of gone) {
-    box.checked = false;
-    box.closest("li").classList.remove("on");
-    box.closest("li").querySelector(".cap").disabled = true;
-    run.caps.delete(+box.dataset.bag);
-  }
-  run.ask = null;
-  run.said = gone.length > 1 ? `Bags ${gone.map((box) => box.dataset.bag).join(", ")} no longer fit the list and were unchecked` : `Bag ${gone[0].dataset.bag} no longer fits the list and was unchecked`;
-  run.bad = true;
-  sync();
+  pagers();
 }
 
 const tell = (text, bad = false) => { run.said = text; run.bad = bad; panel(); };
@@ -523,7 +552,8 @@ $("run").oninput = (e) => {
   sync();
 };
 $("wallet").onclick = (e) => {
-  if (!e.target.closest("[data-play]")) return;
+  const view = e.target.closest("[data-view]");
+  if (!view || (view.dataset.view === "play") === run.open) return;
   run.open = !run.open;
   run.said = "";
   run.ask = null;
@@ -577,7 +607,7 @@ $("stage").onclick = (e) => { if (e.target.closest("[data-details]")) go(`?game=
 $("golive").onclick = () => go("");
 addEventListener("popstate", render);
 addEventListener("hashchange", render);
-addEventListener("resize", sync);
+addEventListener("resize", () => { sync(); pagers(); });
 
 const source = new EventSource("/events");
 source.onopen = load;
