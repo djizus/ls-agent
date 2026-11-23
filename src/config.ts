@@ -1,3 +1,9 @@
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+
+const SETTINGS = `${homedir()}/.config/ls-agent/env`;
+if (existsSync(SETTINGS)) process.loadEnvFile(SETTINGS);
+
 export const RPC_URL = process.env.LS_RPC_URL ?? "https://starknet-rpc.publicnode.com";
 export const WS_URL = RPC_URL.replace(/^http/, "ws");
 export const SEATS = Math.max(1, Number(process.env.LS_SEATS ?? 1));

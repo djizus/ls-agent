@@ -20,7 +20,7 @@ ls-agent deploy          # after sending STRK to that address: deploys the accou
 
 `var/wallet.json` holds the private key in plain text. Whoever reads it owns the funds, so back it up. Practice games and `ls-agent bench` need no wallet and cost nothing.
 
-`ls-agent start` reads these environment variables, and `scripts/prove.sh` also reads `~/.config/ls-agent/env`. Every other command reads `LS_HOST` and `LS_PORT` to find the service.
+Every command, `ls-agent start` included, reads these settings from the environment and from `~/.config/ls-agent/env` when that file exists, one `NAME=value` a line; a variable set in the shell wins over the file. Put them in the file so the service and the commands agree on where the service listens.
 
 | Variable | Default | Meaning |
 |---|---|---|

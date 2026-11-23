@@ -6,7 +6,6 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/var/evidence/$(date +%Y%m%d-%H%M%S)"
 port="${LS_PROVE_PORT:-4199}"
 mkdir -p "$out"
-[[ -f "$HOME/.config/ls-agent/env" ]] && set -a && source "$HOME/.config/ls-agent/env" && set +a
 
 LS_HOST=127.0.0.1 LS_PORT="$port" LS_VAR_DIR="$out/" node --disable-warning=ExperimentalWarning "$root/src/cli.ts" start > "$out/service.log" 2>&1 &
 service=$!

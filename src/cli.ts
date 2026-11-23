@@ -16,6 +16,8 @@ async function call(path: string, body?: unknown): Promise<string> {
   return text;
 }
 
+const round = (n: number) => (Math.abs(n) < 1 ? +n.toPrecision(2) : +n.toFixed(1));
+const amount = (n: number | undefined) => (n === undefined ? "?" : round(n));
 const show = (text: string) => console.log(JSON.stringify(JSON.parse(text), null, 2));
 
 async function follow(send: () => Promise<unknown>, end: (e: Event) => boolean): Promise<void> {
@@ -43,14 +45,14 @@ async function follow(send: () => Promise<unknown>, end: (e: Event) => boolean):
   await reader.cancel();
   for (const row of rows) {
     const { game } = JSON.parse(await call(`/api/games/${row}`));
-    console.log(`game ${row}, ${game.dungeon ?? game.mode}: level ${game.level ?? "-"}, ${game.beasts ?? 0} named kills, ${game.claimed ?? 0} claimed, ${(game.gas_strk ?? 0).toFixed(2)} STRK gas, ${game.ending ?? "unfinished"}`);
+    console.log(`game ${row}, ${game.dungeon ?? game.mode}: level ${game.level ?? "-"}, ${game.beasts ?? 0} named kills, ${game.claimed ?? 0} claimed, ${round(game.gas_strk ?? 0)} STRK gas, ${game.ending ?? "unfinished"}`);
   }
   await wallet();
 }
 
 async function wallet(): Promise<void> {
   const w = JSON.parse(await call("/api/wallet"));
-  console.log(`wallet ${w.address}${w.deployed === false ? " (not deployed)" : ""}: ${w.strk ?? "?"} STRK, ${w.tickets ?? "?"} tickets, ${w.survivor ?? "?"} SURVIVOR`);
+  console.log(`wallet ${w.address}${w.deployed === false ? " (not deployed)" : ""}: ${amount(w.strk)} STRK, ${amount(w.tickets)} tickets, ${amount(w.survivor)} SURVIVOR`);
 }
 
 const batchDone = (e: Event) => e.kind === "status" && e.text === "batch done";
