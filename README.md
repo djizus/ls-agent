@@ -1,6 +1,6 @@
 # ls-agent
 
-A bot that plays Loot Survivor 2, a dungeon game on the Starknet blockchain. It picks every move with fixed rules, pays for each move from its own wallet, and keeps the beasts it kills. Several games run side by side and send their moves together, so they share the network fee.
+A bot that plays Loot Survivor 2, a dungeon game on the Starknet blockchain. It picks every move with fixed rules, pays for each move from its own wallet, and keeps the beasts it kills. Given more than one seat, it runs several games side by side and sends their moves together, so they share the network fee.
 
 You watch it on a page served from your own machine, at http://127.0.0.1:4100 once `ls-agent start` runs. Whoever holds the key can also start and stop runs there, from the Play panel at `/#play`.
 
@@ -20,6 +20,18 @@ ls-agent deploy          # after sending STRK to that address: deploys the accou
 ```
 
 `var/wallet.json` holds the private key in plain text. Whoever reads it owns the funds, so back it up. Practice games (`ls-agent play --practice`) and `ls-agent bench` cost nothing.
+
+Before the first real game, the wallet needs STRK: send some to the address `ls-agent wallet` prints, run `ls-agent deploy`, then `ls-agent play beast 5`. Loot Dungeon games also need SURVIVOR for the bag: each beast a Beast Mode claim brings pays 10 to 14 SURVIVOR to the wallet, while Loot Dungeon claims pay none, so Beast Mode games fund the bags, or you send SURVIVOR to the same address.
+
+One seat plays the games of a run one after another. Set `LS_SEATS=8` to play eight at once, sharing each round's transaction; the default stays 1 so a new wallet spends on one game at a time.
+
+To keep the service running after you log out, edit `WorkingDirectory` and the node path in `deploy/ls-agent.service` to match this checkout, then:
+
+```
+ln -s "$PWD/deploy/ls-agent.service" ~/.config/systemd/user/
+systemctl --user enable --now ls-agent
+loginctl enable-linger $USER
+```
 
 Every command, `ls-agent start` included, reads these settings from the environment and from `~/.config/ls-agent/env` when that file exists, one `NAME=value` a line; a variable set in the shell wins over the file. Put them in the file so the service and the commands agree on where the service listens.
 
@@ -65,7 +77,7 @@ When a game ends, its seat takes the next game, and a minute later the bot settl
 | Command | Example | What it does |
 |---|---|---|
 | `start` | `ls-agent start` | Runs the service: the page, the API and every run |
-| `play` | `ls-agent play lootBag 7273 3378 7843 7808 --max 100` | Buys four bags, each for at most 100 SURVIVOR, and plays one Loot Dungeon game on each, side by side. Refused before anything is bought when a run is going, when the pool lacks a bag, or when a bag costs more than `--max` or the bags more than the wallet holds |
+| `play` | `ls-agent play lootBag 7273 3378 7843 7808 --max 100` | Buys four bags, each for at most 100 SURVIVOR, and plays one Loot Dungeon game on each, side by side when `LS_SEATS` is 4 or more. Refused before anything is bought when a run is going, when the pool lacks a bag, or when a bag costs more than `--max` or the bags more than the wallet holds |
 | | `ls-agent play beast 40` | Plays 40 Beast Mode games |
 | | `ls-agent play beast 10 lootBag 7273 --max 90` | Both at once |
 | | `ls-agent play --practice beast 20 lootBag 5` | Practice games on the benchmark starts, for nothing |
