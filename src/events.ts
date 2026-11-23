@@ -1,7 +1,6 @@
 type AgentEvent = (
-  | { kind: "decision"; phase: string; options: unknown[]; thought: string; actions: unknown[]; note: string; reserve: number; costUsd: number }
+  | { kind: "decision"; phase: string; thought: string; actions: unknown[] }
   | { kind: "rejected"; actions: unknown[]; reason: string }
-  | { kind: "preview"; actions: unknown; result: string }
   | { kind: "status"; text: string; ending?: string }
   | { kind: "cycle"; on: boolean; text: string }
   | { kind: "state"; game: string; state: object }

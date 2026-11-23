@@ -10,7 +10,7 @@ import { NECK, beastHit, yourHit } from "./engine/damage.ts";
 import { actLive, liveGame, type Entry, type Starts } from "./live.ts";
 import type { Dungeon } from "./config.ts";
 import { ARMOR_SLOTS, foeOf, toSnapshot } from "./engine/engine.ts";
-import { act, audit, newPracticeGame, preview, revertReason, type Game, type Snapshot } from "./practice.ts";
+import { act, audit, newPracticeGame, revertReason, type Game, type Snapshot } from "./practice.ts";
 
 type Worn = LootItem & { greatness: number; xp: number; suffix?: string; bonus?: Partial<Stats> };
 type Gear = Worn & { toNext: number; grants: string[] };
@@ -192,7 +192,7 @@ export function render(s: State): string {
   return lines.join("\n");
 }
 
-export type Phase = "battle" | "explore";
+type Phase = "battle" | "explore";
 
 export type Table = { game: Game; last: Snapshot; row?: number };
 
@@ -237,65 +237,11 @@ export async function commit(moves: { table: Table; actions: Action[] }[], start
   return { committed, started: "error" in sent.started ? { error: new Error(revertReason(sent.started.error)) } : sent.started, strk: sent.strk };
 }
 
-const SAMPLES = 8;
-
-type Odds = { death: number; ongoing: number; hp: [number, number, number]; xp: number; gold: number };
-export type Option = { move: string; label: string } & (Odds | { error: string });
-
-async function odds(t: Table, actions: Action[], samples: number): Promise<Odds> {
-  const outcomes = preview(t.game, actions, samples);
-  const pick = (values: number[]) => values.sort((x, y) => x - y)[Math.floor(samples / 2)];
-  const hp = outcomes.map((o) => o.adventurer.health).sort((x, y) => x - y);
-  return {
-    death: outcomes.filter((o) => o.adventurer.health === 0).length / samples,
-    ongoing: outcomes.filter((o) => o.adventurer.beast_health > 0).length / samples,
-    hp: [hp[0], hp[Math.floor(samples / 2)], hp[samples - 1]],
-    xp: pick(outcomes.map((o) => o.adventurer.xp - t.last.adventurer.xp)),
-    gold: pick(outcomes.map((o) => o.adventurer.gold - t.last.adventurer.gold)),
-  };
-}
-
-export function describeOdds(o: Odds): string {
-  const pct = (n: number) => `${Math.round(100 * n)}%`;
-  return `death ${pct(o.death)}, still in battle ${pct(o.ongoing)}, HP after worst ${o.hp[0]} median ${o.hp[1]} best ${o.hp[2]}, XP gained median ${o.xp}, gold change median ${o.gold}`;
-}
-
-export async function forecast(actions: Action[], samples: number): Promise<string> {
-  const [t] = tables;
-  if (!t || t.last.over) return "No game in progress.";
-  try {
-    return describeOdds(await odds(t, actions, samples));
-  } catch (err) {
-    return `rejected: ${revertReason(err)}`;
-  }
-}
-
-const LABEL: Record<string, string> = { attack: "fight until it ends", flee: "flee until escaped", explore: "explore one step (after the automatic heal)" };
-
-export async function options(t: Table, s: State): Promise<Option[]> {
-  if (s.statUpgradesAvailable > 0) return [];
-  const moves: Action[] = s.beast ? [{ type: "attack" }, { type: "flee" }] : [{ type: "explore" }];
-  return Promise.all(
-    moves.map(async (m) => {
-      try {
-        return { move: m.type, label: LABEL[m.type], ...(await odds(t, shape(s, [m]), SAMPLES)) };
-      } catch (err) {
-        return { move: m.type, label: LABEL[m.type], error: revertReason(err) };
-      }
-    }),
-  );
-}
-
-export function describeOptions(list: Option[]): string {
-  if (!list.length) return "";
-  return [`Simulated outcomes (${SAMPLES} samples each):`, ...list.map((o) => `- ${o.label}: ${"error" in o ? `rejected: ${o.error}` : describeOdds(o)}`)].join("\n");
-}
-
 const RANDOM = new Set(["explore", "attack", "flee"]);
 
 export const auditGame = (t: Table): Promise<string | undefined> => audit(t.game);
 
-export function shape(s: State, actions: Action[], reserve = 0): Action[] {
+export function shape(s: State, actions: Action[]): Action[] {
   if (s.beast) return actions;
   const ups = (stat: string) => actions.reduce((n, a) => n + (a.type === "upgrade" && a.stat === stat ? a.amount : 0), 0);
   const lost = (stat: "vitality" | "charisma") => actions.reduce((n, a) => n + (a.type === "drop" ? ([...s.bag, ...s.equipment].find((g) => g.id === a.item)?.bonus?.[stat] ?? 0) : 0), 0);
@@ -307,7 +253,7 @@ export function shape(s: State, actions: Action[], reserve = 0): Action[] {
   const wanted = actions.reduce((n, a) => n + (a.type === "potions" ? a.qty : 0), 0);
   const needed = Math.ceil((maxHealth - health) / 10);
   const exploring = actions.at(-1)?.type === "explore";
-  const healing = exploring ? Math.min(needed, Math.floor(Math.max(0, gold - reserve) / price)) : 0;
+  const healing = exploring ? Math.min(needed, Math.floor(Math.max(0, gold) / price)) : 0;
   const qty = Math.min(Math.max(wanted, healing), needed, Math.floor(gold / price));
   const rest = actions.filter((a) => a.type !== "potions");
   const random = rest.filter((a) => RANDOM.has(a.type));

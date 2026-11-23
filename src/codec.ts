@@ -34,7 +34,6 @@ const action = z.discriminatedUnion("type", [
   z.object({ type: z.literal("drop"), item: itemId }),
   z.object({ type: z.literal("potions"), qty: z.number().int().min(1).max(255).describe("Each heals 10 HP.") }),
 ]);
-export const actions = z.array(action).min(1).max(15);
 export type Action = z.infer<typeof action>;
 
 const item = (v: bigint): Item => ({ id: Number(v & 127n), xp: Number(v >> 7n) });

@@ -16,8 +16,7 @@ db.exec(`
     ended_at INTEGER,
     level INTEGER,
     xp INTEGER,
-    moves INTEGER,
-    cost_usd REAL NOT NULL DEFAULT 0
+    moves INTEGER
   );
   CREATE TABLE IF NOT EXISTS strategies (
     hash TEXT PRIMARY KEY,

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Action } from "./codec.ts";
+import { encodePacket, type Action } from "./codec.ts";
 import { DUNGEONS } from "./config.ts";
 import { begin, commit, current, enrich, namedKills, namedSlain, render, shape, type State, type Table } from "./play.ts";
-import { act, newPracticeGame, preview, replay, type Snapshot } from "./practice.ts";
+import { step, toSnapshot } from "./engine/engine.ts";
+import { act, newPracticeGame, randomHash, replay, type Snapshot } from "./practice.ts";
 
 const move = async (table: Table, actions: Action[]): Promise<State> => {
   const [moved] = (await commit([{ table, actions }])).committed;
@@ -33,10 +34,11 @@ test("attack and flee without a threshold run until the fight ends; tillHealth s
     snap = act(game, [...(points ? [{ type: "upgrade" as const, stat: "dexterity" as const, amount: points }] : []), { type: "explore" }]);
   }
   const ended = (o: Snapshot) => o.adventurer.health === 0 || o.adventurer.beast_health === 0;
-  assert.ok((preview(game, [{ type: "attack" }], 8)).every(ended));
-  assert.ok((preview(game, [{ type: "flee" }], 8)).every(ended));
+  const outcomes = (actions: Action[]) => Array.from({ length: 8 }, () => toSnapshot(step(game.local, game.id, encodePacket(actions), randomHash())));
+  assert.ok(outcomes([{ type: "attack" }]).every(ended));
+  assert.ok(outcomes([{ type: "flee" }]).every(ended));
   const floor = snap.adventurer.health - 1;
-  assert.ok((preview(game, [{ type: "attack", tillHealth: floor }], 8)).every((o) => o.adventurer.health > 0 && (o.adventurer.beast_health === 0 || o.adventurer.health <= floor)));
+  assert.ok(outcomes([{ type: "attack", tillHealth: floor }]).every((o) => o.adventurer.health > 0 && (o.adventurer.beast_health === 0 || o.adventurer.health <= floor)));
 });
 
 test("potion price formula matches the contract; explores are healed first", { timeout: 300_000 }, async () => {
@@ -63,9 +65,6 @@ test("potion price formula matches the contract; explores are healed first", { t
   const potions = healed.find((a) => a.type === "potions");
   assert.ok(potions && potions.type === "potions");
   assert.equal(potions.qty, Math.min(Math.ceil((state.maxHealth - state.health) / 10), Math.floor(state.gold / state.potionPrice)));
-  assert.equal(shape(state, [{ type: "explore" }], state.gold).some((a) => a.type === "potions"), false);
-  const half = shape(state, [{ type: "explore" }], Math.floor(state.gold / 2)).find((a) => a.type === "potions");
-  assert.ok(!half || (half.type === "potions" && half.qty * state.potionPrice <= state.gold - Math.floor(state.gold / 2)));
   const one = await move(table!, [{ type: "potions", qty: 1 }]);
   assert.equal(goldBefore - one.gold, state.potionPrice);
   assert.equal(one.health, Math.min(healthBefore + 10, state.maxHealth));

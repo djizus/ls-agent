@@ -37,6 +37,6 @@ node -e '
 const g = require(process.argv[1]);
 const kinds = {};
 for (const l of require("fs").readFileSync(process.argv[2], "utf8").split("\n").filter(Boolean)) { const k = JSON.parse(l).kind; kinds[k] = (kinds[k] || 0) + 1; }
-console.log(JSON.stringify({ games: g.map(({ id, level, xp, moves, cost_usd }) => ({ id, level, xp, moves, cost_usd })), events: kinds }, null, 1));
+console.log(JSON.stringify({ games: g.map(({ id, level, xp, moves }) => ({ id, level, xp, moves })), events: kinds }, null, 1));
 ' "$out/games.json" "$out/events.jsonl"
 echo "evidence: $out"

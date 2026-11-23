@@ -12,7 +12,6 @@ import { balanceOf, keys, strkBalance } from "./wallet.ts";
 import { affixes, claimableKill, inventory, pendingClaims, sellPrices, worth } from "./beasts.ts";
 import { liveRows, subscribe } from "./events.ts";
 import { forSale, poolIds, usdPrice } from "./live.ts";
-import { handleMcp } from "./mcp.ts";
 import { ENDED, dungeonFigures, type Ended } from "./summary.ts";
 
 const page = readFileSync(new URL("../web/index.html", import.meta.url));
@@ -146,8 +145,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown
     if (req.method === "POST") rankBags();
     return reply(res, bags());
   }
-  if (!own && (req.method !== "GET" || url.pathname === "/mcp")) return res.writeHead(403).end();
-  if (url.pathname === "/mcp") return handleMcp(req, res, req.method === "POST" ? await json(req) : undefined);
+  if (!own && req.method !== "GET") return res.writeHead(403).end();
   if (url.pathname === "/events") {
     res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
     res.write(":\n\n");

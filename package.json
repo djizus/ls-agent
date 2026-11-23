@@ -17,7 +17,6 @@
     "prove": "scripts/prove.sh"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.2",
     "starknet": "^10.8.0",
     "zod": "^4.6.7"
   },

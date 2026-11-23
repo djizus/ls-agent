@@ -82,11 +82,6 @@ export function act(game: Game, actions: Action[]): Snapshot {
   return toSnapshot(game.local);
 }
 
-export function preview(game: Game, actions: Action[], samples: number): Snapshot[] {
-  const packet = encodePacket(actions);
-  return Array.from({ length: samples }, () => toSnapshot(step(game.local, game.id, packet, randomHash())));
-}
-
 export async function audit(game: Game): Promise<string | undefined> {
   for (let moves = game.packets.length; moves > 0; moves = Math.floor(moves * 0.8)) {
     const [packets, luckHashes] = [game.packets.slice(0, moves), hashes(game).slice(0, moves)];

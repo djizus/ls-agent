@@ -69,7 +69,6 @@ Environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env`.
 | `LS_VAR_DIR` | `var/` | Where the wallet, database and caches live. End it with a slash. |
 | `LS_RPC_URL` | public node | Starknet RPC |
 | `LS_PACE_MS` | 0 | Pause between a decision and its move |
-| `LS_DECIDER` | `rules` | `rules` is `src/policy.ts`, local and free. `jev` asks `api.typesafe.ai` (`TYPESAFE_API_KEY`, `LS_JEV_MODEL`); `model` runs the `model` command (`LS_MODEL`, `LS_EFFORT`, `LS_STRATEGY`). Both play one game at a time. |
 
 ## Feature map
 
@@ -89,7 +88,6 @@ Environment variables. `scripts/prove.sh` also reads `~/.config/ls-agent/env`.
 | Play real games by hand | `POST /api/play {"live":true,"games":3}`; add `"dungeon":"lootBag","bag":7806,"maxSurvivor":90` for a Loot Dungeon game |
 | Practice games | `POST /api/play {"games":20}`, with `"dungeon":"lootBag"` for Loot Dungeon starts. Not on the page. |
 | Game data | `GET /api/state`, `/api/games`, `/api/games/<row id>`, `/api/items`, `/events` |
-| Preview a decision against random luck, for a model decider | MCP tool `preview` at `/mcp`, from the machine itself |
 | Wallet address and balance / deploy the account | `node src/cli.ts wallet` / `node src/cli.ts deploy` |
 | Settle a game and claim its beasts (runs by itself) / its simulated cost | `node src/cli.ts collect <game id>` / `node src/cli.ts quote <game id>` |
 | A bag's price, whether the pool holds it, a simulated purchase | `node src/cli.ts bag <bag number> [address]`, from the wallet unless an address is given; the simulation needs a deployed account |
