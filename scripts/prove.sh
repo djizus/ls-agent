@@ -6,6 +6,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/var/evidence/$(date +%Y%m%d-%H%M%S)"
 port="${LS_PROVE_PORT:-4199}"
 mkdir -p "$out"
+export LS_TOKEN="$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')"
 
 LS_HOST=127.0.0.1 LS_PORT="$port" LS_VAR_DIR="$out/" node --disable-warning=ExperimentalWarning "$root/src/cli.ts" start > "$out/service.log" 2>&1 &
 service=$!

@@ -13,6 +13,7 @@ You need Node 22.18 or newer, bash and curl.
 ```
 npm install
 npm link                 # puts ls-agent on your PATH
+mkdir -p ~/.config/ls-agent && echo "LS_TOKEN=$(openssl rand -hex 32)" >> ~/.config/ls-agent/env   # the key for actions
 ls-agent start           # the page and the API on :4100; keep it running
 ls-agent wallet          # in another terminal: creates var/wallet.json and prints its address
 ls-agent deploy          # after sending STRK to that address: deploys the account
@@ -27,6 +28,7 @@ Every command, `ls-agent start` included, reads these settings from the environm
 | `LS_SEATS` | 1 | Real games played at once, sharing one transaction per round |
 | `LS_BEASTS_TO` | unset | Account that receives every beast once claimed; the page lists its beasts, else the wallet's |
 | `LS_HOST`, `LS_PORT` | 127.0.0.1, 4100 | Where the service listens |
+| `LS_TOKEN` | unset | The key every action needs: `ls-agent` sends it, and any other caller sends `Authorization: Bearer <LS_TOKEN>`. Unset, the service refuses every action |
 | `LS_VAR_DIR` | `var/` | Where the wallet, database and caches live. End it with a slash. |
 | `LS_RPC_URL` | public node | Starknet RPC |
 | `LS_PACE_MS` | 0 | Pause between a decision and its move |
@@ -69,7 +71,8 @@ When a game ends, its seat takes the next game, and a minute later the bot settl
 | | `ls-agent play --practice beast 20 lootBag 5` | Practice games on the benchmark starts, for nothing |
 | `cycle` | `ls-agent cycle` | Runs one cycle, drawn above |
 | `stop` | `ls-agent stop` | Ends the run and the cycle after the current move; unfinished games resume with the next run |
-| `status` | `ls-agent status` | Whether a run is going, its live games with level and named kills, and the cycle's last step |
+| `status` | `ls-agent status` | Whether a run is going, whether the service accepts this machine's `LS_TOKEN`, the live games with level and named kills, and the cycle's last step |
+| `rank` | `ls-agent rank` | Ranks the bags new in the pool, in the background; the page shows the ranking |
 | `logs` | `ls-agent logs` | Follows the run going now until it is done, then prints each game and the wallet. `play` and `cycle` do this by themselves |
 | `wallet` | `ls-agent wallet` | Address, whether it is deployed, STRK, tickets and SURVIVOR |
 | `rules` | `ls-agent rules` | Every rule the service plays with and the strategy id; a rule changed from the shipped `src/rules.json` shows the shipped value beside it |
@@ -119,11 +122,11 @@ What the real games cost for their moves and loot bags, in dollars at today's pr
 | Engine no longer matches the contract | One red line above the middle panel when the last daily check failed or is older than 2 days, and nothing otherwise. `GET /api/check`. |
 | Wallet and the cycle's last step | "Wallet" on the right: STRK (red under the floor), tickets, SURVIVOR, and the cycle's step now or how the last one ended. `ls-agent wallet`, `ls-agent status`. |
 | Beasts held and to claim | "Beasts" on the right, one group per dungeon: count, tiers, Megas, staked, and what the Loot Dungeon pools pay for them. Hover a portrait for its name and price; "More" shows all. `ls-agent beasts`. |
-| Loot bag ranking | "Loot bags" on the right: the best 25 bags the pool holds, by mean level or named kills, with copies left. "Refresh" (any viewer) ranks the bags new in the pool. |
-| Play real games, practice games, a cycle, stop | `ls-agent play`, `ls-agent play --practice`, `ls-agent cycle`, `ls-agent stop`, from the machine itself |
+| Loot bag ranking | "Loot bags" on the right: the best 25 bags the pool holds, by mean level or named kills, with copies left. `ls-agent rank` ranks the bags new in the pool. |
+| Play real games, practice games, a cycle, stop | `ls-agent play`, `ls-agent play --practice`, `ls-agent cycle`, `ls-agent stop`, with `LS_TOKEN` |
 | Follow a run, see what runs | `ls-agent logs`, `ls-agent status` |
 | See, try and change the rules | `ls-agent rules`, `ls-agent bench <rule>=<value>`, `ls-agent rules set <rule>=<value>` |
 | Settle a game, its simulated cost, a bag's price, send the beasts | `ls-agent collect`, `ls-agent quote`, `ls-agent bag`, `ls-agent send-beasts` |
-| Who may do what | Only the machine itself reaches the service unless `LS_HOST` says otherwise. Others may then read the page and its `GET` routes and refresh the bag ranking (`POST /api/bags`, spends nothing); the service refuses everything else. A reverse proxy on the same machine makes every visitor look local, so give it its own access control. |
+| Who may do what | Anyone who reaches the service reads the page and its `GET` routes. Every action, from starting or stopping a run to setting a rule, claiming beasts or ranking bags again, needs `Authorization: Bearer <LS_TOKEN>`: 401 without it or with a wrong key, 403 when `LS_TOKEN` is unset. `GET /api/auth` answers 204 for a good key. Pick a long random key, for example `openssl rand -hex 32`, since the code is public. |
 
 MIT licence.

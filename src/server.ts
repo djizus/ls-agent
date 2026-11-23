@@ -1,8 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { networkInterfaces } from "node:os";
-import { BAG_RANKING, BEASTS_TO, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, TICKET, VAR_DIR } from "./config.ts";
+import { createHash, timingSafeEqual } from "node:crypto";
+import { BAG_RANKING, BEASTS_TO, DUNGEONS, HOST, PORT, STRK, STRK_FLOOR, SURVIVOR, TICKET, TOKEN, VAR_DIR } from "./config.ts";
 import { db } from "./db.ts";
 import { ITEMS } from "./items.ts";
 import { z } from "zod";
@@ -151,16 +151,24 @@ const TOOLS: Record<string, (body: Record<string, string>) => Promise<unknown>> 
   },
 };
 
-const OWN = new Set(Object.values(networkInterfaces()).flatMap((list) => (list ?? []).map((i) => i.address)));
+const digest = (text: string) => createHash("sha256").update(text).digest();
+
+function refusal(req: IncomingMessage): [number, string] | null {
+  if (!TOKEN) return [403, "set LS_TOKEN to allow actions"];
+  const given = req.headers.authorization;
+  if (!given) return [401, "send the header Authorization: Bearer <LS_TOKEN>"];
+  return timingSafeEqual(digest(given), digest(`Bearer ${TOKEN}`)) ? null : [401, "wrong token"];
+}
 
 async function route(req: IncomingMessage, res: ServerResponse): Promise<unknown> {
   const url = new URL(req.url ?? "/", "http://x");
-  const own = OWN.has((req.socket.remoteAddress ?? "").replace("::ffff:", ""));
+  const refused = url.pathname === "/api/auth" || req.method !== "GET" ? refusal(req) : null;
+  if (refused) return res.writeHead(refused[0]).end(refused[1]);
+  if (url.pathname === "/api/auth") return res.writeHead(204).end();
   if (url.pathname === "/api/bags") {
     if (req.method === "POST") rankBags();
     return reply(res, bags());
   }
-  if (!own && req.method !== "GET") return res.writeHead(403).end();
   if (url.pathname === "/events") {
     res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
     res.write(":\n\n");

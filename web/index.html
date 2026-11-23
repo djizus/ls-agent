@@ -352,7 +352,7 @@ function render() {
   const age = (Date.now() - (data.bags?.at ?? NaN)) / 60_000;
   const since = isNaN(age) ? "" : age < 1 ? "now" : age < 60 ? `${Math.floor(age)} min ago` : age < 1440 ? `${Math.floor(age / 60)} h ago` : `${Math.floor(age / 1440)} d ago`;
   const sacks = [...(data.bags?.rows ?? [])].sort((a, b) => (b[bagSort] ?? -1) - (a[bagSort] ?? -1)).slice(0, BAGS);
-  put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><div class="head"><span class="dim">${data.bags?.running ? "Ranking the pool's bags" : `Ranked ${since || "never"}`}</span><span class="seg"><button type="button" data-rank ${data.bags?.running ? "disabled" : ""}>Refresh</button></span></div><ol id="sacks" class="rows scroll">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>${x.n ? `x${x.n}` : ""}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>`);
+  put($("bags"), `<div class="head"><h2>Loot bags</h2><span class="seg">${Object.entries(SORTS).map(([k, label]) => `<button type="button" data-sort="${k}" aria-pressed="${k === bagSort}">${label}</button>`).join("")}</span></div><div class="head"><span class="dim">${data.bags?.running ? "Ranking the pool's bags" : `Ranked ${since || "never"}`}</span></div><ol id="sacks" class="rows scroll">${sacks.map((x) => `<li class="card" title="${esc(`Bag ${x.bag}: ${x.weapon}, ${x.set}, ${x.neck}, ${x.ring}`)}"><span class="dim">${x.bag}</span><span class="arts">${[x.weapon, x.neck, x.ring].map(first).filter((n) => byName[n]).map(art).join("")}</span><span>${x.n ? `x${x.n}` : ""}</span><b>${x[bagSort] === undefined ? "-" : round(x[bagSort], 1)}</b></li>`).join("")}</ol>`);
 }
 
 let due;
@@ -394,7 +394,7 @@ const pick = (e) => { const m = e.target.closest("[data-mode]"); if (m) { keep("
 $("games").onclick = pick;
 $("games").onkeydown = (e) => { if (e.key === "Enter") pick(e); };
 $("beasts").onclick = (e) => { if (e.target.closest("[data-more]")) { zooAll = true; render(); } };
-$("bags").onclick = (e) => { const b = e.target.closest("[data-sort]"); if (b) { bagSort = b.dataset.sort; keep("bagSort", bagSort); render(); } if (e.target.closest("[data-rank]")) fetch("/api/bags", { method: "POST" }).then(loadSide); };
+$("bags").onclick = (e) => { const b = e.target.closest("[data-sort]"); if (b) { bagSort = b.dataset.sort; keep("bagSort", bagSort); render(); } };
 $("again").onclick = () => watch(target(), true);
 $("stage").onclick = (e) => { if (e.target.closest("[data-details]")) go(`?game=${e.target.closest(".seat").dataset.id}`); };
 $("golive").onclick = () => go("");

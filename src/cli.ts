@@ -1,14 +1,15 @@
 #!/usr/bin/env -S node --disable-warning=ExperimentalWarning
 import { spawnSync } from "node:child_process";
-import { DUNGEONS, HOST, PORT } from "./config.ts";
+import { DUNGEONS, HOST, PORT, TOKEN } from "./config.ts";
 import { changes, chosen } from "./rules.ts";
 
 const SERVICE = `http://${HOST}:${PORT}`;
+const headers: Record<string, string> = TOKEN ? { authorization: `Bearer ${TOKEN}` } : {};
 type Event = { kind: string; text?: string; on?: boolean; row?: number; reason?: string };
 type Command = { args: string; help: string; run: (args: string[]) => Promise<unknown> };
 
 async function call(path: string, body?: unknown): Promise<string> {
-  const res = await fetch(`${SERVICE}${path}`, body === undefined ? undefined : { method: "POST", body: JSON.stringify(body) }).catch(() => {
+  const res = await fetch(`${SERVICE}${path}`, body === undefined ? { headers } : { method: "POST", headers, body: JSON.stringify(body) }).catch(() => {
     throw new Error(`no service answers on ${SERVICE}: start it with ls-agent start`);
   });
   const text = await res.text();
@@ -112,10 +113,11 @@ const commands: Record<string, Command> = {
   stop: { args: "", help: "stops the run and the cycle after the current move; unfinished games resume with the next run", run: () => call("/api/stop", {}).then(() => console.log("stopping after the current move")) },
   status: {
     args: "",
-    help: "whether a run is going, its live games, and the cycle's last step",
+    help: "whether a run is going, whether the service accepts this key for actions, the live games, and the cycle's last step",
     async run() {
       const s = JSON.parse(await call("/api/status"));
       console.log(s.running ? "a run is going" : "no run is going");
+      console.log(await call("/api/auth").then(() => "actions: this key is accepted", (err: Error) => `actions: refused, ${err.message}`));
       for (const g of s.live) console.log(`game ${g.id}, ${g.dungeon}: level ${g.level ?? "-"}, ${g.beasts} named kills`);
       if (s.cycle.text) console.log(`cycle${s.cycle.on ? "" : ", last"}: ${s.cycle.text}`);
     },
@@ -142,6 +144,7 @@ const commands: Record<string, Command> = {
     help: "plays the service's rules (else this checkout's) and the candidate on the same practice starts, 10k by default, nothing on chain, and prints each with the difference and its standard error",
     run: bench,
   },
+  rank: { args: "", help: "ranks the bags new in the pool by replaying them, in the background; the ranking shows on the page", run: () => call("/api/bags", {}).then(() => console.log("ranking the pool's new bags")) },
   wallet: { args: "", help: "the wallet's address, whether it is deployed, and its STRK, tickets and SURVIVOR", run: wallet },
   deploy: { args: "", help: "deploys the wallet's account, after STRK was sent to its address", run: () => call("/api/deploy", {}).then(show) },
   bag: { args: "<bag> [address]", help: "a bag's price, whether the pool holds it, and a simulated purchase from the wallet or the address", run: ([bag, address]) => call("/api/bag", { bag, address }).then(show) },

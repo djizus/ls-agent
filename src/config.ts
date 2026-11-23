@@ -11,6 +11,7 @@ export const VAR_DIR = process.env.LS_VAR_DIR ?? new URL("../var/", import.meta.
 export const BAG_RANKING = `${VAR_DIR}bag-ranking.json`;
 export const PORT = Number(process.env.LS_PORT ?? 4100);
 export const HOST = process.env.LS_HOST ?? "127.0.0.1";
+export const TOKEN = process.env.LS_TOKEN || undefined;
 
 export const OZ_ACCOUNT_CLASS = "0x061dac032f228abef9c6626f995015233097ae253a7f72d68552db02f2971b8f";
 export const ETH = "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7";
