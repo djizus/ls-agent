@@ -417,8 +417,10 @@ addEventListener("click", (e) => {
     page[id] += Number(step.dataset.step);
     return pagers();
   }
-  const key = id.slice("zoo:".length);
-  zoo[key] = (zoo[key] ?? 0) + Number(step.dataset.step);
+  const group = data.beasts?.groups?.find((x) => `zoo:${x.key}` === id);
+  if (!group) return;
+  zoo[group.key] = zooAt(group) + Number(step.dataset.step);
+  zoo[group.key] = Math.max(0, zooAt(group));
   render();
 });
 
