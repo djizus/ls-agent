@@ -29,6 +29,7 @@ export const GAME_CORE = "0x03cafe867e9f5dc7ccf73471b98c1d6d6d54804744cef9626acc
 export const BEAST_NFT = "0x00f739e402e52830a736335a0f47d58ec78ba067443c9c6930da182eab2ff8b0";
 export const SETTLE_MAX_PACKETS = 469;
 export const SETTLE_CHUNK = 117;
+export const SETTLED_CHECK_EVERY = 16;
 export type Dungeon = { name: string; address: string; settingsId: number; claim: string; rolledStart: boolean; pool?: string; sell?: { normal: string[]; mega: string[] }; firstSpecies: number; speciesCount: number; benchmark: string[] };
 
 export const DUNGEONS: Record<string, Dungeon> = {

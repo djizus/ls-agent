@@ -7,6 +7,7 @@ import { balanceOf, strkBalance } from "./wallet.ts";
 import { plan } from "./policy.ts";
 import { RULES, chosen, version, type Rules } from "./rules.ts";
 import { emit, subscribe } from "./events.ts";
+import { revertReason } from "./practice.ts";
 import { type State, type Table, auditGame, begin, namedSlain, commit, current, leave, phase, shape } from "./play.ts";
 
 const MAX_REJECTIONS = 3;
@@ -109,7 +110,8 @@ async function round(seats: Seat[], starts: Starts | undefined): Promise<{ start
     const result = sent.includes(move) ? results[sent.indexOf(move)] : { error: new Error("spend your stat points before anything else") };
     if ("error" in result) {
       emit({ kind: "rejected", actions, reason: result.error.message, row: seat.row });
-      if (++seat.rejections === MAX_REJECTIONS) seat.ending = `stopped after ${MAX_REJECTIONS} rejected decisions`;
+      if (/already settled/.test(revertReason(result.error))) seat.ending = "stopped: the contract has settled this game";
+      else if (++seat.rejections === MAX_REJECTIONS) seat.ending = `stopped after ${MAX_REJECTIONS} rejected decisions`;
       continue;
     }
     const before = seat.state;

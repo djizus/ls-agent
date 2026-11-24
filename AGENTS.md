@@ -24,6 +24,7 @@ When a game ends, its seat takes the next game. A minute later the bot settles t
 | Spend floor | Under 20 STRK (`STRK_FLOOR` in `src/config.ts`) the bot sends nothing. Above it, nothing else limits spending. |
 | Tickets | One per game. With less than one left, the bot buys 10 on Ekubo and refuses if they cost more than 2 STRK. |
 | Loot bag purchase | Refused above the seat's `maxSurvivor` (`--max`), when the pool no longer holds the bag, or when the wallet is short. When sending fails, the bot asks the game token whether the wallet owns the game anyway and does not send the purchase again. |
+| Moves | Most moves go through `commit_actions_unchecked`, which skips the contract's read of whether the game is settled and costs 40,000 L2 gas less. A game's first move in a process, and every 16th (`SETTLED_CHECK_EVERY` in `src/config.ts`), goes through `commit_actions`, which refuses a settled game; that refusal ends the seat at once. Nothing is sent for a game the local engine says is over. The owner check and the `expected_chain` check stay in both. An explore runs until 5 damage lands at full health, or until gold is found when the game is short of health and cannot buy a potion (`exploreDamage`, `exploreGold` in `src/rules.json`), so one move covers several encounters. |
 | Stopping | `ls-agent stop` ends play after the current move. The bot also stops if its local state differs from the contract. |
 
 ## Prove a change

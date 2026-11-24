@@ -18,3 +18,10 @@ test("encodes packets exactly as the live client does", () => {
     (1n << 240n) | (0x1n << 16n) | 0x94n,
   );
 });
+
+test("an explore carries its damage limit in bits 4 to 14 and its gold stop in bit 15", () => {
+  assert.equal(encodePacket([{ type: "explore" }]), 0x1n);
+  assert.equal(encodePacket([{ type: "explore", tillDamage: 5 }]), 0x51n);
+  assert.equal(encodePacket([{ type: "explore", tillGold: true }]), 0x8001n);
+  assert.equal(encodePacket([{ type: "explore", tillDamage: 2047, tillGold: true }]), 0xfff1n);
+});
