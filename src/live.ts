@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hash, type Call } from "starknet";
 import { claims as pending } from "./beasts.ts";
-import { BEAST_NFT, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, STRK, STRK_FLOOR, SURVIVOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, USDC, VAR_DIR, type Dungeon, dungeonOf } from "./config.ts";
+import { BEAST_NFT, DUNGEONS, EKUBO_QUOTER, EKUBO_ROUTER, GAME_CORE, RPC_URL, SETTLE_CHUNK, SETTLE_MAX_PACKETS, SETTLED_CHECK_EVERY, STRK, STRK_FLOOR, SURVIVOR, TICKET, TICKET_BATCH, TICKET_BATCH_MAX_STRK, USDC, VAR_DIR, type Dungeon, dungeonOf } from "./config.ts";
 import { encodePacket, type Action } from "./codec.ts";
 import { fromSnapshot, replayLocal, step, toSnapshot } from "./engine/engine.ts";
 import { randomHash, startOf, type Game, type Snapshot } from "./practice.ts";
@@ -339,14 +339,22 @@ type Round = { moved: Moved[]; started: string[] | { error: unknown }; strk: num
 
 export type Starts = { dungeon: Dungeon; games: number };
 
+const settledChecked = new WeakSet<Game>();
+
+export function commitCall(game: Pick<Game, "id" | "packets" | "chain" | "local">, packet: bigint, checked: boolean): Call {
+  if (game.local.over) throw new Error("the game is over, so nothing more is committed to it");
+  const entrypoint = !checked || game.packets.length % SETTLED_CHECK_EVERY === 0 ? "commit_actions" : "commit_actions_unchecked";
+  return { contractAddress: GAME_CORE, entrypoint, calldata: [game.id, hex(game.packets.length ? game.chain!.rolling : 0n), "0x1", hex(packet)] };
+}
+
 export async function actLive(moves: Move[], starts?: Starts): Promise<Round> {
   const moved: Moved[] = moves.map(() => ({ error: new Error("not sent") }));
-  const first = (game: Game) => (game.packets.length ? game.chain!.rolling : 0n);
   let ready = moves.flatMap(({ game, actions }, at) => {
     try {
       const packet = encodePacket(actions);
+      const call = commitCall(game, packet, settledChecked.has(game));
       step(game.local, game.id, packet, randomHash());
-      return [{ at, game, packet, call: { contractAddress: GAME_CORE, entrypoint: "commit_actions", calldata: [game.id, hex(first(game)), "0x1", hex(packet)] } }];
+      return [{ at, game, packet, call }];
     } catch (error) {
       moved[at] = { error };
       return [];
@@ -378,7 +386,8 @@ export async function actLive(moves: Move[], starts?: Starts): Promise<Round> {
   keep([...new Set([...liveIds(), ...started])]);
   const block = BigInt(receipt.block_number);
   const strk = Number(BigInt(receipt.actual_fee.amount)) / 1e18 / (ready.length + START_MOVES * started.length || 1);
-  for (const { at, game, packet } of ready) {
+  for (const { at, game, packet, call } of ready) {
+    if (call.entrypoint === "commit_actions") settledChecked.add(game);
     const chain = game.chain!;
     chain.rolling = BigInt(hash.computePoseidonHashOnElements([game.packets.length ? chain.rolling : BigInt(hash.computePoseidonHashOnElements([BigInt(game.id)])), packet, block]));
     game.packets.push(packet);
