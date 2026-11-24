@@ -5,6 +5,7 @@ import { itemOf, levelOf, potionPrice, priceOf, type ItemType, type LootItem } f
 import { MAX_GREATNESS, type Hit } from "./combat.ts";
 import { marketOf } from "./market.ts";
 import { settingsOf } from "./settings.ts";
+import { RULES } from "./rules.ts";
 import { BAG_STATS, SUFFIX_GREATNESS, SUFFIXES, effectiveStats, suffixOf } from "./specials.ts";
 import { NECK, beastHit, yourHit } from "./engine/damage.ts";
 import { actLive, liveGame, type Entry, type Starts } from "./live.ts";
@@ -241,6 +242,12 @@ const RANDOM = new Set(["explore", "attack", "flee"]);
 
 export const auditGame = (t: Table): Promise<string | undefined> => audit(t.game);
 
+export function explore(full: boolean, canHeal: boolean): Action {
+  if (full) return RULES.exploreDamage ? { type: "explore", tillDamage: RULES.exploreDamage } : { type: "explore" };
+  if (canHeal || !RULES.exploreGold) return { type: "explore" };
+  return { type: "explore", tillGold: true };
+}
+
 export function shape(s: State, actions: Action[]): Action[] {
   if (s.beast) return actions;
   const ups = (stat: string) => actions.reduce((n, a) => n + (a.type === "upgrade" && a.stat === stat ? a.amount : 0), 0);
@@ -256,7 +263,10 @@ export function shape(s: State, actions: Action[]): Action[] {
   const healing = exploring ? Math.min(needed, Math.floor(Math.max(0, gold) / price)) : 0;
   const qty = Math.min(Math.max(wanted, healing), needed, Math.floor(gold / price));
   const rest = actions.filter((a) => a.type !== "potions");
-  const random = rest.filter((a) => RANDOM.has(a.type));
+  const healed = Math.min(maxHealth, health + 10 * Math.max(qty, 0));
+  const left = gold - Math.max(qty, 0) * price;
+  const until = (a: Action): Action => (a.type !== "explore" || a.tillDamage || a.tillGold ? a : explore(healed >= maxHealth, left >= price));
+  const random = rest.filter((a) => RANDOM.has(a.type)).map(until);
   const fixed = rest.filter((a) => !RANDOM.has(a.type));
   return [...fixed, ...(qty > 0 ? [{ type: "potions" as const, qty }] : []), ...random];
 }

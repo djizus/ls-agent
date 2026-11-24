@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { encodePacket, type Action } from "./codec.ts";
 import { DUNGEONS } from "./config.ts";
-import { begin, commit, current, enrich, namedKills, namedSlain, render, shape, type State, type Table } from "./play.ts";
+import { begin, commit, current, enrich, explore, namedKills, namedSlain, render, shape, type State, type Table } from "./play.ts";
 import { step, toSnapshot } from "./engine/engine.ts";
 import { act, newPracticeGame, randomHash, replay, type Snapshot } from "./practice.ts";
 
@@ -131,4 +131,10 @@ test("games moved in one round each advance as they would alone", { timeout: 120
   assert.ok("error" in together[1] && /battle/.test(together[1].error.message));
   const [second] = (await commit([{ table: b, actions: explore(b) }])).committed;
   assert.deepEqual("state" in second && second.state, await move(alone, explore(alone)));
+});
+
+test("at full health an explore runs until 5 damage lands, and short of health with no gold for a potion it runs until gold is found", () => {
+  assert.deepEqual(explore(true, true), { type: "explore", tillDamage: 5 });
+  assert.deepEqual(explore(true, false), { type: "explore", tillDamage: 5 });
+  assert.deepEqual(explore(false, false), { type: "explore", tillGold: true });
 });

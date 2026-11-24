@@ -53,7 +53,7 @@ function decode(packet: bigint): Action[] {
 function instruction(word: number): Action {
   const arg = word >> 4;
   switch (word & 15) {
-    case 1: return { type: "explore" };
+    case 1: return { type: "explore", ...(arg & 2047 ? { tillDamage: arg & 2047 } : {}), ...(arg >> 11 ? { tillGold: true } : {}) };
     case 2: return { type: "attack", tillHealth: arg & 1023, spareBeast: (arg >> 10) as 0 | 1 | 2 };
     case 3: return { type: "flee", tillHealth: arg & 1023 };
     case 4: return { type: "upgrade", stat: STATS[arg & 7], amount: arg >> 3 };
@@ -197,10 +197,22 @@ class Game {
     if (levelOf(this.a.xp) > start) this.a.level_salt = salt(s.market, 16383n);
   }
 
-  explore(entropy: bigint): void {
+  explore(entropy: bigint, tillDamage: number, tillGold: boolean): void {
     if (this.a.beast_health > 0) reject("in battle");
     if (this.a.stat_upgrades_available > 0) reject("upgrades pending");
     const s = seeds(entropy, this.id, this.a);
+    const start = levelOf(this.a.xp);
+    let taken = 0;
+    for (;;) {
+      const { damage, found } = this.encounter(s);
+      taken += damage;
+      const stop = this.a.health === 0 || this.a.beast_health > 0 || this.a.stat_upgrades_available > 0 || (!tillDamage && !tillGold);
+      if (stop || (tillDamage && taken >= tillDamage) || (tillGold && found === "gold") || found === "loot") break;
+    }
+    this.levelSalt(start, s);
+  }
+
+  encounter(s: Seeds): { damage: number; found?: "gold" | "health" | "loot" } {
     const start = levelOf(this.a.xp);
     const r = rolls(poseidon(this.a.xp, s.action));
     const stats = this.stats();
@@ -210,13 +222,16 @@ class Game {
       this.a.beast_health = Math.min(1023, 1 + (b[2] % (start * 20)) + healthBonus(start));
       if (!dodged(stats.wisdom, start, r[6])) this.strike(this.foe(), r[4], r[5], settingsOf(this.id).ambush);
       else this.log.push("Avoided the ambush");
-    } else if (r[7] % 3 === 1) {
+      return { damage: 0 };
+    }
+    if (r[7] % 3 === 1) {
       const id = kindOf(r[0]);
       const foe: Foe = { level: 1 + (r[3] % (start * 3)) + levelBonus(start), tier: Math.floor(((id - 1) % 25) / 5) + 1, type: id < 26 ? "Magic" : id < 51 ? "Blade" : "Bludgeon", prefix: null, suffix: null };
       const armor = this.a.equipment[ARMOR_SLOTS[r[4] % 5]];
       const damage = reduced(obstacleHit(foe, armor, this.a.equipment.neck, crit(Math.min(start, 100), r[5])), settingsOf(this.id).ambush);
       const trap = `${foe.type} trap, level ${foe.level} T${foe.tier}`;
-      if (dodged(stats.intelligence, start, r[6])) this.log.push(`Dodged a ${trap}`);
+      const dodge = dodged(stats.intelligence, start, r[6]);
+      if (dodge) this.log.push(`Dodged a ${trap}`);
       else {
         this.log.push(`A ${trap} hits your ${ARMOR_SLOTS[r[4] % 5]} for ${damage}`);
         this.hurt(damage);
@@ -226,31 +241,34 @@ class Game {
         this.addXp(xp);
         this.itemXp(xp, r[2]);
       }
-    } else {
-      this.discover(start, r[4], r[5], r[6]);
-      this.addXp(1);
+      return { damage: dodge ? 0 : damage };
     }
-    this.levelSalt(start, s);
+    const found = this.discover(start, r[4], r[5], r[6]);
+    this.addXp(1);
+    return { damage: 0, found };
   }
 
-  discover(level: number, kind: number, amount: number, pick: number): void {
+  discover(level: number, kind: number, amount: number, pick: number): "gold" | "health" | "loot" {
     const roll = Math.floor((kind * 100 + 127) / 255);
     if (roll < 45) {
       this.log.push(`Found ${(amount % level) + 1} gold`);
-      return this.addGold((amount % level) + 1);
+      this.addGold((amount % level) + 1);
+      return "gold";
     }
     if (roll < 90) {
       this.log.push(`Found a health potion, +${((amount % level) + 1) * 2} HP`);
-      return this.heal(((amount % level) + 1) * 2);
+      this.heal(((amount % level) + 1) * 2);
+      return "health";
     }
     const tier = Math.floor((amount * 100 + 127) / 255);
     const list = LOOT_BY_TIER[tier < 50 ? 0 : tier < 80 ? 1 : tier < 92 ? 2 : tier < 98 ? 3 : 4];
     const id = list[pick % list.length];
     const slot = itemOf(id)!.slot;
     this.log.push(`Found ${itemOf(id)!.name}`);
-    if (this.owns(id) || (this.bagFull() && this.a.equipment[slot].id !== 0)) return this.addGold(basePrice(itemOf(id)!.tier));
-    if (this.a.equipment[slot].id === 0) this.a.equipment[slot] = { id, xp: 0 };
+    if (this.owns(id) || (this.bagFull() && this.a.equipment[slot].id !== 0)) this.addGold(basePrice(itemOf(id)!.tier));
+    else if (this.a.equipment[slot].id === 0) this.a.equipment[slot] = { id, xp: 0 };
     else this.toBag({ id, xp: 0 });
+    return "loot";
   }
 
   attack(entropy: bigint, tillHealth: number, spare: number): void {
@@ -377,7 +395,7 @@ class Game {
   apply(group: Action[], entropy: bigint): void {
     const a = group[0];
     switch (a.type) {
-      case "explore": return this.explore(entropy);
+      case "explore": return this.explore(entropy, a.tillDamage ?? 0, a.tillGold ?? false);
       case "attack": return this.attack(entropy, a.tillHealth ?? 0, a.spareBeast ?? 0);
       case "flee": return this.flee(entropy, a.tillHealth ?? 0);
       case "buy":

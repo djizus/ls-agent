@@ -8,5 +8,7 @@
   "fightRisk": 0.35,
   "swapGain": 0.05,
   "weaponReserve": 3,
-  "healthFloor": 0.97
+  "healthFloor": 0.97,
+  "exploreDamage": 5,
+  "exploreGold": 1
 }
