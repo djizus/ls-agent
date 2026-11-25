@@ -356,16 +356,21 @@ export function batchCommits(calls: Call[]): Call[] {
   });
 }
 
-let batching: Promise<boolean> | undefined;
+const BATCH_CHECK_MS = 10 * 60_000;
+let batching: { at: number; answer: Promise<boolean> } | undefined;
 
-const canBatch = (): Promise<boolean> =>
-  (batching ??= provider.getClassAt(GAME_CORE).then(
+const canBatch = (): Promise<boolean> => {
+  if (batching && Date.now() - batching.at < BATCH_CHECK_MS) return batching.answer;
+  const answer = provider.getClassAt(GAME_CORE).then(
     (cls) => {
       const external = new Set(("entry_points_by_type" in cls ? cls.entry_points_by_type.EXTERNAL : []).map((e) => BigInt(e.selector)));
       return Object.values(BATCHES).every((name) => external.has(BigInt(hash.getSelectorFromName(name))));
     },
     () => ((batching = undefined), false),
-  ));
+  );
+  batching = { at: Date.now(), answer };
+  return answer;
+};
 
 export async function actLive(moves: Move[], starts?: Starts): Promise<Round> {
   const moved: Moved[] = moves.map(() => ({ error: new Error("not sent") }));
