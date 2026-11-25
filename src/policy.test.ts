@@ -19,7 +19,7 @@ const state = (over: Partial<Parameters<typeof enrich>[0]>): State =>
 const REST = [22, 27, 32, 37].map((id) => gear(id, 20));
 
 test("bag items are kept while there is room", () => {
-  assert.deepEqual(plan(state({ equipment: [gear(PLATE_MAIL, 5)], bag: [gear(SHIRT, 1)] })).actions, [{ type: "explore" }]);
+  assert.deepEqual(plan(state({ equipment: [gear(PLATE_MAIL, 5)], bag: [gear(SHIRT, 1)] })).actions, [{ type: "explore", tillDamage: 5 }]);
 });
 
 test("a full bag gives up its least useful item for a purchase, and never one with a vitality or charisma bonus", () => {
@@ -27,14 +27,14 @@ test("a full bag gives up its least useful item for a purchase, and never one wi
   assert.deepEqual(plan(state({ ...maxed, bag: JUNK.map((id) => gear(id, 1)) })).actions, [
     { type: "drop", item: SHIRT },
     { type: "buy", item: HOLY_CHESTPLATE, equip: true },
-    { type: "explore" },
+    { type: "explore", tillDamage: 5 },
   ]);
-  assert.deepEqual(plan(state({ ...maxed, bag: JUNK.map((id) => gear(id, 15, { vitality: 3 })) })).actions, [{ type: "explore" }]);
+  assert.deepEqual(plan(state({ ...maxed, bag: JUNK.map((id) => gear(id, 15, { vitality: 3 })) })).actions, [{ type: "explore", tillDamage: 5 }]);
 });
 
 test("a kept piece of a better tier is worn when the worn one is maxed", () => {
-  assert.deepEqual(plan(state({ equipment: [gear(PLATE_MAIL, 20)], bag: [gear(HOLY_CHESTPLATE, 1)] })).actions, [{ type: "equip", item: HOLY_CHESTPLATE }, { type: "explore" }]);
-  assert.deepEqual(plan(state({ equipment: [gear(PLATE_MAIL, 19)], bag: [gear(HOLY_CHESTPLATE, 1)] })).actions, [{ type: "explore" }]);
+  assert.deepEqual(plan(state({ equipment: [gear(PLATE_MAIL, 20)], bag: [gear(HOLY_CHESTPLATE, 1)] })).actions, [{ type: "equip", item: HOLY_CHESTPLATE }, { type: "explore", tillDamage: 5 }]);
+  assert.deepEqual(plan(state({ equipment: [gear(PLATE_MAIL, 19)], bag: [gear(HOLY_CHESTPLATE, 1)] })).actions, [{ type: "explore", tillDamage: 5 }]);
 });
 
 test("a tier 1 weapon replaces the worn one only when it would catch up by greatness 5, or the worn one is maxed", () => {
@@ -49,27 +49,27 @@ test("a tier 1 weapon replaces the worn one only when it would catch up by great
 
 test("an armor upgrade is bought with the gold left after a full heal now and half a full heal kept back", () => {
   const maxed = { equipment: [gear(PLATE_MAIL, 20)], market: [offer(HOLY_CHESTPLATE, 10)], health: 60 };
-  assert.deepEqual(plan(state({ ...maxed, gold: 19 })).actions, [{ type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "potions", qty: 4 }, { type: "explore" }]);
-  assert.deepEqual(plan(state({ ...maxed, gold: 18 })).actions, [{ type: "potions", qty: 4 }, { type: "explore" }]);
+  assert.deepEqual(plan(state({ ...maxed, gold: 19 })).actions, [{ type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "potions", qty: 4 }, { type: "explore", tillDamage: 5 }]);
+  assert.deepEqual(plan(state({ ...maxed, gold: 18 })).actions, [{ type: "potions", qty: 4 }, { type: "explore", tillDamage: 5 }]);
 });
 
 test("a maxed ring makes way for the next one, bought only with two full heals of gold to spare", () => {
   const maxed = { equipment: [gear(TITANIUM_RING, 20)], market: [offer(GOLD_RING, 10)] };
-  assert.deepEqual(plan(state({ ...maxed, gold: 30 })).actions, [{ type: "buy", item: GOLD_RING, equip: true }, { type: "explore" }]);
-  assert.deepEqual(plan(state({ ...maxed, gold: 29 })).actions, [{ type: "explore" }]);
-  assert.deepEqual(plan(state({ equipment: [gear(TITANIUM_RING, 19)], market: [offer(GOLD_RING, 10)] })).actions, [{ type: "explore" }]);
-  assert.deepEqual(plan(state({ ...maxed, bag: [gear(PLATINUM_RING, 5)] })).actions, [{ type: "equip", item: PLATINUM_RING }, { type: "explore" }]);
-  assert.deepEqual(plan(state({ equipment: [gear(GOLD_RING, 20)], bag: [gear(TITANIUM_RING, 20)] })).actions, [{ type: "equip", item: TITANIUM_RING }, { type: "explore" }]);
-  assert.deepEqual(plan(state({ equipment: [gear(TITANIUM_RING, 20)], bag: [gear(GOLD_RING, 20)] })).actions, [{ type: "explore" }]);
+  assert.deepEqual(plan(state({ ...maxed, gold: 30 })).actions, [{ type: "buy", item: GOLD_RING, equip: true }, { type: "explore", tillDamage: 5 }]);
+  assert.deepEqual(plan(state({ ...maxed, gold: 29 })).actions, [{ type: "explore", tillDamage: 5 }]);
+  assert.deepEqual(plan(state({ equipment: [gear(TITANIUM_RING, 19)], market: [offer(GOLD_RING, 10)] })).actions, [{ type: "explore", tillDamage: 5 }]);
+  assert.deepEqual(plan(state({ ...maxed, bag: [gear(PLATINUM_RING, 5)] })).actions, [{ type: "equip", item: PLATINUM_RING }, { type: "explore", tillDamage: 5 }]);
+  assert.deepEqual(plan(state({ equipment: [gear(GOLD_RING, 20)], bag: [gear(TITANIUM_RING, 20)] })).actions, [{ type: "equip", item: TITANIUM_RING }, { type: "explore", tillDamage: 5 }]);
+  assert.deepEqual(plan(state({ equipment: [gear(TITANIUM_RING, 20)], bag: [gear(GOLD_RING, 20)] })).actions, [{ type: "explore", tillDamage: 5 }]);
 });
 
 test("a drop that takes vitality or charisma away is counted before healing and pricing", () => {
   const maxed = { equipment: [gear(PLATE_MAIL, 20), ...REST], market: [offer(HOLY_CHESTPLATE, 10)] };
   const stash = JUNK.slice(1).map((id) => gear(id, 15, { vitality: 3 }));
   const sturdy = state({ ...maxed, maxHealth: 115, health: 105, bag: [gear(SHIRT, 15, { vitality: 1 }), ...stash] });
-  assert.deepEqual(plan(sturdy).actions, [{ type: "drop", item: SHIRT }, { type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "explore" }]);
+  assert.deepEqual(plan(sturdy).actions, [{ type: "drop", item: SHIRT }, { type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "explore", tillDamage: 5 }]);
   const charming = state({ ...maxed, health: 60, gold: 19, bag: [gear(SHIRT, 15, { charisma: 1 }), ...stash] });
-  assert.deepEqual(plan(charming).actions, [{ type: "drop", item: SHIRT }, { type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "potions", qty: 4 }, { type: "explore" }]);
+  assert.deepEqual(plan(charming).actions, [{ type: "drop", item: SHIRT }, { type: "buy", item: HOLY_CHESTPLATE, equip: true }, { type: "potions", qty: 4 }, { type: "explore", tillDamage: 5 }]);
 });
 
 const beast = (health: number) => ({ id: 29, name: "Dragon", baseName: "Dragon", tier: 1, type: "Blade" as const, level: 30, health, specialPrefix: null, specialSuffix: null, isCollectable: false });
@@ -99,7 +99,7 @@ test("a move never holds more than 15 actions: a purchase that does not fit wait
   });
   const actions = plan(busy).actions;
   assert.equal(actions.length, 15);
-  assert.deepEqual(actions.at(-1), { type: "explore" });
+  assert.deepEqual(actions.at(-1), { type: "explore", tillDamage: 5 });
   assert.equal(actions.filter((a) => a.type === "upgrade").length, 4);
   assert.equal(actions.filter((a) => a.type === "equip").length, 6);
   assert.equal(actions.filter((a) => a.type === "buy").length, 1);
@@ -116,7 +116,7 @@ test("armor that takes less from this beast is put on in the fight when that bea
 });
 
 test("after the fight the real armor goes back on", () => {
-  assert.deepEqual(plan(state({ equipment: [gear(SHIRT, 20)], bag: [gear(HOLY_CHESTPLATE, 20)] })).actions, [{ type: "equip", item: HOLY_CHESTPLATE }, { type: "explore" }]);
+  assert.deepEqual(plan(state({ equipment: [gear(SHIRT, 20)], bag: [gear(HOLY_CHESTPLATE, 20)] })).actions, [{ type: "equip", item: HOLY_CHESTPLATE }, { type: "explore", tillDamage: 5 }]);
 });
 
 test("the chance to escape counts every failed try as a hit taken", () => {
@@ -128,9 +128,9 @@ const GHOST_WAND = 9, WARHAMMER = 72;
 
 test("once a tier 1 weapon is maxed, the type that covers its weak matchup is bought with three full heals to spare and carried", () => {
   const first = { equipment: [gear(KATANA, 20), gear(PLATE_MAIL, 5)], market: [offer(WARHAMMER, 10), offer(GHOST_WAND, 10)] };
-  assert.deepEqual(plan(state({ ...first, gold: 40 })).actions, [{ type: "buy", item: GHOST_WAND, equip: false }, { type: "explore" }]);
-  assert.deepEqual(plan(state({ ...first, gold: 39 })).actions, [{ type: "explore" }]);
-  assert.deepEqual(plan(state({ ...first, bag: [gear(GHOST_WAND, 3)] })).actions, [{ type: "equip", item: GHOST_WAND }, { type: "explore" }]);
+  assert.deepEqual(plan(state({ ...first, gold: 40 })).actions, [{ type: "buy", item: GHOST_WAND, equip: false }, { type: "explore", tillDamage: 5 }]);
+  assert.deepEqual(plan(state({ ...first, gold: 39 })).actions, [{ type: "explore", tillDamage: 5 }]);
+  assert.deepEqual(plan(state({ ...first, bag: [gear(GHOST_WAND, 3)] })).actions, [{ type: "equip", item: GHOST_WAND }, { type: "explore", tillDamage: 5 }]);
 });
 
 test("the weapon that wins the fight is taken up when that beats staying, the free strike counted", () => {

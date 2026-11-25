@@ -63,7 +63,7 @@ function choose(l: Local, id: string, rnd: () => number): Action[] {
   const qty = Math.min(Math.floor(missing / 10), Math.floor(gold / price));
   if (qty > 0 && rnd() < 0.9) out.push({ type: "potions", qty });
   if (out.length === 0 && bag.length && rnd() < 0.15) return [{ type: rnd() < 0.5 ? "equip" : "drop", item: pick(bag).id }];
-  if (out.length === 0 || rnd() < 0.5) out.push({ type: "explore" });
+  if (out.length === 0 || rnd() < 0.5) out.push(pick([{ type: "explore" }, { type: "explore", tillDamage: 5 }, { type: "explore", tillDamage: 1 + Math.floor(rnd() * 60) }, { type: "explore", tillGold: true }, { type: "explore", tillDamage: 20, tillGold: true }] as const));
   return out;
 }
 
