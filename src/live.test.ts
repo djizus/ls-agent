@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DUNGEONS, SETTLED_CHECK_EVERY, SURVIVOR } from "./config.ts";
-import { bagPurchase, commitCall, forSale, heldGames, mintedSince, readQuote, shortlist, units, unplayed, unranked } from "./live.ts";
+import { bagPurchase, batchCommits, commitCall, forSale, heldGames, mintedSince, readQuote, shortlist, units, unplayed, unranked } from "./live.ts";
 
 const POOL = DUNGEONS.lootBag.pool!;
 const ME = "0x123";
@@ -91,4 +91,14 @@ test("a game's first commit in a process and every 16th commit go through commit
 test("nothing is committed to a game the engine says is over", () => {
   const over = { id: "0x7", packets: [1n], chain: { blocks: [], hashes: [], rolling: 1n }, local: { over: true } } as unknown as Parameters<typeof commitCall>[0];
   assert.throws(() => commitCall(over, 5n, true), /the game is over/);
+});
+
+test("with two or more of a kind, a round's commits go out as one commit_actions_batch and one commit_actions_batch_unchecked, each entry the calldata of its single call, and a lone commit stays a single call", () => {
+  const call = (entrypoint: string, id: number) => ({ contractAddress: "0xc", entrypoint, calldata: [`0x${id}`, "0xabc", "0x1", "0x5"] });
+  const unchecked = [call("commit_actions_unchecked", 1), call("commit_actions_unchecked", 2), call("commit_actions_unchecked", 3)];
+  const batched = batchCommits([call("commit_actions", 9), ...unchecked]);
+  assert.deepEqual(batched.map((c) => c.entrypoint), ["commit_actions", "commit_actions_batch_unchecked"]);
+  assert.deepEqual(batched[1].calldata, ["0x3", "0x1", "0xabc", "0x1", "0x5", "0x2", "0xabc", "0x1", "0x5", "0x3", "0xabc", "0x1", "0x5"]);
+  assert.deepEqual(batchCommits([call("commit_actions", 8), call("commit_actions", 9)]).map((c) => [c.entrypoint, (c.calldata as string[]).length]), [["commit_actions_batch", 9]]);
+  assert.deepEqual(batchCommits([]), []);
 });

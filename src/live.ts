@@ -347,8 +347,29 @@ export function commitCall(game: Pick<Game, "id" | "packets" | "chain" | "local"
   return { contractAddress: GAME_CORE, entrypoint, calldata: [game.id, hex(game.packets.length ? game.chain!.rolling : 0n), "0x1", hex(packet)] };
 }
 
+const BATCHES: Record<string, string> = { commit_actions: "commit_actions_batch", commit_actions_unchecked: "commit_actions_batch_unchecked" };
+
+export function batchCommits(calls: Call[]): Call[] {
+  return Object.entries(BATCHES).flatMap(([single, batch]) => {
+    const group = calls.filter((c) => c.entrypoint === single);
+    return group.length < 2 ? group : [{ contractAddress: GAME_CORE, entrypoint: batch, calldata: [hex(BigInt(group.length)), ...group.flatMap((c) => c.calldata as string[])] }];
+  });
+}
+
+let batching: Promise<boolean> | undefined;
+
+const canBatch = (): Promise<boolean> =>
+  (batching ??= provider.getClassAt(GAME_CORE).then(
+    (cls) => {
+      const external = new Set(("entry_points_by_type" in cls ? cls.entry_points_by_type.EXTERNAL : []).map((e) => BigInt(e.selector)));
+      return Object.values(BATCHES).every((name) => external.has(BigInt(hash.getSelectorFromName(name))));
+    },
+    () => ((batching = undefined), false),
+  ));
+
 export async function actLive(moves: Move[], starts?: Starts): Promise<Round> {
   const moved: Moved[] = moves.map(() => ({ error: new Error("not sent") }));
+  const batched = await canBatch();
   let ready = moves.flatMap(({ game, actions }, at) => {
     try {
       const packet = encodePacket(actions);
@@ -361,7 +382,7 @@ export async function actLive(moves: Move[], starts?: Starts): Promise<Round> {
     }
   });
   let entries = starts ? entryCalls(starts.dungeon, starts.games) : [];
-  const calls = () => [...ready.map((r) => r.call), ...entries];
+  const calls = () => [...(batched ? batchCommits(ready.map((r) => r.call)) : ready.map((r) => r.call)), ...entries];
   const refuse = (error: unknown): Round => (ready.forEach((r) => (moved[r.at] = { error })), { moved, started: entries.length ? { error } : [], strk: 0 });
   if (!calls().length) return { moved, started: [], strk: 0 };
   let receipt: Awaited<ReturnType<typeof send>>;
